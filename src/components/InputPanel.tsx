@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 import { RegimeEditor } from '@/components/RegimeEditor'
+import { GestoreAnni } from '@/components/GestoreAnni'
 import { Field, NumberInput, Select } from '@/components/ui'
-import { ANNI_DISPONIBILI } from '@/data/taxData'
+import { anniDisponibili } from '@/data/taxData'
 import type { CalcoloInput, RisultatoCalcolo } from '@/domain/types'
 import { formatEuro } from '@/domain/labels'
 import { theme } from '@/theme'
@@ -13,25 +14,29 @@ interface InputPanelProps {
   input: InputState
   calcoli: RisultatoCalcolo | null
   onChange: (partial: Partial<InputState>) => void
+  onAnniChanged: () => void
 }
 
 /** Pannello laterale di input: anno, contributi, regimi, opzioni avanzate. */
-export function InputPanel({ input, calcoli, onChange }: InputPanelProps) {
+export function InputPanel({ input, calcoli, onChange, onAnniChanged }: InputPanelProps) {
   const [showAvanzate, setShowAvanzate] = useState(false)
 
   return (
     <div className={theme.sidebar}>
       {/* Anno di riferimento */}
-      <Field
-        label="Anno di riferimento"
-        info="Anno per cui si calcolano imposte e contributi. Determina anche quali costanti INPS vengono usate."
-      >
-        <Select<number>
-          value={input.anno}
-          onChange={(v) => onChange({ anno: v })}
-          options={ANNI_DISPONIBILI.map((a) => ({ value: a, label: String(a) }))}
-        />
-      </Field>
+      <div className="space-y-2">
+        <Field
+          label="Anno di riferimento"
+          info="Anno per cui si calcolano imposte e contributi. Determina anche quali costanti INPS vengono usate."
+        >
+          <Select<number>
+            value={input.anno}
+            onChange={(v) => onChange({ anno: v })}
+            options={anniDisponibili().map((a) => ({ value: a, label: String(a) }))}
+          />
+        </Field>
+        <GestoreAnni onAnniChanged={onAnniChanged} />
+      </div>
 
       {/* Contributi versati anno corrente */}
       <div className={theme.section}>

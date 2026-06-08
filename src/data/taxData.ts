@@ -71,7 +71,7 @@ function contributoFisso(anno: string, campo: string, v: unknown): ContributoFis
   }
 }
 
-function validaAnno(anno: string, v: unknown): DatiAnno {
+export function validaAnno(anno: string, v: unknown): DatiAnno {
   if (typeof v !== 'object' || v === null) {
     throw new TaxDataError(anno, '(root)', 'atteso oggetto')
   }
@@ -110,17 +110,46 @@ export const DATI_FISCALI: Record<number, DatiAnno> = Object.fromEntries(
   Object.entries(anniRaw).map(([anno, dati]) => [Number(anno), validaAnno(anno, dati)]),
 )
 
-/** Anni disponibili, ordinati in modo decrescente (più recente per primo). */
+/** Anni built-in ordinati decrescenti (snapshot statico — non include anni personalizzati). */
 export const ANNI_DISPONIBILI: number[] = Object.keys(DATI_FISCALI)
   .map(Number)
   .sort((a, b) => b - a)
 
+// ---------------------------------------------------------------------------
+// Anni personalizzati: configurati a runtime tramite UI, non nel JSON
+// ---------------------------------------------------------------------------
+
+const anniEsterni: Partial<Record<number, DatiAnno>> = {}
+
+/** Aggiunge o sovrascrive un anno configurato dall'utente. */
+export function registraAnnoEsterno(anno: number, dati: DatiAnno): void {
+  anniEsterni[anno] = dati
+}
+
+/** Rimuove un anno personalizzato. Non tocca gli anni built-in. */
+export function rimuoviAnnoEsterno(anno: number): void {
+  delete anniEsterni[anno]
+}
+
+/**
+ * Anni disponibili (built-in + personalizzati), ordinati decrescenti.
+ * Da usare ovunque al posto di `ANNI_DISPONIBILI` quando l'utente può aggiungere anni.
+ */
+export function anniDisponibili(): number[] {
+  return [
+    ...new Set([
+      ...Object.keys(DATI_FISCALI).map(Number),
+      ...Object.keys(anniEsterni).map(Number),
+    ]),
+  ].sort((a, b) => b - a)
+}
+
 /** Restituisce i dati fiscali di un anno, lanciando se non presente. */
 export function datiAnno(anno: number): DatiAnno {
-  const d = DATI_FISCALI[anno]
+  const d = anniEsterni[anno] ?? DATI_FISCALI[anno]
   if (!d) {
     throw new Error(
-      `Anno ${anno} non presente nel database fiscale. Anni disponibili: ${ANNI_DISPONIBILI.join(', ')}.`,
+      `Anno ${anno} non presente nel database fiscale. Anni disponibili: ${anniDisponibili().join(', ')}.`,
     )
   }
   return d
