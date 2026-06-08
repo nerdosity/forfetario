@@ -7,7 +7,39 @@
  */
 
 export const theme = {
-  // --- Layout ---
+  // --- App shell ---
+  appBg: 'min-h-screen bg-slate-100',
+  topbar: 'sticky top-0 z-30 border-b border-slate-200 bg-white/90 backdrop-blur',
+  topbarInner: 'mx-auto flex max-w-7xl items-center justify-between gap-4 px-6 py-3',
+  brand: 'flex items-center gap-2.5',
+  brandMark: 'inline-flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-blue-600 to-indigo-700 text-white shadow-sm',
+  brandTitle: 'text-base font-semibold tracking-tight text-slate-900 leading-none',
+  brandTag: 'text-xs text-slate-400 leading-none mt-0.5',
+  shell: 'mx-auto max-w-7xl px-6 py-6 space-y-6',
+
+  // --- KPI ---
+  kpiStrip: 'grid grid-cols-2 gap-3 sm:grid-cols-4',
+  kpiCard: 'rounded-xl border border-slate-200 bg-white p-4 shadow-sm',
+  kpiIcon: 'inline-flex h-8 w-8 items-center justify-center rounded-lg',
+  kpiLabel: 'text-xs font-medium text-slate-500',
+  kpiValue: 'mt-1 text-xl font-bold tabular-nums tracking-tight',
+  kpiCaption: 'mt-0.5 text-xs text-slate-400',
+
+  // --- Tabs ---
+  tabBar: 'flex gap-1 overflow-x-auto rounded-xl border border-slate-200 bg-white p-1 shadow-sm',
+  tab: 'inline-flex items-center gap-2 whitespace-nowrap rounded-lg px-4 py-2 text-sm font-medium text-slate-500 transition-colors hover:text-slate-800',
+  tabActive: 'bg-blue-50 text-blue-700',
+
+  // --- Drawer ---
+  drawerOverlay: 'fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-sm transition-opacity',
+  drawerPanel:
+    'fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col bg-white shadow-2xl ' +
+    'ring-1 ring-slate-900/5',
+  drawerHeader: 'flex items-center justify-between gap-4 border-b border-slate-100 px-5 py-4',
+  drawerBody: 'flex-1 overflow-y-auto',
+  drawerFooter: 'flex items-center justify-end gap-3 border-t border-slate-100 bg-slate-50 px-5 py-3',
+
+  // --- Layout (legacy grid, ancora usato altrove) ---
   page: 'max-w-7xl mx-auto p-6',
   grid: 'grid lg:grid-cols-3 gap-6',
   colInput: 'lg:col-span-1',

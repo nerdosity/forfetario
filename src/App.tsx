@@ -1,10 +1,12 @@
-import { useCallback, useMemo, useReducer } from 'react'
-import { Calculator } from 'lucide-react'
+import { useCallback, useMemo, useReducer, useState } from 'react'
+import { Calculator, SlidersHorizontal, LayoutDashboard, BarChart3, Calendar, FileText } from 'lucide-react'
 import { InputPanel } from '@/components/InputPanel'
+import { KpiStrip } from '@/components/KpiStrip'
 import { RiepilogoPrecedente } from '@/components/RiepilogoPrecedente'
 import { DettaglioRegimi } from '@/components/DettaglioRegimi'
 import { CalendarioFiscale } from '@/components/CalendarioFiscale'
 import { SaldiCrediti } from '@/components/SaldiCrediti'
+import { Drawer, Tabs, Select, type TabItem } from '@/components/ui'
 import { calcola } from '@/domain/calcolo'
 import { regimeVuoto } from '@/domain/regimeFactory'
 import type { CalcoloInput } from '@/domain/types'
@@ -27,62 +29,109 @@ function inputIniziale(): CalcoloInput {
   }
 }
 
+type TabId = 'riepilogo' | 'regimi' | 'calendario' | 'saldi'
+
+const TABS: TabItem<TabId>[] = [
+  { id: 'riepilogo', label: 'Riepilogo', icon: LayoutDashboard },
+  { id: 'regimi', label: 'Dettaglio regimi', icon: BarChart3 },
+  { id: 'calendario', label: 'Calendario', icon: Calendar },
+  { id: 'saldi', label: 'Saldi e crediti', icon: FileText },
+]
+
 export default function App() {
   const [input, setInput] = useInputState(inputIniziale)
-  // Forza re-render del selettore anni quando l'utente aggiunge/rimuove un anno personalizzato
   const [, forceUpdate] = useReducer((x: number) => x + 1, 0)
+  const [drawerOpen, setDrawerOpen] = useState(false)
+  const [tab, setTab] = useState<TabId>('riepilogo')
 
   const calcoli = useMemo(() => calcola(input), [input])
 
   const handleAnniChanged = useCallback(() => {
     setInput((prev) => {
       const anni = anniDisponibili()
-      // Se l'anno correntemente selezionato è stato rimosso, passa al più recente
       return anni.includes(prev.anno) ? { ...prev } : { ...prev, anno: anni[0] }
     })
     forceUpdate()
   }, [setInput])
 
+  // Mostra il riepilogo dell'anno precedente solo se sono stati inseriti dati
+  const prev = calcoli.datiAnnoPrecedente
+  const hasDatiPrecedente = prev.totaleFatturato > 0 || prev.totaleImponibileLordo > 0
+
   return (
-    <div className={theme.page}>
-      {/* Intestazione */}
-      <header className={theme.hero}>
-        <div className="flex items-center gap-4">
-          <span className={theme.heroIcon}>
-            <Calculator size={32} aria-hidden />
-          </span>
-          <div>
-            <h1 className={theme.heroTitle}>Calcolatore forfettario</h1>
-            <p className={theme.heroSubtitle}>
-              Calcoli precisi e calendario fiscale completo · Anno {input.anno}
-            </p>
+    <div className={theme.appBg}>
+      {/* ── Top bar ── */}
+      <header className={theme.topbar}>
+        <div className={theme.topbarInner}>
+          <div className={theme.brand}>
+            <span className={theme.brandMark}>
+              <Calculator size={20} aria-hidden />
+            </span>
+            <div>
+              <p className={theme.brandTitle}>Calcolatore forfettario</p>
+              <p className={theme.brandTag}>Imposte e contributi INPS</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <div className="hidden items-center gap-2 sm:flex">
+              <span className="text-sm text-slate-500">Anno</span>
+              <Select<number>
+                value={input.anno}
+                onChange={(v) => setInput((prev) => ({ ...prev, anno: v }))}
+                options={anniDisponibili().map((a) => ({ value: a, label: String(a) }))}
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => setDrawerOpen(true)}
+              className={theme.btnPrimary}
+            >
+              <SlidersHorizontal size={16} aria-hidden />
+              Dati
+            </button>
           </div>
         </div>
       </header>
 
-      <div className={theme.grid}>
-        {/* Pannello input */}
-        <div className={theme.colInput}>
-          <InputPanel
-            input={input}
-            calcoli={calcoli}
-            onChange={(partial) => setInput((prev) => ({ ...prev, ...partial }))}
-            onAnniChanged={handleAnniChanged}
-          />
-        </div>
+      {/* ── Contenuto ── */}
+      <main className={theme.shell}>
+        <KpiStrip anno={input.anno} calcoli={calcoli} />
 
-        {/* Pannello risultati */}
-        <div className={theme.colResults}>
-          <RiepilogoPrecedente
-            anno={input.anno}
-            calcoli={calcoli}
-            contributiVersatiDuranteAnnoPrecedente={input.contributiVersatiDuranteAnnoPrecedente}
-          />
-          <DettaglioRegimi anno={input.anno} calcoli={calcoli} />
-          <CalendarioFiscale anno={input.anno} calcoli={calcoli} />
-          <SaldiCrediti anno={input.anno} calcoli={calcoli} />
-        </div>
-      </div>
+        <Tabs items={TABS} value={tab} onChange={setTab} />
+
+        {tab === 'riepilogo' && (
+          <div className="space-y-6">
+            <DettaglioRegimi anno={input.anno} calcoli={calcoli} />
+            {hasDatiPrecedente && (
+              <RiepilogoPrecedente
+                anno={input.anno}
+                calcoli={calcoli}
+                contributiVersatiDuranteAnnoPrecedente={input.contributiVersatiDuranteAnnoPrecedente}
+              />
+            )}
+          </div>
+        )}
+
+        {tab === 'regimi' && <DettaglioRegimi anno={input.anno} calcoli={calcoli} />}
+        {tab === 'calendario' && <CalendarioFiscale anno={input.anno} calcoli={calcoli} />}
+        {tab === 'saldi' && <SaldiCrediti anno={input.anno} calcoli={calcoli} />}
+      </main>
+
+      {/* ── Drawer input dati ── */}
+      <Drawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        title="Dati di calcolo"
+        subtitle={`Anno ${input.anno}`}
+      >
+        <InputPanel
+          input={input}
+          calcoli={calcoli}
+          onChange={(partial) => setInput((prev) => ({ ...prev, ...partial }))}
+          onAnniChanged={handleAnniChanged}
+        />
+      </Drawer>
     </div>
   )
 }

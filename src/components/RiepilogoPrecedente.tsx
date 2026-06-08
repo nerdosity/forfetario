@@ -42,9 +42,15 @@ export function RiepilogoPrecedente({ anno, calcoli, contributiVersatiDuranteAnn
         <div className="space-y-2">
           <SummaryRow label={`Contributi INPS ${anno - 1} dovuti`} value={prev.totaleContributiINPS} valueIntent="cost" />
           <div className="pl-3 space-y-1">
-            <SummaryRow label="G.S." value={prev.totaleContributiSeparata} />
-            <SummaryRow label="Art/Comm fissi" value={prev.totaleContributiFissiArtComm} />
-            <SummaryRow label="Art/Comm eccedenza" value={prev.totaleContributiEccedenzaArtComm} />
+            {prev.totaleContributiSeparata > 0.005 && (
+              <SummaryRow label="G.S." value={prev.totaleContributiSeparata} />
+            )}
+            {prev.totaleContributiFissiArtComm > 0.005 && (
+              <SummaryRow label="Art/Comm fissi" value={prev.totaleContributiFissiArtComm} />
+            )}
+            {prev.totaleContributiEccedenzaArtComm > 0.005 && (
+              <SummaryRow label="Art/Comm eccedenza" value={prev.totaleContributiEccedenzaArtComm} />
+            )}
           </div>
         </div>
       </div>

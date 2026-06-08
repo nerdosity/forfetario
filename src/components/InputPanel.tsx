@@ -22,7 +22,7 @@ export function InputPanel({ input, calcoli, onChange, onAnniChanged }: InputPan
   const [showAvanzate, setShowAvanzate] = useState(false)
 
   return (
-    <div className={theme.sidebar}>
+    <div>
       {/* ── Anno di riferimento ── */}
       <div className={theme.sidebarBlock}>
         <Field
