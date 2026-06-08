@@ -173,7 +173,25 @@ export function calcola(input: CalcoloInput): RisultatoCalcolo {
   const deducibiliAnnoPrecedente = contributiVersatiDuranteAnnoPrecedente ?? 0
 
   const datiCorrente = calcolaDatiAnno(regimiCorrente, anno, deducibiliAnnoCorrente)
-  const datiPrecedente = calcolaDatiAnno(regimiPrecedente, anno - 1, deducibiliAnnoPrecedente)
+
+  // Anno precedente potrebbe non essere nel database (es. primo anno disponibile).
+  // In quel caso si usano zero ovunque: nessun saldo/acconto basato sull'anno prima.
+  let datiPrecedente: ReturnType<typeof calcolaDatiAnno>
+  try {
+    datiPrecedente = calcolaDatiAnno(regimiPrecedente, anno - 1, deducibiliAnnoPrecedente)
+  } catch {
+    datiPrecedente = {
+      dettagliRegimiCalcolati: [],
+      totaleImponibileLordo: 0,
+      totaleContributiINPS: 0,
+      totaleContributiSeparata: 0,
+      totaleContributiFissiArtComm: 0,
+      totaleContributiEccedenzaArtComm: 0,
+      totaleImposte: 0,
+      totaleFatturato: 0,
+      imponibileNettoTotalePerImposte: 0,
+    }
+  }
 
   // ─── Saldi anno corrente ──────────────────────────────────────────────────
   const accontiImposteEff = accontiImposteVersatiPerAnnoCorrente ?? 0
