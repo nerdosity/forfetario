@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 import { RegimeEditor } from '@/components/RegimeEditor'
 import { GestoreAnni } from '@/components/GestoreAnni'
-import { Field, NumberInput, MoneyInput, Select } from '@/components/ui'
+import { Field, MoneyInput, Select } from '@/components/ui'
 import { anniDisponibili } from '@/data/taxData'
 import type { CalcoloInput, RisultatoCalcolo } from '@/domain/types'
 import { formatEuro } from '@/domain/labels'
@@ -52,10 +52,10 @@ export function InputPanel({ input, calcoli, onChange, onAnniChanged }: InputPan
       {/* ── Contributi versati anno corrente ── */}
       <div className={theme.sidebarBlock}>
         <Field
-          label={`Contributi INPS versati nel ${input.anno} (€)`}
+          label={`Contributi INPS versati nel ${input.anno}`}
           info={`Somma di tutti i contributi INPS effettivamente versati durante il ${input.anno}: saldi dell'anno precedente, acconti, rate fisse. Questo importo è deducibile dall'imponibile prima del calcolo dell'imposta sostitutiva ${input.anno}.`}
         >
-          <NumberInput
+          <MoneyInput
             value={input.contributiVersatiDuranteAnno}
             onChange={(v) => onChange({ contributiVersatiDuranteAnno: v })}
             placeholder={`Stima: ${formatEuro(calcoli?.totaleContributiINPS ?? 0)}`}
@@ -77,10 +77,10 @@ export function InputPanel({ input, calcoli, onChange, onAnniChanged }: InputPan
         <p className={theme.helpText}>Usati per il calcolo degli acconti e per il riepilogo dell'anno precedente.</p>
 
         <Field
-          label={`Contributi INPS versati nel ${input.anno - 1} (€)`}
+          label={`Contributi INPS versati nel ${input.anno - 1}`}
           info={`Contributi versati durante il ${input.anno - 1}: usati per la deducibilità dell'imposta sostitutiva ${input.anno - 1} mostrata nel riepilogo.`}
         >
-          <NumberInput
+          <MoneyInput
             value={input.contributiVersatiDuranteAnnoPrecedente}
             onChange={(v) => onChange({ contributiVersatiDuranteAnnoPrecedente: v })}
             placeholder="0"

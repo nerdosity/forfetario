@@ -1,72 +1,40 @@
 /**
  * Tema centralizzato dell'applicazione.
  *
- * Tutte le combinazioni di classi Tailwind riutilizzabili sono definite qui e
- * riciclate nei componenti. Non scrivere classi "sciolte" nei componenti per
- * elementi ricorrenti: aggiungere o modificare il token corrispondente qui.
+ * Raccoglie le combinazioni di classi Tailwind ricorrenti che NON sono già
+ * coperte dai componenti Flowbite (shell, KPI, card, righe riepilogo…).
+ * Per i controlli (input, select, bottoni, tabelle, modali) si usano
+ * direttamente i componenti di flowbite-react.
  */
 
 export const theme = {
-  // --- App shell (stile Fiscozen: barra brand piena + nav orizzontale) ---
+  // --- App shell (barra brand piena + nav orizzontale) ---
   appBg: 'min-h-screen bg-slate-50',
-  // Barra superiore a tinta piena con il marchio
   topbar: 'bg-blue-600',
   topbarInner: 'mx-auto flex max-w-7xl items-center justify-between gap-4 px-6 py-4',
   brand: 'flex items-center gap-2.5',
   brandMark: 'inline-flex h-8 w-8 items-center justify-center rounded-lg bg-white/15 text-white ring-1 ring-white/20',
   brandTitle: 'text-lg font-semibold tracking-tight text-white leading-none',
   topbarYear: 'flex items-center gap-2 text-sm text-white/90',
-  // Barra di navigazione orizzontale sotto al brand
   navbar: 'sticky top-0 z-30 border-b border-slate-200 bg-white shadow-sm',
   navbarInner: 'mx-auto flex max-w-7xl items-center gap-1 px-6',
   navItem:
     'inline-flex items-center gap-2 border-b-2 border-transparent px-4 py-4 text-sm font-medium ' +
     'text-slate-500 transition-colors hover:text-slate-800',
   navItemActive: 'border-blue-600 text-blue-700',
-  // Breadcrumb
   breadcrumb: 'flex items-center gap-1.5 text-sm text-slate-400',
   breadcrumbCurrent: 'text-slate-700 font-medium',
   shell: 'mx-auto max-w-7xl px-6 py-6 space-y-6',
   pageTitle: 'text-2xl font-semibold tracking-tight text-blue-700',
+  // Blocco di sezione nel drawer dei dati: diviso da un bordo, niente scatole annidate.
+  sidebarBlock: 'px-5 py-4 border-b border-slate-100 last:border-b-0 space-y-3',
 
-  // --- KPI (tiles piene in stile Fiscozen) ---
+  // --- KPI (tiles piene) ---
   kpiStrip: 'grid grid-cols-2 gap-4 sm:grid-cols-4',
   kpiTile: 'flex flex-col items-center justify-center rounded-xl px-4 py-6 text-center text-white shadow-sm',
   kpiTileValue: 'text-2xl font-bold tabular-nums tracking-tight leading-none',
   kpiTileLabel: 'mt-2 text-sm font-medium text-white/90',
   kpiTileCaption: 'mt-0.5 text-xs text-white/70',
-
-  // --- Tabella adempimenti / scadenze ---
-  table: 'w-full text-sm',
-  tableHead: 'border-b border-slate-200 text-left text-xs font-semibold uppercase tracking-wide text-slate-400',
-  tableHeadCell: 'px-4 py-3',
-  tableRow: 'border-b border-slate-100 last:border-b-0 hover:bg-slate-50/60',
-  tableCell: 'px-4 py-3.5',
-  statusBadge: 'inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold',
-
-  // --- Tabs ---
-  tabBar: 'flex gap-1 overflow-x-auto rounded-xl border border-slate-200 bg-white p-1 shadow-sm',
-  tab: 'inline-flex items-center gap-2 whitespace-nowrap rounded-lg px-4 py-2 text-sm font-medium text-slate-500 transition-colors hover:text-slate-800',
-  tabActive: 'bg-blue-50 text-blue-700',
-
-  // --- Drawer ---
-  drawerOverlay: 'fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-sm transition-opacity',
-  drawerPanel:
-    'fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col bg-white shadow-2xl ' +
-    'ring-1 ring-slate-900/5',
-  drawerHeader: 'flex items-center justify-between gap-4 border-b border-slate-100 px-5 py-4',
-  drawerBody: 'flex-1 overflow-y-auto',
-  drawerFooter: 'flex items-center justify-end gap-3 border-t border-slate-100 bg-slate-50 px-5 py-3',
-
-  // --- Layout (legacy grid, ancora usato altrove) ---
-  page: 'max-w-7xl mx-auto p-6',
-  grid: 'grid lg:grid-cols-3 gap-6',
-  colInput: 'lg:col-span-1',
-  colResults: 'lg:col-span-2 space-y-6',
-  // Sidebar: contenitore esterno, le sezioni interne sono separate da divisori
-  // (sidebarBlock) anziché da scatole annidate, per evitare padding-dentro-padding.
-  sidebar: 'bg-white rounded-xl border border-slate-200 shadow-sm sticky top-6 overflow-hidden',
-  sidebarBlock: 'px-5 py-4 border-b border-slate-100 last:border-b-0 space-y-3',
 
   // --- Card / sezioni ---
   card: 'bg-white rounded-xl border border-slate-200 p-6 shadow-sm',
@@ -74,53 +42,22 @@ export const theme = {
   cardIconBadge: 'inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg',
   cardCompact: 'bg-white rounded-lg border border-slate-200 p-4',
   // Sezione "piatta": raggruppa contenuti senza bordo/sfondo, per non annidare scatole.
-  section: 'rounded-lg border border-slate-200 p-4 space-y-3',
   sectionFlat: 'space-y-3',
   // Mini-card interna senza bordo, solo sfondo tenue: usata per i periodi.
   cardInner: 'bg-slate-50 rounded-lg p-3 space-y-2',
-  // Etichetta di gruppo (intestazione di una sezione nella sidebar)
   groupLabel: 'text-xs font-semibold text-slate-500 uppercase tracking-wide',
 
-  // --- Intestazione pagina ---
-  hero: 'rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 px-8 py-10 mb-8 text-white shadow-lg',
-  heroIcon: 'inline-flex items-center justify-center rounded-xl bg-white/15 p-3 ring-1 ring-white/25 backdrop-blur',
-  heroTitle: 'text-3xl font-bold tracking-tight',
-  heroSubtitle: 'text-sm text-blue-100',
-
   // --- Tipografia ---
-  h1: 'text-3xl font-bold text-slate-900',
   h2: 'text-xl font-semibold text-slate-900',
   h3: 'text-base font-semibold text-slate-800',
-  subtitle: 'text-sm text-slate-500',
-  label: 'block text-sm font-medium text-slate-700',
   labelSmall: 'block text-xs font-medium text-slate-600',
   helpText: 'text-xs text-slate-500',
-  mono: 'font-mono text-xs text-slate-600 whitespace-pre-wrap',
 
-  // --- Controlli form ---
-  input:
-    'w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 ' +
-    'shadow-sm transition-colors placeholder:text-slate-400 ' +
-    'focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30',
-  inputSmall:
-    'w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-900 ' +
-    'transition-colors focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30',
-  select:
-    'w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 ' +
-    'transition-colors focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30',
-  checkbox: 'h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500/40',
-
-  // --- Bottoni ---
+  // --- Bottoni icona (azioni inline nei card) ---
   btnIcon: 'inline-flex items-center justify-center rounded-md p-1.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700',
   btnIconDanger: 'inline-flex items-center justify-center rounded-md p-1.5 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600',
-  btnGhost: 'inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 transition-colors hover:text-blue-800',
-  btnPrimary:
-    'inline-flex items-center justify-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm ' +
-    'font-medium text-white shadow-sm transition-colors hover:bg-blue-700',
-  btnSecondary:
-    'inline-flex items-center justify-center gap-2 rounded-md border border-slate-300 bg-white ' +
-    'px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50',
-  // Sezione di form con intestazione: usata dentro il modal per raggruppare campi
+
+  // --- Sezione di form con intestazione (dentro il modal anno) ---
   formSection: 'space-y-3',
   formSectionTitle: 'flex items-center gap-2 text-sm font-semibold text-slate-800',
 
@@ -130,25 +67,7 @@ export const theme = {
   rowValue: 'font-medium text-slate-900',
   rowTotal: 'flex items-center justify-between border-t border-slate-200 pt-2 text-sm font-semibold',
 
-  // --- Modal ---
-  modalOverlay:
-    'fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/50 ' +
-    'p-4 backdrop-blur-sm sm:items-center',
-  modalDialog:
-    'relative my-8 w-full max-w-2xl rounded-2xl bg-white shadow-2xl ring-1 ring-slate-900/5',
-  modalHeader: 'flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-4',
-  modalBody: 'max-h-[70vh] overflow-y-auto px-6 py-5 space-y-6',
-  modalFooter:
-    'flex items-center justify-end gap-3 border-t border-slate-100 bg-slate-50 px-6 py-4 rounded-b-2xl',
-
-  // --- Tooltip ---
-  tooltipTrigger: 'inline-flex text-slate-400 transition-colors hover:text-slate-600',
-  tooltipBubble:
-    'pointer-events-none absolute left-1/2 bottom-full z-20 mb-2 w-72 -translate-x-1/2 ' +
-    'rounded-md bg-slate-900 px-3 py-2 text-xs font-normal leading-relaxed text-white ' +
-    'opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100 whitespace-pre-wrap',
-
-  // --- Badge / evidenze numeriche ---
+  // --- Evidenze numeriche ---
   metricValue: 'text-lg font-bold tabular-nums',
   metricLabel: 'text-xs text-slate-500',
   highlightBox: 'rounded-lg bg-slate-50 p-4 text-center border border-slate-200',

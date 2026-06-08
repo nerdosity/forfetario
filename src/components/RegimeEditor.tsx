@@ -4,7 +4,7 @@ import { regimeVuoto } from '@/domain/regimeFactory'
 import { NOMI_MESI, giorniPermanenza } from '@/domain/dates'
 import { getMesiInPeriodo } from '@/domain/contributi'
 import { labelTipo, formatEuro } from '@/domain/labels'
-import { Field, NumberInput, Select } from '@/components/ui'
+import { Field, NumberInput, MoneyInput, Select } from '@/components/ui'
 import { theme } from '@/theme'
 
 const TIPI: TipoRegime[] = ['separata', 'artigiani', 'commercianti']
@@ -158,8 +158,8 @@ export function RegimeEditor({
             </div>
           )}
 
-          <Field label="Fatturato periodo (€)" small info="Compensi incassati nel periodo, al lordo di imposte e contributi.">
-            <NumberInput
+          <Field label="Fatturato periodo" small info="Compensi incassati nel periodo, al lordo di imposte e contributi.">
+            <MoneyInput
               small
               value={regime.fatturato}
               onChange={(v) => aggiorna(regime.id, 'fatturato', v ?? 0)}

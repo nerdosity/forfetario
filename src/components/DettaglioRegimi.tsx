@@ -1,6 +1,7 @@
 import { BarChart3 } from 'lucide-react'
 import type { RisultatoCalcolo } from '@/domain/types'
 import { Card, SummaryRow, Metric, Tooltip } from '@/components/ui'
+import { FunnelImposta } from '@/components/FunnelImposta'
 import { labelTipo, formatEuro } from '@/domain/labels'
 import { theme } from '@/theme'
 
@@ -35,6 +36,17 @@ export function DettaglioRegimi({ anno, calcoli }: Props) {
           label="Imposta sostitutiva"
           caption={`Su ${formatEuro(calcoli.imponibileNettoTotalePerImposte)} imponibile`}
           valueIntent="warning"
+        />
+      </div>
+
+      {/* Funnel dal fatturato all'imposta */}
+      <div className="mb-6">
+        <FunnelImposta
+          fatturato={calcoli.totaleFatturato}
+          imponibileLordo={calcoli.totaleImponibileLordo}
+          imponibileNetto={calcoli.imponibileNettoTotalePerImposte}
+          imposta={calcoli.totaleImposte}
+          contributiDedotti={calcoli.contributiVersatiAnnoImpostaPerDeducibilita}
         />
       </div>
 

@@ -1,6 +1,7 @@
 import { History } from 'lucide-react'
 import type { RisultatoCalcolo } from '@/domain/types'
 import { Card, Metric } from '@/components/ui'
+import { FunnelImposta } from '@/components/FunnelImposta'
 import { formatEuro } from '@/domain/labels'
 import { theme } from '@/theme'
 
@@ -10,33 +11,10 @@ interface Props {
   contributiVersatiDuranteAnnoPrecedente: number | null
 }
 
-interface Stage {
-  label: string
-  value: number
-  /** Classe di sfondo della barra. */
-  bar: string
-  /** Classe del testo del valore. */
-  text: string
-}
-
 /** Riepilogo simulato dell'anno precedente, con funnel da fatturato a imposta. */
 export function RiepilogoPrecedente({ anno, calcoli, contributiVersatiDuranteAnnoPrecedente }: Props) {
   const prev = calcoli.datiAnnoPrecedente
   if (!prev) return null
-
-  const deducibili = contributiVersatiDuranteAnnoPrecedente ?? 0
-
-  // Funnel: ogni stadio è una frazione del fatturato, mostrato come barra in scala.
-  const max = Math.max(prev.totaleFatturato, 1)
-  const stages: Stage[] = [
-    { label: 'Fatturato', value: prev.totaleFatturato, bar: 'bg-emerald-500', text: 'text-emerald-700' },
-    { label: 'Imponibile lordo', value: prev.totaleImponibileLordo, bar: 'bg-blue-500', text: 'text-blue-700' },
-    { label: 'Imponibile netto', value: prev.imponibileNettoTotalePerImposte, bar: 'bg-indigo-500', text: 'text-indigo-700' },
-    { label: 'Imposta sostitutiva', value: prev.totaleImposte, bar: 'bg-red-500', text: 'text-red-700' },
-  ]
-
-  const pct = (v: number) => `${Math.max(2, Math.min(100, (v / max) * 100))}%`
-  const incidenza = prev.totaleFatturato > 0 ? (prev.totaleImposte / prev.totaleFatturato) * 100 : 0
 
   const contributiBreakdown = [
     { label: 'Gestione separata', value: prev.totaleContributiSeparata },
@@ -47,34 +25,14 @@ export function RiepilogoPrecedente({ anno, calcoli, contributiVersatiDuranteAnn
   return (
     <Card title={`Riepilogo anno ${anno - 1}`} icon={History} iconIntent="neutral">
       <div className="grid gap-6 lg:grid-cols-5">
-        {/* Funnel */}
         <div className="lg:col-span-3">
-          <div className="mb-3 flex items-baseline justify-between">
-            <h3 className={theme.groupLabel}>Dal fatturato all'imposta</h3>
-            <span className="text-xs text-slate-400">
-              Incidenza imposta {incidenza.toFixed(1)}%
-            </span>
-          </div>
-
-          <div className="space-y-2.5">
-            {stages.map((s) => (
-              <div key={s.label}>
-                <div className="mb-1 flex items-center justify-between">
-                  <span className="text-xs font-medium text-slate-600">{s.label}</span>
-                  <span className={`text-sm font-semibold tabular-nums ${s.text}`}>{formatEuro(s.value)}</span>
-                </div>
-                <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
-                  <div className={`h-full rounded-full ${s.bar} transition-all`} style={{ width: pct(s.value) }} />
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {deducibili > 0.005 && (
-            <p className="mt-3 text-xs text-amber-700">
-              Include {formatEuro(deducibili)} di contributi dedotti dall'imponibile.
-            </p>
-          )}
+          <FunnelImposta
+            fatturato={prev.totaleFatturato}
+            imponibileLordo={prev.totaleImponibileLordo}
+            imponibileNetto={prev.imponibileNettoTotalePerImposte}
+            imposta={prev.totaleImposte}
+            contributiDedotti={contributiVersatiDuranteAnnoPrecedente ?? 0}
+          />
         </div>
 
         {/* Riepilogo contributi a lato */}

@@ -14,8 +14,12 @@ interface NumberInputProps {
   nullable?: boolean
 }
 
-/** Input numerico controllato (Flowbite TextInput) che normalizza vuoto/NaN. */
-export function NumberInput({
+/**
+ * Input numerico controllato (Flowbite TextInput, type="number").
+ * Il punto è l'unico separatore decimale: la virgola viene rifiutata dal campo
+ * nativo. Normalizza vuoto/NaN.
+ */
+function NumericField({
   value,
   onChange,
   placeholder,
@@ -25,11 +29,13 @@ export function NumberInput({
   small,
   id,
   nullable = false,
-}: NumberInputProps) {
+  addon,
+}: NumberInputProps & { addon?: ReactNode }) {
   return (
     <TextInput
       id={id}
       type="number"
+      addon={addon}
       sizing={small ? 'sm' : 'md'}
       value={value ?? ''}
       placeholder={placeholder}
@@ -49,31 +55,14 @@ export function NumberInput({
   )
 }
 
-/** NumberInput con € come addon iniziale (Flowbite TextInput addon). */
+/** Input numerico controllato. */
+export function NumberInput(props: NumberInputProps) {
+  return <NumericField {...props} />
+}
+
+/** NumberInput con € come addon iniziale. */
 export function MoneyInput(props: Omit<NumberInputProps, 'placeholder'> & { placeholder?: string }) {
-  const { value, onChange, placeholder, min, max, step, small, id, nullable = false } = props
-  return (
-    <TextInput
-      id={id}
-      type="number"
-      addon="€"
-      sizing={small ? 'sm' : 'md'}
-      value={value ?? ''}
-      placeholder={placeholder}
-      min={min}
-      max={max}
-      step={step}
-      onChange={(e) => {
-        const raw = e.target.value
-        if (raw === '') {
-          onChange(nullable ? null : 0)
-          return
-        }
-        const n = Number(raw)
-        onChange(Number.isNaN(n) ? (nullable ? null : 0) : n)
-      }}
-    />
-  )
+  return <NumericField {...props} addon="€" />
 }
 
 interface Option<T> {

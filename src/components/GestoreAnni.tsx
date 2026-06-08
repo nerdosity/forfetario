@@ -13,7 +13,7 @@ import {
   anniPersonalizzatiSalvati,
 } from '@/data/customYears'
 import { Button } from 'flowbite-react'
-import { Field, NumberInput, DateInput, Modal } from '@/components/ui'
+import { Field, NumberInput, MoneyInput, DateInput, Modal } from '@/components/ui'
 import { theme } from '@/theme'
 
 interface Props {
@@ -210,11 +210,11 @@ export function GestoreAnni({ onAnniChanged }: Props) {
             Imponibili e soglie
           </h3>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Minimale reddito (€)" info="Reddito minimale annuo per i contributi fissi proporzionali (circolare IVS INPS).">
-              <NumberInput value={form.minimaleReddito} onChange={setNum('minimaleReddito')} min={0} step={0.01} />
+            <Field label="Minimale reddito" info="Reddito minimale annuo per i contributi fissi proporzionali (circolare IVS INPS).">
+              <MoneyInput value={form.minimaleReddito} onChange={setNum('minimaleReddito')} min={0} step={0.01} />
             </Field>
-            <Field label="Soglia prima fascia (€)" info="Oltre questa soglia si applica l’aliquota maggiorata (+1%) sull’eccedenza per artigiani e commercianti.">
-              <NumberInput value={form.sogliaPrimaFascia} onChange={setNum('sogliaPrimaFascia')} min={0} step={0.01} />
+            <Field label="Soglia prima fascia" info="Oltre questa soglia si applica l’aliquota maggiorata (+1%) sull’eccedenza per artigiani e commercianti.">
+              <MoneyInput value={form.sogliaPrimaFascia} onChange={setNum('sogliaPrimaFascia')} min={0} step={0.01} />
             </Field>
           </div>
         </section>
@@ -226,11 +226,11 @@ export function GestoreAnni({ onAnniChanged }: Props) {
             Contributi fissi IVS annui
           </h3>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Artigiani (€)" info="Contributo IVS fisso annuo per artigiani, ripartito nei trimestri di attività.">
-              <NumberInput value={form.ivsArtigiani} onChange={setNum('ivsArtigiani')} min={0} step={0.01} />
+            <Field label="Artigiani" info="Contributo IVS fisso annuo per artigiani, ripartito nei trimestri di attività.">
+              <MoneyInput value={form.ivsArtigiani} onChange={setNum('ivsArtigiani')} min={0} step={0.01} />
             </Field>
-            <Field label="Commercianti (€)" info="Contributo IVS fisso annuo per commercianti.">
-              <NumberInput value={form.ivsCommercianti} onChange={setNum('ivsCommercianti')} min={0} step={0.01} />
+            <Field label="Commercianti" info="Contributo IVS fisso annuo per commercianti.">
+              <MoneyInput value={form.ivsCommercianti} onChange={setNum('ivsCommercianti')} min={0} step={0.01} />
             </Field>
           </div>
         </section>
@@ -302,11 +302,11 @@ export function GestoreAnni({ onAnniChanged }: Props) {
             Quota maternità mensile
           </h3>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Artigiani (€/mese)" info="Quota maternità mensile. Non soggetta a riduzione.">
-              <NumberInput value={form.maternitaArtigiani} onChange={setNum('maternitaArtigiani')} min={0} step={0.01} />
+            <Field label="Artigiani (mese)" info="Quota maternità mensile. Non soggetta a riduzione.">
+              <MoneyInput value={form.maternitaArtigiani} onChange={setNum('maternitaArtigiani')} min={0} step={0.01} />
             </Field>
-            <Field label="Commercianti (€/mese)" info="Quota maternità mensile. Non soggetta a riduzione.">
-              <NumberInput value={form.maternitaCommercianti} onChange={setNum('maternitaCommercianti')} min={0} step={0.01} />
+            <Field label="Commercianti (mese)" info="Quota maternità mensile. Non soggetta a riduzione.">
+              <MoneyInput value={form.maternitaCommercianti} onChange={setNum('maternitaCommercianti')} min={0} step={0.01} />
             </Field>
           </div>
         </section>

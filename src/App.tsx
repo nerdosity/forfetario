@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useReducer, useState } from 'react'
+import { useCallback, useEffect, useMemo, useReducer, useState } from 'react'
 import {
   Calculator,
   SlidersHorizontal,
@@ -6,6 +6,7 @@ import {
   BarChart3,
   Calendar,
   FileText,
+  History,
   ChevronRight,
 } from 'lucide-react'
 import { Button, Drawer, DrawerHeader, DrawerItems } from 'flowbite-react'
@@ -20,11 +21,12 @@ import { calcola } from '@/domain/calcolo'
 import { regimeVuoto } from '@/domain/regimeFactory'
 import type { CalcoloInput } from '@/domain/types'
 import { anniDisponibili } from '@/data/taxData'
+import { caricaInput, salvaInput } from '@/data/inputStorage'
 import { theme } from '@/theme'
 import { useInputState } from '@/hooks/useInputState'
 
-// Stato iniziale: tutto vuoto, un periodo vuoto per anno
-function inputIniziale(): CalcoloInput {
+// Stato di default: tutto vuoto, un periodo vuoto per anno
+function inputDefault(): CalcoloInput {
   return {
     anno: anniDisponibili()[0],
     regimiCorrente: [regimeVuoto()],
@@ -38,13 +40,20 @@ function inputIniziale(): CalcoloInput {
   }
 }
 
-type TabId = 'riepilogo' | 'regimi' | 'calendario' | 'saldi'
+// Stato iniziale: riprende l'input salvato in localStorage, altrimenti il default
+function inputIniziale(): CalcoloInput {
+  const def = inputDefault()
+  return caricaInput(def) ?? def
+}
+
+type TabId = 'riepilogo' | 'regimi' | 'calendario' | 'saldi' | 'precedente'
 
 const NAV: { id: TabId; label: string; icon: typeof LayoutDashboard }[] = [
   { id: 'riepilogo', label: 'Riepilogo', icon: LayoutDashboard },
   { id: 'regimi', label: 'Dettaglio regimi', icon: BarChart3 },
   { id: 'calendario', label: 'Calendario', icon: Calendar },
   { id: 'saldi', label: 'Saldi e crediti', icon: FileText },
+  { id: 'precedente', label: 'Anno precedente', icon: History },
 ]
 
 const TITOLO: Record<TabId, string> = {
@@ -52,6 +61,7 @@ const TITOLO: Record<TabId, string> = {
   regimi: 'Dettaglio regimi',
   calendario: 'Calendario fiscale',
   saldi: 'Saldi e crediti',
+  precedente: 'Riepilogo anno precedente',
 }
 
 export default function App() {
@@ -61,6 +71,12 @@ export default function App() {
   const [tab, setTab] = useState<TabId>('riepilogo')
 
   const calcoli = useMemo(() => calcola(input), [input])
+
+  // Persisti l'input in localStorage a ogni modifica (debounce per non scrivere ad ogni tasto)
+  useEffect(() => {
+    const t = setTimeout(() => salvaInput(input), 300)
+    return () => clearTimeout(t)
+  }, [input])
 
   const handleAnniChanged = useCallback(() => {
     setInput((prev) => {
@@ -72,6 +88,11 @@ export default function App() {
 
   const prev = calcoli.datiAnnoPrecedente
   const hasDatiPrecedente = prev.totaleFatturato > 0 || prev.totaleImponibileLordo > 0
+
+  // Se il tab "anno precedente" è attivo ma i dati vengono rimossi, torna al riepilogo
+  useEffect(() => {
+    if (tab === 'precedente' && !hasDatiPrecedente) setTab('riepilogo')
+  }, [tab, hasDatiPrecedente])
 
   return (
     <div className={theme.appBg}>
@@ -98,18 +119,25 @@ export default function App() {
       {/* ── Navigazione orizzontale ── */}
       <nav className={theme.navbar}>
         <div className={theme.navbarInner}>
-          {NAV.map(({ id, label, icon: Icon }) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setTab(id)}
-              className={`${theme.navItem} ${tab === id ? theme.navItemActive : ''}`}
-              aria-current={tab === id ? 'page' : undefined}
-            >
-              <Icon size={16} aria-hidden />
-              {label}
-            </button>
-          ))}
+          {NAV.map(({ id, label, icon: Icon }) => {
+            const disabled = id === 'precedente' && !hasDatiPrecedente
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => !disabled && setTab(id)}
+                disabled={disabled}
+                title={disabled ? `Inserisci i dati del ${input.anno - 1} per abilitare questa sezione` : undefined}
+                className={`${theme.navItem} ${tab === id ? theme.navItemActive : ''} ${
+                  disabled ? 'cursor-not-allowed opacity-40 hover:text-slate-500' : ''
+                }`}
+                aria-current={tab === id ? 'page' : undefined}
+              >
+                <Icon size={16} aria-hidden />
+                {label}
+              </button>
+            )
+          })}
         </div>
       </nav>
 
@@ -133,22 +161,17 @@ export default function App() {
 
         <KpiStrip anno={input.anno} calcoli={calcoli} />
 
-        {tab === 'riepilogo' && (
-          <div className="space-y-6">
-            <DettaglioRegimi anno={input.anno} calcoli={calcoli} />
-            {hasDatiPrecedente && (
-              <RiepilogoPrecedente
-                anno={input.anno}
-                calcoli={calcoli}
-                contributiVersatiDuranteAnnoPrecedente={input.contributiVersatiDuranteAnnoPrecedente}
-              />
-            )}
-          </div>
-        )}
-
+        {tab === 'riepilogo' && <DettaglioRegimi anno={input.anno} calcoli={calcoli} />}
         {tab === 'regimi' && <DettaglioRegimi anno={input.anno} calcoli={calcoli} />}
         {tab === 'calendario' && <CalendarioFiscale anno={input.anno} calcoli={calcoli} />}
         {tab === 'saldi' && <SaldiCrediti anno={input.anno} calcoli={calcoli} />}
+        {tab === 'precedente' && hasDatiPrecedente && (
+          <RiepilogoPrecedente
+            anno={input.anno}
+            calcoli={calcoli}
+            contributiVersatiDuranteAnnoPrecedente={input.contributiVersatiDuranteAnnoPrecedente}
+          />
+        )}
       </main>
 
       {/* ── Drawer input dati (componente Flowbite) ── */}
