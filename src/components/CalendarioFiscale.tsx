@@ -63,9 +63,6 @@ export function CalendarioFiscale({ anno, calcoli }: Props) {
       <div className="mb-6">
         <h3 className={`${theme.h3} mb-3`}>
           Scadenze {anno}
-          <span className={`${theme.helpText} ml-2 font-normal`}>
-            — pagamenti basati su {anno - 1}
-          </span>
         </h3>
         <div className="space-y-3">
           {correnti.length > 0
@@ -80,7 +77,7 @@ export function CalendarioFiscale({ anno, calcoli }: Props) {
         <h3 className={`${theme.h3} mb-3`}>
           Scadenze {anno + 1}
           <span className={`${theme.helpText} ml-2 font-normal`}>
-            — pagamenti basati su {anno}
+            — saldo e acconti su {anno}
           </span>
         </h3>
         <div className="space-y-3">

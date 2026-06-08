@@ -16,6 +16,10 @@ concurrency:
   group: pages
   cancel-in-progress: false
 
+# Opta subito in Node.js 24 per le action interne (richiesto da giugno 2026)
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -43,6 +47,9 @@ jobs:
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
+        with:
+          # Abilita Pages automaticamente se non è ancora configurato
+          enablement: true
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
