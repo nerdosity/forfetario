@@ -1,6 +1,6 @@
 import { Calendar } from 'lucide-react'
 import type { RisultatoCalcolo, Scadenza } from '@/domain/types'
-import { Card } from '@/components/ui'
+import { Card, Tooltip } from '@/components/ui'
 import { formatEuro } from '@/domain/labels'
 import { theme } from '@/theme'
 
@@ -9,92 +9,105 @@ interface Props {
   calcoli: RisultatoCalcolo
 }
 
-const ABBR_MESE: Record<string, string> = {
-  Gennaio: 'GEN', Febbraio: 'FEB', Marzo: 'MAR', Aprile: 'APR', Maggio: 'MAG', Giugno: 'GIU',
-  Luglio: 'LUG', Agosto: 'AGO', Settembre: 'SET', Ottobre: 'OTT', Novembre: 'NOV', Dicembre: 'DIC',
+const MESE_NUM: Record<string, number> = {
+  Gennaio: 0, Febbraio: 1, Marzo: 2, Aprile: 3, Maggio: 4, Giugno: 5,
+  Luglio: 6, Agosto: 7, Settembre: 8, Ottobre: 9, Novembre: 10, Dicembre: 11,
 }
 
-/** Estrae giorno e abbreviazione mese da "GG Mese AAAA". */
-function parseData(data: string): { giorno: string; mese: string } {
-  const [gg, mese] = data.split(' ')
-  return { giorno: gg, mese: ABBR_MESE[mese] ?? mese?.slice(0, 3).toUpperCase() ?? '' }
+type Stato = 'scaduta' | 'in-scadenza' | 'prevista'
+
+const STATO_LABEL: Record<Stato, string> = {
+  scaduta: 'Scaduta',
+  'in-scadenza': 'In scadenza',
+  prevista: 'Prevista',
+}
+const STATO_BADGE: Record<Stato, string> = {
+  scaduta: 'bg-rose-100 text-rose-700',
+  'in-scadenza': 'bg-amber-100 text-amber-700',
+  prevista: 'bg-sky-100 text-sky-700',
 }
 
-/**
- * Una scadenza mostra il dettaglio componenti solo se aggiunge informazione:
- * più di una componente, oppure una sola ma con importo diverso dal totale.
- */
-function haDettaglioUtile(s: Scadenza): boolean {
-  if (s.componenti.length > 1) return true
-  if (s.componenti.length === 1) return Math.abs(s.componenti[0].importo - s.importo) > 0.005
-  return false
+/** Determina lo stato di una scadenza rispetto a oggi (>30gg futura = prevista). */
+function statoScadenza(data: string): Stato {
+  const [gg, mese, aaaa] = data.split(' ')
+  const d = new Date(Number(aaaa), MESE_NUM[mese] ?? 0, Number(gg))
+  const oggi = new Date()
+  oggi.setHours(0, 0, 0, 0)
+  if (d < oggi) return 'scaduta'
+  const giorniMancanti = (d.getTime() - oggi.getTime()) / 86_400_000
+  return giorniMancanti <= 30 ? 'in-scadenza' : 'prevista'
 }
 
-function VoceScadenza({ scadenza, past }: { scadenza: Scadenza; past: boolean }) {
-  const { giorno, mese } = parseData(scadenza.data)
+/** Mostra il dettaglio componenti solo se aggiunge informazione. */
+function dettaglioUtile(s: Scadenza): string | null {
+  if (s.componenti.length > 1 || (s.componenti.length === 1 && Math.abs(s.componenti[0].importo - s.importo) > 0.005)) {
+    return s.componenti.map((c) => `${c.tipo}: ${formatEuro(c.importo)}`).join('\n')
+  }
+  return null
+}
+
+function RigaScadenza({ scadenza }: { scadenza: Scadenza }) {
+  const stato = statoScadenza(scadenza.data)
+  const dettaglio = dettaglioUtile(scadenza)
+  const scaduta = stato === 'scaduta'
+
   return (
-    <li className="flex gap-4">
-      {/* Blocco data tipo calendario */}
-      <div
-        className={`flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-lg border ${
-          past ? 'border-red-200 bg-red-50 text-red-700' : 'border-amber-200 bg-amber-50 text-amber-700'
-        }`}
-      >
-        <span className="text-lg font-bold leading-none tabular-nums">{giorno}</span>
-        <span className="mt-0.5 text-[10px] font-semibold tracking-wide">{mese}</span>
-      </div>
-
-      {/* Contenuto */}
-      <div className="min-w-0 flex-1 border-b border-slate-100 pb-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-sm font-medium text-slate-800">{scadenza.descrizione}</p>
-            <p className="text-xs text-slate-400">{scadenza.data}</p>
-          </div>
-          <span className={`shrink-0 text-base font-bold tabular-nums ${past ? 'text-red-700' : 'text-amber-700'}`}>
-            {formatEuro(scadenza.importo)}
+    <tr className={theme.tableRow}>
+      <td className={theme.tableCell}>
+        <div className="flex items-center gap-1.5">
+          <span className={`font-medium ${scaduta ? 'text-slate-400' : 'text-slate-800'}`}>
+            {scadenza.descrizione}
           </span>
+          {dettaglio && <Tooltip content={dettaglio} label="Dettaglio componenti" />}
         </div>
-
-        {haDettaglioUtile(scadenza) && (
-          <ul className="mt-2 space-y-1 rounded-md bg-slate-50 px-3 py-2">
-            {scadenza.componenti.map((c, i) => (
-              <li key={i} className="flex justify-between text-xs">
-                <span className="text-slate-500">{c.tipo}</span>
-                <span className="font-medium tabular-nums text-slate-700">{formatEuro(c.importo)}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-    </li>
+      </td>
+      <td className={theme.tableCell}>
+        <span className={`${theme.statusBadge} ${STATO_BADGE[stato]}`}>{STATO_LABEL[stato]}</span>
+      </td>
+      <td className={`${theme.tableCell} text-right tabular-nums font-semibold ${scaduta ? 'text-slate-400' : 'text-slate-800'}`}>
+        {formatEuro(scadenza.importo)}
+      </td>
+      <td className={`${theme.tableCell} whitespace-nowrap text-right tabular-nums ${scaduta ? 'text-slate-400' : 'text-slate-600'}`}>
+        {scadenza.data}
+      </td>
+    </tr>
   )
 }
 
-function GruppoAnno({ titolo, sottotitolo, scadenze, past }: {
+function TabellaScadenze({ titolo, sottotitolo, scadenze }: {
   titolo: string
   sottotitolo?: string
   scadenze: Scadenza[]
-  past: boolean
 }) {
   const totale = scadenze.reduce((s, x) => s + x.importo, 0)
   return (
     <div>
-      <div className="mb-4 flex items-baseline justify-between">
+      <div className="mb-3 flex items-baseline justify-between">
         <h3 className="flex items-baseline gap-2">
           <span className={theme.h3}>{titolo}</span>
           {sottotitolo && <span className={`${theme.helpText} font-normal`}>{sottotitolo}</span>}
         </h3>
         {scadenze.length > 0 && (
-          <span className="text-xs text-slate-400">
-            {scadenze.length} scaden{scadenze.length > 1 ? 'ze' : 'za'} · {formatEuro(totale)}
-          </span>
+          <span className="text-xs text-slate-400">Totale {formatEuro(totale)}</span>
         )}
       </div>
+
       {scadenze.length > 0 ? (
-        <ul className="space-y-4">
-          {scadenze.map((s, i) => <VoceScadenza key={i} scadenza={s} past={past} />)}
-        </ul>
+        <div className="overflow-x-auto rounded-lg border border-slate-200">
+          <table className={theme.table}>
+            <thead className={theme.tableHead}>
+              <tr>
+                <th className={theme.tableHeadCell}>Adempimento</th>
+                <th className={theme.tableHeadCell}>Stato</th>
+                <th className={`${theme.tableHeadCell} text-right`}>Importo</th>
+                <th className={`${theme.tableHeadCell} text-right`}>Scadenza</th>
+              </tr>
+            </thead>
+            <tbody>
+              {scadenze.map((s, i) => <RigaScadenza key={i} scadenza={s} />)}
+            </tbody>
+          </table>
+        </div>
       ) : (
         <p className={theme.helpText}>Nessuna scadenza rilevante calcolata.</p>
       )}
@@ -102,7 +115,7 @@ function GruppoAnno({ titolo, sottotitolo, scadenze, past }: {
   )
 }
 
-/** Calendario fiscale con scadenze dell'anno corrente e dell'anno successivo. */
+/** Calendario fiscale: adempimenti dell'anno corrente e del successivo in tabella. */
 export function CalendarioFiscale({ anno, calcoli }: Props) {
   const correnti = calcoli.scadenzeAnnoCorrente.filter((s) => s.importo > 0.005)
   const future = calcoli.scadenzeAnnoSuccessivo.filter((s) => s.importo > 0.005)
@@ -115,12 +128,11 @@ export function CalendarioFiscale({ anno, calcoli }: Props) {
       info="Le date indicate sono quelle nominali. Se cadono in giorni festivi o prefestivi slittano al primo giorno lavorativo utile."
     >
       <div className="space-y-8">
-        <GruppoAnno titolo={`Scadenze ${anno}`} scadenze={correnti} past />
-        <GruppoAnno
+        <TabellaScadenze titolo={`Scadenze ${anno}`} scadenze={correnti} />
+        <TabellaScadenze
           titolo={`Scadenze ${anno + 1}`}
           sottotitolo={`— saldo e acconti su ${anno}`}
           scadenze={future}
-          past={false}
         />
       </div>
     </Card>

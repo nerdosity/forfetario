@@ -1,6 +1,6 @@
 export { Tooltip } from './Tooltip'
 export { Field } from './Field'
-export { NumberInput, Select } from './inputs'
+export { NumberInput, MoneyInput, Select } from './inputs'
 export { DateInput } from './DateInput'
 export { Modal } from './Modal'
 export { Drawer } from './Drawer'

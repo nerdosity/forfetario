@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 import { RegimeEditor } from '@/components/RegimeEditor'
 import { GestoreAnni } from '@/components/GestoreAnni'
-import { Field, NumberInput, Select } from '@/components/ui'
+import { Field, NumberInput, MoneyInput, Select } from '@/components/ui'
 import { anniDisponibili } from '@/data/taxData'
 import type { CalcoloInput, RisultatoCalcolo } from '@/domain/types'
 import { formatEuro } from '@/domain/labels'
@@ -120,18 +120,18 @@ export function InputPanel({ input, calcoli, onChange, onAnniChanged }: InputPan
         )}
 
         {showAvanzate && (
-          <div className="space-y-4">
+          <div className="space-y-5">
             {/* Acconti PER l'anno corrente */}
-            <div className={theme.cardInner}>
-              <p className={theme.labelSmall}>
-                Versati nel {input.anno} (acconti per il {input.anno})
+            <div className="space-y-3">
+              <p className={`${theme.helpText} font-medium text-slate-500`}>
+                Versati nel {input.anno}, a titolo di acconto per il {input.anno}
               </p>
               <Field
-                label="Imposta sostitutiva (€)"
+                label="Imposta sostitutiva"
                 small
                 info={`Acconti versati a giugno e novembre ${input.anno}, calcolati sulle imposte ${input.anno - 1}. Usati per determinare il saldo.`}
               >
-                <NumberInput
+                <MoneyInput
                   small
                   value={input.accontiImposteVersatiPerAnnoCorrente}
                   onChange={(v) => onChange({ accontiImposteVersatiPerAnnoCorrente: v })}
@@ -141,49 +141,53 @@ export function InputPanel({ input, calcoli, onChange, onAnniChanged }: InputPan
                   nullable
                 />
               </Field>
-              <Field
-                label="Contributi G.S. (€)"
-                small
-                info={`Acconti Gestione Separata versati a giugno e novembre ${input.anno}, basati sui contributi G.S. ${input.anno - 1}.`}
-              >
-                <NumberInput
+              <div className="grid grid-cols-2 gap-3">
+                <Field
+                  label="Contributi G.S."
                   small
-                  value={input.accontiContributiSeparataVersatiPerAnnoCorrente}
-                  onChange={(v) => onChange({ accontiContributiSeparataVersatiPerAnnoCorrente: v })}
-                  placeholder="0"
-                  min={0}
-                  step={0.01}
-                  nullable
-                />
-              </Field>
-              <Field
-                label="Contributi eccedenza Art/Comm (€)"
-                small
-                info={`Acconti contributi sull'eccedenza artigiani/commercianti versati a giugno e novembre ${input.anno}.`}
-              >
-                <NumberInput
+                  info={`Acconti Gestione Separata versati a giugno e novembre ${input.anno}, basati sui contributi G.S. ${input.anno - 1}.`}
+                >
+                  <MoneyInput
+                    small
+                    value={input.accontiContributiSeparataVersatiPerAnnoCorrente}
+                    onChange={(v) => onChange({ accontiContributiSeparataVersatiPerAnnoCorrente: v })}
+                    placeholder="0"
+                    min={0}
+                    step={0.01}
+                    nullable
+                  />
+                </Field>
+                <Field
+                  label="Ecc. Art/Comm"
                   small
-                  value={input.accontiContributiEccedenzaArtCommVersatiPerAnnoCorrente}
-                  onChange={(v) => onChange({ accontiContributiEccedenzaArtCommVersatiPerAnnoCorrente: v })}
-                  placeholder="0"
-                  min={0}
-                  step={0.01}
-                  nullable
-                />
-              </Field>
+                  info={`Acconti contributi sull'eccedenza artigiani/commercianti versati a giugno e novembre ${input.anno}.`}
+                >
+                  <MoneyInput
+                    small
+                    value={input.accontiContributiEccedenzaArtCommVersatiPerAnnoCorrente}
+                    onChange={(v) => onChange({ accontiContributiEccedenzaArtCommVersatiPerAnnoCorrente: v })}
+                    placeholder="0"
+                    min={0}
+                    step={0.01}
+                    nullable
+                  />
+                </Field>
+              </div>
             </div>
 
+            <hr className="border-slate-100" />
+
             {/* Acconti PER l'anno precedente */}
-            <div className={theme.cardInner}>
-              <p className={theme.labelSmall}>
-                Versati nel {input.anno - 1} (acconti per il {input.anno - 1})
+            <div className="space-y-3">
+              <p className={`${theme.helpText} font-medium text-slate-500`}>
+                Versati nel {input.anno - 1}, a titolo di acconto per il {input.anno - 1}
               </p>
               <Field
-                label="Imposta sostitutiva (€)"
+                label="Imposta sostitutiva"
                 small
                 info={`Acconti versati a giugno e novembre ${input.anno - 1}. Usati per calcolare il saldo dell'anno precedente mostrato nel riepilogo.`}
               >
-                <NumberInput
+                <MoneyInput
                   small
                   value={input.accontiImposteVersatiPerAnnoPrecedente}
                   onChange={(v) => onChange({ accontiImposteVersatiPerAnnoPrecedente: v })}

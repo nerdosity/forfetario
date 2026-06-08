@@ -17,13 +17,20 @@ export const theme = {
   brandTag: 'text-xs text-slate-400 leading-none mt-0.5',
   shell: 'mx-auto max-w-7xl px-6 py-6 space-y-6',
 
-  // --- KPI ---
-  kpiStrip: 'grid grid-cols-2 gap-3 sm:grid-cols-4',
-  kpiCard: 'rounded-xl border border-slate-200 bg-white p-4 shadow-sm',
-  kpiIcon: 'inline-flex h-8 w-8 items-center justify-center rounded-lg',
-  kpiLabel: 'text-xs font-medium text-slate-500',
-  kpiValue: 'mt-1 text-xl font-bold tabular-nums tracking-tight',
-  kpiCaption: 'mt-0.5 text-xs text-slate-400',
+  // --- KPI (tiles piene in stile Fiscozen) ---
+  kpiStrip: 'grid grid-cols-2 gap-4 sm:grid-cols-4',
+  kpiTile: 'flex flex-col items-center justify-center rounded-xl px-4 py-6 text-center text-white shadow-sm',
+  kpiTileValue: 'text-2xl font-bold tabular-nums tracking-tight leading-none',
+  kpiTileLabel: 'mt-2 text-sm font-medium text-white/90',
+  kpiTileCaption: 'mt-0.5 text-xs text-white/70',
+
+  // --- Tabella adempimenti / scadenze ---
+  table: 'w-full text-sm',
+  tableHead: 'border-b border-slate-200 text-left text-xs font-semibold uppercase tracking-wide text-slate-400',
+  tableHeadCell: 'px-4 py-3',
+  tableRow: 'border-b border-slate-100 last:border-b-0 hover:bg-slate-50/60',
+  tableCell: 'px-4 py-3.5',
+  statusBadge: 'inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold',
 
   // --- Tabs ---
   tabBar: 'flex gap-1 overflow-x-auto rounded-xl border border-slate-200 bg-white p-1 shadow-sm',

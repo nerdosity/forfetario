@@ -1,9 +1,6 @@
-import { Wallet, Landmark, Receipt, CalendarClock } from 'lucide-react'
-import type { ComponentType } from 'react'
-import type { LucideProps } from 'lucide-react'
 import type { RisultatoCalcolo } from '@/domain/types'
 import { formatEuro } from '@/domain/labels'
-import { theme, intent, type Intent } from '@/theme'
+import { theme } from '@/theme'
 
 interface Props {
   anno: number
@@ -14,11 +11,10 @@ interface Kpi {
   label: string
   value: string
   caption: string
-  icon: ComponentType<LucideProps>
-  tone: Intent
+  bg: string
 }
 
-/** Striscia di indicatori chiave in cima alla pagina. */
+/** Striscia di indicatori chiave a tiles piene colorate (stile Fiscozen). */
 export function KpiStrip({ anno, calcoli }: Props) {
   const totaleSaldi =
     calcoli.saldoImposteDaVersareAnnoCorrente +
@@ -30,42 +26,35 @@ export function KpiStrip({ anno, calcoli }: Props) {
       label: 'Fatturato',
       value: formatEuro(calcoli.totaleFatturato),
       caption: `Anno ${anno}`,
-      icon: Wallet,
-      tone: 'income',
+      bg: 'bg-emerald-500',
     },
     {
       label: 'Contributi INPS',
       value: formatEuro(calcoli.totaleContributiINPS),
       caption: 'Dovuti',
-      icon: Landmark,
-      tone: 'info',
+      bg: 'bg-sky-500',
     },
     {
       label: 'Imposta sostitutiva',
       value: formatEuro(calcoli.totaleImposte),
       caption: 'Dovuta',
-      icon: Receipt,
-      tone: 'warning',
+      bg: 'bg-amber-400',
     },
     {
       label: 'Saldo da versare',
       value: formatEuro(totaleSaldi),
       caption: `Giugno ${anno + 1}`,
-      icon: CalendarClock,
-      tone: 'cost',
+      bg: 'bg-rose-500',
     },
   ]
 
   return (
     <div className={theme.kpiStrip}>
       {kpis.map((k) => (
-        <div key={k.label} className={theme.kpiCard}>
-          <span className={`${theme.kpiIcon} ${intent[k.tone].badge}`}>
-            <k.icon size={17} aria-hidden />
-          </span>
-          <p className={`${theme.kpiValue} ${intent[k.tone].amount}`}>{k.value}</p>
-          <p className={theme.kpiLabel}>{k.label}</p>
-          <p className={theme.kpiCaption}>{k.caption}</p>
+        <div key={k.label} className={`${theme.kpiTile} ${k.bg}`}>
+          <p className={theme.kpiTileValue}>{k.value}</p>
+          <p className={theme.kpiTileLabel}>{k.label}</p>
+          <p className={theme.kpiTileCaption}>{k.caption}</p>
         </div>
       ))}
     </div>

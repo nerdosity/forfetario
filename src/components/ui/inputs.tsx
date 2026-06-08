@@ -49,6 +49,24 @@ export function NumberInput({
   )
 }
 
+/** NumberInput con simbolo € agganciato a sinistra, per importi. */
+export function MoneyInput(props: Omit<NumberInputProps, 'placeholder'> & { placeholder?: string }) {
+  return (
+    <div className="relative">
+      <span
+        className={`pointer-events-none absolute inset-y-0 left-0 flex items-center text-slate-400 ${
+          props.small ? 'pl-2 text-xs' : 'pl-3 text-sm'
+        }`}
+      >
+        €
+      </span>
+      <span className={props.small ? 'block [&>input]:pl-6' : 'block [&>input]:pl-7'}>
+        <NumberInput {...props} />
+      </span>
+    </div>
+  )
+}
+
 interface Option<T> {
   value: T
   label: ReactNode
