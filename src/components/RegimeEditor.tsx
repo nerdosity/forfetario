@@ -40,7 +40,7 @@ export function RegimeEditor({
     onChange(regimi.map((r) => (r.id === id ? { ...r, [campo]: valore } : r)))
 
   return (
-    <div className={theme.section}>
+    <div className={theme.sectionFlat}>
       <div className="flex items-center justify-between">
         <h3 className={theme.h3}>{titolo}</h3>
         <button type="button" onClick={aggiungi} className={theme.btnIcon} aria-label="Aggiungi periodo">
@@ -49,7 +49,7 @@ export function RegimeEditor({
       </div>
 
       {regimi.map((regime, index) => (
-        <div key={regime.id} className={`${theme.cardCompact} space-y-2`}>
+        <div key={regime.id} className={theme.cardInner}>
           <div className="flex items-center justify-between">
             <span className={theme.labelSmall}>Periodo {index + 1}</span>
             {regimi.length > 1 && (
@@ -169,7 +169,7 @@ export function RegimeEditor({
           </Field>
 
           {mostraDate && (
-            <div className="rounded-md bg-slate-50 p-2 text-xs text-slate-500">
+            <div className="rounded-md bg-white border border-slate-200 p-2 text-xs text-slate-500">
               <span>{labelTipo(regime.tipo)} · {regime.aliquota}% · </span>
               <span>
                 {getMesiInPeriodo(

@@ -101,6 +101,7 @@ export function SaldiCrediti({ anno, calcoli }: Props) {
         {/* Nota esplicativa */}
         <div className="space-y-4">
           <Metric
+            featured
             value={formatEuro(
               calcoli.saldoImposteDaVersareAnnoCorrente +
               calcoli.saldoContributiGSAnnoCorrente +

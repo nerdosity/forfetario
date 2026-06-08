@@ -1,6 +1,8 @@
 export { Tooltip } from './Tooltip'
 export { Field } from './Field'
 export { NumberInput, Select } from './inputs'
+export { DateInput } from './DateInput'
+export { Modal } from './Modal'
 export { Card } from './Card'
 export { SummaryRow } from './SummaryRow'
 export { Metric } from './Metric'

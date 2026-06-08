@@ -24,8 +24,12 @@ export function Card({
   return (
     <section className={compact ? theme.cardCompact : theme.card}>
       {title && (
-        <header className="mb-4 flex items-center gap-2">
-          {Icon && <Icon size={20} className={intent[iconIntent].icon} aria-hidden />}
+        <header className="mb-5 flex items-center gap-3">
+          {Icon && (
+            <span className={`${theme.cardIconBadge} ${intent[iconIntent].badge}`}>
+              <Icon size={18} aria-hidden />
+            </span>
+          )}
           <h2 className={theme.h2}>{title}</h2>
           {info && <Tooltip content={info} />}
         </header>

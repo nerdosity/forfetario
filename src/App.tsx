@@ -46,12 +46,18 @@ export default function App() {
   return (
     <div className={theme.page}>
       {/* Intestazione */}
-      <header className="text-center mb-10">
-        <Calculator className="mx-auto mb-3 text-blue-600" size={44} aria-hidden />
-        <h1 className={theme.h1}>Calcolatore forfettario</h1>
-        <p className={`${theme.subtitle} mt-2`}>
-          Calcoli precisi e calendario fiscale completo · Anno {input.anno}
-        </p>
+      <header className={theme.hero}>
+        <div className="flex items-center gap-4">
+          <span className={theme.heroIcon}>
+            <Calculator size={32} aria-hidden />
+          </span>
+          <div>
+            <h1 className={theme.heroTitle}>Calcolatore forfettario</h1>
+            <p className={theme.heroSubtitle}>
+              Calcoli precisi e calendario fiscale completo · Anno {input.anno}
+            </p>
+          </div>
+        </div>
       </header>
 
       <div className={theme.grid}>
