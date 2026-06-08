@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { ChevronDown, ChevronUp } from 'lucide-react'
+import { ChevronDown, ChevronUp, Trash2, TriangleAlert } from 'lucide-react'
+import { Button, Modal as FbModal, ModalHeader, ModalBody, ModalFooter } from 'flowbite-react'
 import { RegimeEditor } from '@/components/RegimeEditor'
 import { GestoreAnni } from '@/components/GestoreAnni'
 import { Field, MoneyInput, Select } from '@/components/ui'
@@ -15,11 +16,19 @@ interface InputPanelProps {
   calcoli: RisultatoCalcolo | null
   onChange: (partial: Partial<InputState>) => void
   onAnniChanged: () => void
+  /** Azzera i dati del solo anno di riferimento corrente. */
+  onAzzeraAnnoCorrente: () => void
 }
 
 /** Pannello laterale di input: anno, contributi, regimi, opzioni avanzate. */
-export function InputPanel({ input, calcoli, onChange, onAnniChanged }: InputPanelProps) {
+export function InputPanel({ input, calcoli, onChange, onAnniChanged, onAzzeraAnnoCorrente }: InputPanelProps) {
   const [showAvanzate, setShowAvanzate] = useState(false)
+  const [confermaAzzera, setConfermaAzzera] = useState(false)
+
+  const azzera = () => {
+    onAzzeraAnnoCorrente()
+    setConfermaAzzera(false)
+  }
 
   return (
     <div>
@@ -201,6 +210,44 @@ export function InputPanel({ input, calcoli, onChange, onAnniChanged }: InputPan
           </div>
         )}
       </div>
+
+      {/* ── Azzera dati anno corrente ── */}
+      <div className={theme.sidebarBlock}>
+        <Button color="red" outline size="sm" onClick={() => setConfermaAzzera(true)}>
+          <Trash2 size={15} className="mr-2" aria-hidden />
+          Azzera dati {input.anno}
+        </Button>
+        <p className={`${theme.helpText} mt-2`}>
+          Cancella regimi, contributi e acconti del {input.anno}. I dati del {input.anno - 1} restano.
+        </p>
+      </div>
+
+      {/* Modal di conferma azzeramento */}
+      <FbModal show={confermaAzzera} size="md" onClose={() => setConfermaAzzera(false)} popup>
+        <ModalHeader />
+        <ModalBody>
+          <div className="text-center">
+            <TriangleAlert className="mx-auto mb-4 h-12 w-12 text-red-500" aria-hidden />
+            <h3 className="mb-2 text-lg font-semibold text-slate-800">
+              Azzerare i dati del {input.anno}?
+            </h3>
+            <p className="mb-1 text-sm text-slate-500">
+              Verranno cancellati regimi, contributi versati e acconti dell'anno {input.anno}.
+            </p>
+            <p className="text-sm text-slate-500">
+              I dati dell'anno {input.anno - 1} non saranno toccati. L'operazione non è reversibile.
+            </p>
+          </div>
+        </ModalBody>
+        <ModalFooter className="justify-center">
+          <Button color="red" onClick={azzera}>
+            Sì, azzera
+          </Button>
+          <Button color="light" onClick={() => setConfermaAzzera(false)}>
+            Annulla
+          </Button>
+        </ModalFooter>
+      </FbModal>
     </div>
   )
 }

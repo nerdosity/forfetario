@@ -86,6 +86,19 @@ export default function App() {
     forceUpdate()
   }, [setInput])
 
+  // Azzera SOLO i dati dell'anno di riferimento corrente (regimi e contributi/acconti
+  // dell'anno corrente). Anno selezionato e dati dell'anno precedente restano intatti.
+  const handleAzzeraAnnoCorrente = useCallback(() => {
+    setInput((prev) => ({
+      ...prev,
+      regimiCorrente: [regimeVuoto()],
+      contributiVersatiDuranteAnno: null,
+      accontiImposteVersatiPerAnnoCorrente: null,
+      accontiContributiSeparataVersatiPerAnnoCorrente: null,
+      accontiContributiEccedenzaArtCommVersatiPerAnnoCorrente: null,
+    }))
+  }, [setInput])
+
   const prev = calcoli.datiAnnoPrecedente
   const hasDatiPrecedente = prev.totaleFatturato > 0 || prev.totaleImponibileLordo > 0
 
@@ -107,11 +120,13 @@ export default function App() {
           </div>
           <div className={theme.topbarYear}>
             <span className="hidden sm:inline">Anno di riferimento</span>
-            <Select<number>
-              value={input.anno}
-              onChange={(v) => setInput((p) => ({ ...p, anno: v }))}
-              options={anniDisponibili().map((a) => ({ value: a, label: String(a) }))}
-            />
+            <div className="w-28">
+              <Select<number>
+                value={input.anno}
+                onChange={(v) => setInput((p) => ({ ...p, anno: v }))}
+                options={anniDisponibili().map((a) => ({ value: a, label: String(a) }))}
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -183,6 +198,7 @@ export default function App() {
             calcoli={calcoli}
             onChange={(partial) => setInput((p) => ({ ...p, ...partial }))}
             onAnniChanged={handleAnniChanged}
+            onAzzeraAnnoCorrente={handleAzzeraAnnoCorrente}
           />
         </DrawerItems>
       </Drawer>
