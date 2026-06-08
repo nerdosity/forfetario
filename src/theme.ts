@@ -7,15 +7,27 @@
  */
 
 export const theme = {
-  // --- App shell ---
-  appBg: 'min-h-screen bg-slate-100',
-  topbar: 'sticky top-0 z-30 border-b border-slate-200 bg-white/90 backdrop-blur',
-  topbarInner: 'mx-auto flex max-w-7xl items-center justify-between gap-4 px-6 py-3',
+  // --- App shell (stile Fiscozen: barra brand piena + nav orizzontale) ---
+  appBg: 'min-h-screen bg-slate-50',
+  // Barra superiore a tinta piena con il marchio
+  topbar: 'bg-blue-600',
+  topbarInner: 'mx-auto flex max-w-7xl items-center justify-between gap-4 px-6 py-4',
   brand: 'flex items-center gap-2.5',
-  brandMark: 'inline-flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-blue-600 to-indigo-700 text-white shadow-sm',
-  brandTitle: 'text-base font-semibold tracking-tight text-slate-900 leading-none',
-  brandTag: 'text-xs text-slate-400 leading-none mt-0.5',
+  brandMark: 'inline-flex h-8 w-8 items-center justify-center rounded-lg bg-white/15 text-white ring-1 ring-white/20',
+  brandTitle: 'text-lg font-semibold tracking-tight text-white leading-none',
+  topbarYear: 'flex items-center gap-2 text-sm text-white/90',
+  // Barra di navigazione orizzontale sotto al brand
+  navbar: 'sticky top-0 z-30 border-b border-slate-200 bg-white shadow-sm',
+  navbarInner: 'mx-auto flex max-w-7xl items-center gap-1 px-6',
+  navItem:
+    'inline-flex items-center gap-2 border-b-2 border-transparent px-4 py-4 text-sm font-medium ' +
+    'text-slate-500 transition-colors hover:text-slate-800',
+  navItemActive: 'border-blue-600 text-blue-700',
+  // Breadcrumb
+  breadcrumb: 'flex items-center gap-1.5 text-sm text-slate-400',
+  breadcrumbCurrent: 'text-slate-700 font-medium',
   shell: 'mx-auto max-w-7xl px-6 py-6 space-y-6',
+  pageTitle: 'text-2xl font-semibold tracking-tight text-blue-700',
 
   // --- KPI (tiles piene in stile Fiscozen) ---
   kpiStrip: 'grid grid-cols-2 gap-4 sm:grid-cols-4',

@@ -1,5 +1,5 @@
 import { Info } from 'lucide-react'
-import { theme } from '@/theme'
+import { Tooltip as FbTooltip } from 'flowbite-react'
 
 interface TooltipProps {
   /** Testo informativo mostrato al passaggio del mouse. */
@@ -8,20 +8,13 @@ interface TooltipProps {
   label?: string
 }
 
-/** Icona informativa (i) con bolla esplicativa al hover/focus. */
+/** Icona informativa (i) con tooltip Flowbite al hover/focus. */
 export function Tooltip({ content, label }: TooltipProps) {
   return (
-    <span className="group relative inline-flex">
-      <button
-        type="button"
-        className={theme.tooltipTrigger}
-        aria-label={label ?? content}
-      >
+    <FbTooltip content={<span className="whitespace-pre-wrap">{content}</span>}>
+      <button type="button" className="inline-flex text-slate-400 transition-colors hover:text-slate-600" aria-label={label ?? content}>
         <Info size={14} aria-hidden />
       </button>
-      <span role="tooltip" className={theme.tooltipBubble}>
-        {content}
-      </span>
-    </span>
+    </FbTooltip>
   )
 }

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { theme } from '@/theme'
+import { TextInput, Select as FbSelect } from 'flowbite-react'
 
 interface NumberInputProps {
   value: number | null
@@ -14,7 +14,7 @@ interface NumberInputProps {
   nullable?: boolean
 }
 
-/** Input numerico controllato che normalizza vuoto/NaN. */
+/** Input numerico controllato (Flowbite TextInput) che normalizza vuoto/NaN. */
 export function NumberInput({
   value,
   onChange,
@@ -27,10 +27,10 @@ export function NumberInput({
   nullable = false,
 }: NumberInputProps) {
   return (
-    <input
+    <TextInput
       id={id}
       type="number"
-      className={small ? theme.inputSmall : theme.input}
+      sizing={small ? 'sm' : 'md'}
       value={value ?? ''}
       placeholder={placeholder}
       min={min}
@@ -49,21 +49,30 @@ export function NumberInput({
   )
 }
 
-/** NumberInput con simbolo € agganciato a sinistra, per importi. */
+/** NumberInput con € come addon iniziale (Flowbite TextInput addon). */
 export function MoneyInput(props: Omit<NumberInputProps, 'placeholder'> & { placeholder?: string }) {
+  const { value, onChange, placeholder, min, max, step, small, id, nullable = false } = props
   return (
-    <div className="relative">
-      <span
-        className={`pointer-events-none absolute inset-y-0 left-0 flex items-center text-slate-400 ${
-          props.small ? 'pl-2 text-xs' : 'pl-3 text-sm'
-        }`}
-      >
-        €
-      </span>
-      <span className={props.small ? 'block [&>input]:pl-6' : 'block [&>input]:pl-7'}>
-        <NumberInput {...props} />
-      </span>
-    </div>
+    <TextInput
+      id={id}
+      type="number"
+      addon="€"
+      sizing={small ? 'sm' : 'md'}
+      value={value ?? ''}
+      placeholder={placeholder}
+      min={min}
+      max={max}
+      step={step}
+      onChange={(e) => {
+        const raw = e.target.value
+        if (raw === '') {
+          onChange(nullable ? null : 0)
+          return
+        }
+        const n = Number(raw)
+        onChange(Number.isNaN(n) ? (nullable ? null : 0) : n)
+      }}
+    />
   )
 }
 
@@ -80,7 +89,7 @@ interface SelectProps<T extends string | number> {
   id?: string
 }
 
-/** Select controllata che preserva il tipo (numero o stringa) del valore. */
+/** Select controllata (Flowbite Select) che preserva il tipo del valore. */
 export function Select<T extends string | number>({
   value,
   options,
@@ -90,9 +99,9 @@ export function Select<T extends string | number>({
 }: SelectProps<T>) {
   const isNumeric = typeof value === 'number'
   return (
-    <select
+    <FbSelect
       id={id}
-      className={small ? theme.inputSmall : theme.select}
+      sizing={small ? 'sm' : 'md'}
       value={value}
       onChange={(e) => onChange((isNumeric ? Number(e.target.value) : e.target.value) as T)}
     >
@@ -101,6 +110,6 @@ export function Select<T extends string | number>({
           {o.label}
         </option>
       ))}
-    </select>
+    </FbSelect>
   )
 }

@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
+import { Label } from 'flowbite-react'
 import { Tooltip } from './Tooltip'
-import { theme } from '@/theme'
 
 interface FieldProps {
   label: string
@@ -11,14 +11,14 @@ interface FieldProps {
   children: ReactNode
 }
 
-/** Wrapper etichetta + tooltip (i) + controllo. */
+/** Wrapper etichetta (Flowbite Label) + tooltip (i) + controllo. */
 export function Field({ label, info, small, htmlFor, children }: FieldProps) {
   return (
     <div className="space-y-1">
       <div className="flex items-center gap-1.5">
-        <label htmlFor={htmlFor} className={small ? theme.labelSmall : theme.label}>
+        <Label htmlFor={htmlFor} className={small ? 'text-xs' : undefined}>
           {label}
-        </label>
+        </Label>
         {info && <Tooltip content={info} />}
       </div>
       {children}

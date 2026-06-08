@@ -12,6 +12,7 @@ import {
   rimuoviAnnoPersonalizzato,
   anniPersonalizzatiSalvati,
 } from '@/data/customYears'
+import { Button } from 'flowbite-react'
 import { Field, NumberInput, DateInput, Modal } from '@/components/ui'
 import { theme } from '@/theme'
 
@@ -162,14 +163,10 @@ export function GestoreAnni({ onAnniChanged }: Props) {
           </span>
         ))}
 
-        <button
-          type="button"
-          onClick={apriNuovo}
-          className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-slate-300 px-3 py-1 text-xs font-medium text-slate-500 transition-colors hover:border-blue-400 hover:text-blue-600"
-        >
-          <Plus size={13} />
+        <Button color="light" size="xs" onClick={apriNuovo}>
+          <Plus size={13} className="mr-1" />
           Nuovo anno
-        </button>
+        </Button>
       </div>
 
       <Modal
@@ -185,12 +182,12 @@ export function GestoreAnni({ onAnniChanged }: Props) {
         }
         footer={
           <>
-            <button type="button" onClick={() => setAperto(false)} className={theme.btnSecondary}>
+            <Button color="light" onClick={() => setAperto(false)}>
               Annulla
-            </button>
-            <button type="button" onClick={salva} className={theme.btnPrimary}>
+            </Button>
+            <Button color="blue" onClick={salva}>
               {editing !== null ? 'Salva modifiche' : 'Crea anno'}
-            </button>
+            </Button>
           </>
         }
       >

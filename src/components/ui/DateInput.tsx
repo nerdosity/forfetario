@@ -1,4 +1,4 @@
-import { theme } from '@/theme'
+import { TextInput } from 'flowbite-react'
 
 interface DateInputProps {
   /** Valore in formato "MM-GG". */
@@ -11,24 +11,23 @@ interface DateInputProps {
 }
 
 /**
- * Date-picker nativo del browser per scadenze ricorrenti.
- * Internamente lavora su "AAAA-MM-GG" (richiesto da <input type="date">) ma
- * espone e restituisce solo "MM-GG", perché l'anno della scadenza è implicito.
+ * Date-picker NATIVO del browser (input type="date") per scadenze ricorrenti.
+ * Internamente lavora su "AAAA-MM-GG" (richiesto dall'input nativo) ma espone
+ * e restituisce solo "MM-GG", perché l'anno della scadenza è implicito.
  */
 export function DateInput({ value, onChange, anno, small, id }: DateInputProps) {
-  // "MM-GG" → "AAAA-MM-GG" per il controllo nativo
   const isoValue = /^\d{2}-\d{2}$/.test(value) ? `${anno}-${value}` : ''
 
   return (
-    <input
+    <TextInput
       id={id}
       type="date"
-      className={small ? theme.inputSmall : theme.input}
+      sizing={small ? 'sm' : 'md'}
       value={isoValue}
       onChange={(e) => {
-        const iso = e.target.value // "AAAA-MM-GG" oppure ""
+        const iso = e.target.value
         if (!iso) return
-        onChange(iso.slice(5)) // tiene "MM-GG"
+        onChange(iso.slice(5))
       }}
     />
   )

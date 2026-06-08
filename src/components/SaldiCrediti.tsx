@@ -1,4 +1,12 @@
 import { FileText } from 'lucide-react'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeadCell,
+  TableRow,
+} from 'flowbite-react'
 import type { RisultatoCalcolo } from '@/domain/types'
 import { Card } from '@/components/ui'
 import { formatEuro } from '@/domain/labels'
@@ -63,25 +71,25 @@ export function SaldiCrediti({ anno, calcoli }: Props) {
       </div>
 
       {righe.length > 0 ? (
-        <div className="overflow-hidden rounded-lg border border-slate-200">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
-                <th className="px-4 py-2.5">Voce</th>
-                <th className="px-4 py-2.5 text-right">Dovuto</th>
-                <th className="px-4 py-2.5 text-right">Acconti</th>
-                <th className="px-4 py-2.5 text-right">Saldo</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
+        <div className="overflow-x-auto">
+          <Table hoverable>
+            <TableHead>
+              <TableRow>
+                <TableHeadCell>Voce</TableHeadCell>
+                <TableHeadCell className="text-right">Dovuto</TableHeadCell>
+                <TableHeadCell className="text-right">Acconti</TableHeadCell>
+                <TableHeadCell className="text-right">Saldo</TableHeadCell>
+              </TableRow>
+            </TableHead>
+            <TableBody className="divide-y">
               {righe.map((r) => (
-                <tr key={r.voce} className="hover:bg-slate-50/60">
-                  <td className="px-4 py-3 font-medium text-slate-800">{r.voce}</td>
-                  <td className="px-4 py-3 text-right tabular-nums text-slate-600">{formatEuro(r.dovuto)}</td>
-                  <td className="px-4 py-3 text-right tabular-nums text-slate-500">
+                <TableRow key={r.voce} className="bg-white">
+                  <TableCell className="font-medium text-slate-800">{r.voce}</TableCell>
+                  <TableCell className="text-right tabular-nums text-slate-600">{formatEuro(r.dovuto)}</TableCell>
+                  <TableCell className="text-right tabular-nums text-slate-500">
                     {r.acconti > 0.005 ? `− ${formatEuro(r.acconti)}` : '—'}
-                  </td>
-                  <td className="px-4 py-3 text-right tabular-nums font-semibold">
+                  </TableCell>
+                  <TableCell className="text-right font-semibold tabular-nums">
                     {r.credito && r.credito > 0.005 ? (
                       <span className="text-emerald-700">+ {formatEuro(r.credito)}</span>
                     ) : (
@@ -89,11 +97,11 @@ export function SaldiCrediti({ anno, calcoli }: Props) {
                         {formatEuro(r.saldo)}
                       </span>
                     )}
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
       ) : (
         <p className={theme.helpText}>Nessun saldo da versare con i dati inseriti.</p>

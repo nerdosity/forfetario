@@ -1,4 +1,13 @@
 import { Calendar } from 'lucide-react'
+import {
+  Badge,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeadCell,
+  TableRow,
+} from 'flowbite-react'
 import type { RisultatoCalcolo, Scadenza } from '@/domain/types'
 import { Card, Tooltip } from '@/components/ui'
 import { formatEuro } from '@/domain/labels'
@@ -21,11 +30,11 @@ const STATO_LABEL: Record<Stato, string> = {
   'in-scadenza': 'In scadenza',
   prevista: 'Prevista',
 }
-const STATO_BADGE: Record<Stato, string> = {
-  scaduta: 'bg-rose-100 text-rose-700',
-  'in-scadenza': 'bg-amber-100 text-amber-700',
-  prevista: 'bg-sky-100 text-sky-700',
-}
+const STATO_COLOR = {
+  scaduta: 'failure',
+  'in-scadenza': 'warning',
+  prevista: 'info',
+} as const
 
 /** Determina lo stato di una scadenza rispetto a oggi (>30gg futura = prevista). */
 function statoScadenza(data: string): Stato {
@@ -46,40 +55,13 @@ function dettaglioUtile(s: Scadenza): string | null {
   return null
 }
 
-function RigaScadenza({ scadenza }: { scadenza: Scadenza }) {
-  const stato = statoScadenza(scadenza.data)
-  const dettaglio = dettaglioUtile(scadenza)
-  const scaduta = stato === 'scaduta'
-
-  return (
-    <tr className={theme.tableRow}>
-      <td className={theme.tableCell}>
-        <div className="flex items-center gap-1.5">
-          <span className={`font-medium ${scaduta ? 'text-slate-400' : 'text-slate-800'}`}>
-            {scadenza.descrizione}
-          </span>
-          {dettaglio && <Tooltip content={dettaglio} label="Dettaglio componenti" />}
-        </div>
-      </td>
-      <td className={theme.tableCell}>
-        <span className={`${theme.statusBadge} ${STATO_BADGE[stato]}`}>{STATO_LABEL[stato]}</span>
-      </td>
-      <td className={`${theme.tableCell} text-right tabular-nums font-semibold ${scaduta ? 'text-slate-400' : 'text-slate-800'}`}>
-        {formatEuro(scadenza.importo)}
-      </td>
-      <td className={`${theme.tableCell} whitespace-nowrap text-right tabular-nums ${scaduta ? 'text-slate-400' : 'text-slate-600'}`}>
-        {scadenza.data}
-      </td>
-    </tr>
-  )
-}
-
 function TabellaScadenze({ titolo, sottotitolo, scadenze }: {
   titolo: string
   sottotitolo?: string
   scadenze: Scadenza[]
 }) {
   const totale = scadenze.reduce((s, x) => s + x.importo, 0)
+
   return (
     <div>
       <div className="mb-3 flex items-baseline justify-between">
@@ -93,20 +75,45 @@ function TabellaScadenze({ titolo, sottotitolo, scadenze }: {
       </div>
 
       {scadenze.length > 0 ? (
-        <div className="overflow-x-auto rounded-lg border border-slate-200">
-          <table className={theme.table}>
-            <thead className={theme.tableHead}>
-              <tr>
-                <th className={theme.tableHeadCell}>Adempimento</th>
-                <th className={theme.tableHeadCell}>Stato</th>
-                <th className={`${theme.tableHeadCell} text-right`}>Importo</th>
-                <th className={`${theme.tableHeadCell} text-right`}>Scadenza</th>
-              </tr>
-            </thead>
-            <tbody>
-              {scadenze.map((s, i) => <RigaScadenza key={i} scadenza={s} />)}
-            </tbody>
-          </table>
+        <div className="overflow-x-auto">
+          <Table hoverable>
+            <TableHead>
+              <TableRow>
+                <TableHeadCell>Adempimento</TableHeadCell>
+                <TableHeadCell>Stato</TableHeadCell>
+                <TableHeadCell className="text-right">Importo</TableHeadCell>
+                <TableHeadCell className="text-right">Scadenza</TableHeadCell>
+              </TableRow>
+            </TableHead>
+            <TableBody className="divide-y">
+              {scadenze.map((s, i) => {
+                const stato = statoScadenza(s.data)
+                const dettaglio = dettaglioUtile(s)
+                const scaduta = stato === 'scaduta'
+                return (
+                  <TableRow key={i} className="bg-white">
+                    <TableCell className={`font-medium ${scaduta ? 'text-slate-400' : 'text-slate-800'}`}>
+                      <span className="inline-flex items-center gap-1.5">
+                        {s.descrizione}
+                        {dettaglio && <Tooltip content={dettaglio} label="Dettaglio componenti" />}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <Badge color={STATO_COLOR[stato]} className="w-fit">
+                        {STATO_LABEL[stato]}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className={`text-right font-semibold tabular-nums ${scaduta ? 'text-slate-400' : 'text-slate-800'}`}>
+                      {formatEuro(s.importo)}
+                    </TableCell>
+                    <TableCell className={`whitespace-nowrap text-right tabular-nums ${scaduta ? 'text-slate-400' : 'text-slate-600'}`}>
+                      {s.data}
+                    </TableCell>
+                  </TableRow>
+                )
+              })}
+            </TableBody>
+          </Table>
         </div>
       ) : (
         <p className={theme.helpText}>Nessuna scadenza rilevante calcolata.</p>
