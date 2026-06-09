@@ -29,6 +29,8 @@ const inputBase: CalcoloInput = {
   regimiCorrente: [regimeSeparata],
   regimiPrecedente: [{ ...regimeSeparata, id: 'prev', fatturato: 30000 }],
   contributiVersatiDuranteAnno: null,
+  modalitaContributiVersati: 'totale',
+  contributiVersatiDettaglio: [],
   contributiVersatiDuranteAnnoPrecedente: null,
   accontiImposteVersatiPerAnnoCorrente: null,
   accontiImposteVersatiPerAnnoPrecedente: null,

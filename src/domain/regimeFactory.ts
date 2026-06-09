@@ -1,7 +1,13 @@
-import type { Regime } from '@/domain/types'
+import type { Regime, TipoVersamento, VersamentoContributo } from '@/domain/types'
 
 let contatore = 0
 const nuovoId = () => `regime-${++contatore}`
+
+let contatoreVers = 0
+/** Crea una riga di versamento contributi vuota. */
+export function versamentoVuoto(tipo: TipoVersamento = 'altro'): VersamentoContributo {
+  return { id: `vers-${++contatoreVers}`, tipo, descrizione: '', importo: null }
+}
 
 /**
  * Crea un regime vuoto senza dati precompilati, con periodo sull'anno intero

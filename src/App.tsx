@@ -30,6 +30,8 @@ function inputDefault(): CalcoloInput {
     regimiCorrente: [regimeVuoto()],
     regimiPrecedente: [regimeVuoto()],
     contributiVersatiDuranteAnno: null,
+    modalitaContributiVersati: 'totale',
+    contributiVersatiDettaglio: [],
     contributiVersatiDuranteAnnoPrecedente: null,
     accontiImposteVersatiPerAnnoCorrente: null,
     accontiImposteVersatiPerAnnoPrecedente: null,

@@ -1,5 +1,5 @@
-import type { CalcoloInput, Regime } from '@/domain/types'
-import { regimeVuoto } from '@/domain/regimeFactory'
+import type { CalcoloInput, Regime, TipoVersamento, VersamentoContributo } from '@/domain/types'
+import { regimeVuoto, versamentoVuoto } from '@/domain/regimeFactory'
 import { anniDisponibili } from '@/data/taxData'
 
 const LS_KEY = 'forfettario_input'
@@ -49,6 +49,26 @@ function normalizzaRegimi(raw: unknown): Regime[] {
   return raw.map(normalizzaRegime)
 }
 
+const TIPI_VERS: TipoVersamento[] = ['separata', 'fissi', 'eccedenza', 'altro']
+
+/** Ricostruisce una riga di versamento valida da dati grezzi. */
+function normalizzaVersamento(raw: unknown): VersamentoContributo {
+  const base = versamentoVuoto()
+  if (typeof raw !== 'object' || raw === null) return base
+  const o = raw as Record<string, unknown>
+  return {
+    id: base.id,
+    tipo: TIPI_VERS.includes(o.tipo as TipoVersamento) ? (o.tipo as TipoVersamento) : 'altro',
+    descrizione: typeof o.descrizione === 'string' ? o.descrizione : '',
+    importo: numOrNull(o.importo),
+  }
+}
+
+function normalizzaDettaglio(raw: unknown): VersamentoContributo[] {
+  if (!Array.isArray(raw)) return []
+  return raw.map(normalizzaVersamento)
+}
+
 /**
  * Carica l'input salvato, fondendolo con uno stato di default. Restituisce
  * `null` se non c'è nulla di valido in localStorage (l'app userà il default).
@@ -68,6 +88,8 @@ export function caricaInput(base: CalcoloInput): CalcoloInput | null {
       regimiCorrente: normalizzaRegimi(o.regimiCorrente),
       regimiPrecedente: normalizzaRegimi(o.regimiPrecedente),
       contributiVersatiDuranteAnno: numOrNull(o.contributiVersatiDuranteAnno),
+      modalitaContributiVersati: o.modalitaContributiVersati === 'dettaglio' ? 'dettaglio' : 'totale',
+      contributiVersatiDettaglio: normalizzaDettaglio(o.contributiVersatiDettaglio),
       contributiVersatiDuranteAnnoPrecedente: numOrNull(o.contributiVersatiDuranteAnnoPrecedente),
       accontiImposteVersatiPerAnnoCorrente: numOrNull(o.accontiImposteVersatiPerAnnoCorrente),
       accontiImposteVersatiPerAnnoPrecedente: numOrNull(o.accontiImposteVersatiPerAnnoPrecedente),

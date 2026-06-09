@@ -22,6 +22,11 @@ function inputDiEsempio(): CalcoloInput {
     ],
     regimiPrecedente: [{ ...regimeVuoto(), fatturato: 30000 }],
     contributiVersatiDuranteAnno: 1234.56,
+    modalitaContributiVersati: 'dettaglio',
+    contributiVersatiDettaglio: [
+      { id: 'v1', tipo: 'fissi', descrizione: '', importo: 1000 },
+      { id: 'v2', tipo: 'altro', descrizione: 'Ravvedimento', importo: 234.56 },
+    ],
     contributiVersatiDuranteAnnoPrecedente: 1000,
     accontiImposteVersatiPerAnnoCorrente: 200,
     accontiImposteVersatiPerAnnoPrecedente: 150,
@@ -36,11 +41,23 @@ describe('inputStorage', () => {
     salvaInput(input)
     const caricato = caricaInput(inputDiEsempio())!
 
-    // ogni chiave di CalcoloInput, eccetto i regimi (verificati a parte)
+    // ogni chiave di CalcoloInput, eccetto quelle con id rigenerati (verificate a parte)
     for (const k of Object.keys(input) as (keyof CalcoloInput)[]) {
-      if (k === 'regimiCorrente' || k === 'regimiPrecedente') continue
+      if (k === 'regimiCorrente' || k === 'regimiPrecedente' || k === 'contributiVersatiDettaglio') continue
       expect(caricato[k]).toEqual(input[k])
     }
+  })
+
+  it('round-trip: preserva modalità e righe dei contributi versati (tranne id)', () => {
+    const input = inputDiEsempio()
+    salvaInput(input)
+    const caricato = caricaInput(inputDiEsempio())!
+
+    expect(caricato.modalitaContributiVersati).toBe('dettaglio')
+    expect(caricato.contributiVersatiDettaglio).toHaveLength(2)
+    expect(caricato.contributiVersatiDettaglio.map(({ id: _id, ...r }) => r)).toEqual(
+      input.contributiVersatiDettaglio.map(({ id: _id, ...r }) => r),
+    )
   })
 
   it('round-trip: preserva tutti i campi dei regimi (tranne id, rigenerato)', () => {

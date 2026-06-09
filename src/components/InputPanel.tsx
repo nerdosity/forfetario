@@ -3,13 +3,17 @@ import { Trash2, TriangleAlert, CalendarRange, Landmark, History, Wallet } from 
 import { Button, Modal as FbModal, ModalHeader, ModalBody, ModalFooter } from 'flowbite-react'
 import { RegimeEditor } from '@/components/RegimeEditor'
 import { GestoreAnni } from '@/components/GestoreAnni'
+import { ContributiVersati } from '@/components/ContributiVersati'
 import { Card, Field, MoneyInput, Select } from '@/components/ui'
 import { anniDisponibili } from '@/data/taxData'
-import type { CalcoloInput, RisultatoCalcolo } from '@/domain/types'
-import { formatEuro } from '@/domain/labels'
+import type { CalcoloInput, RisultatoCalcolo, VersamentoContributo } from '@/domain/types'
 import { theme } from '@/theme'
 
 type InputState = Omit<CalcoloInput, 'anno'> & { anno: number }
+
+/** Somma degli importi delle righe di dettaglio (null contano come 0). */
+const sommaDettaglio = (righe: VersamentoContributo[]): number =>
+  righe.reduce((s, r) => s + (r.importo ?? 0), 0)
 
 interface InputPanelProps {
   input: InputState
@@ -71,24 +75,30 @@ export function InputPanel({ input, calcoli, onChange, onAnniChanged, onAzzeraAn
 
         {/* Contributi versati anno corrente */}
         <Card title={`Contributi versati nel ${input.anno}`} icon={Landmark} iconIntent="warning">
-          <Field
-            label="Contributi INPS versati"
-            info={`Somma di tutti i contributi INPS effettivamente versati durante il ${input.anno}: saldi dell'anno precedente, acconti, rate fisse. Deducibile dall'imponibile prima del calcolo dell'imposta sostitutiva ${input.anno}.`}
-          >
-            <MoneyInput
-              value={input.contributiVersatiDuranteAnno}
-              onChange={(v) => onChange({ contributiVersatiDuranteAnno: v })}
-              placeholder={`Stima: ${formatEuro(calcoli?.totaleContributiINPS ?? 0)}`}
-              min={0}
-              step={0.01}
-              nullable
-            />
-          </Field>
-          {calcoli && (
-            <p className={`${theme.helpText} mt-2`}>
-              Valore usato per la deducibilità: {formatEuro(calcoli.contributiVersatiAnnoImpostaPerDeducibilita)}
-            </p>
-          )}
+          <ContributiVersati
+            anno={input.anno}
+            calcoli={calcoli}
+            modalita={input.modalitaContributiVersati}
+            totale={input.contributiVersatiDuranteAnno}
+            dettaglio={input.contributiVersatiDettaglio}
+            onChangeModalita={(m) =>
+              onChange(
+                m === 'dettaglio'
+                  ? {
+                      modalitaContributiVersati: 'dettaglio',
+                      contributiVersatiDuranteAnno: sommaDettaglio(input.contributiVersatiDettaglio),
+                    }
+                  : { modalitaContributiVersati: 'totale' },
+              )
+            }
+            onChangeTotale={(v) => onChange({ contributiVersatiDuranteAnno: v })}
+            onChangeDettaglio={(righe) =>
+              onChange({
+                contributiVersatiDettaglio: righe,
+                contributiVersatiDuranteAnno: sommaDettaglio(righe),
+              })
+            }
+          />
         </Card>
 
         {/* Dati anno precedente */}

@@ -72,6 +72,21 @@ export interface DettaglioRegime extends Regime {
 // Input
 // ---------------------------------------------------------------------------
 
+/**
+ * Tipologia di un versamento di contributi. Le prime tre sono allineate ai
+ * "dovuti" calcolati (per suggerire un placeholder sensato); 'altro' è libero.
+ */
+export type TipoVersamento = 'separata' | 'fissi' | 'eccedenza' | 'altro'
+
+/** Una singola voce di contributo versato durante l'anno. */
+export interface VersamentoContributo {
+  id: string
+  tipo: TipoVersamento
+  /** Descrizione libera (usata soprattutto per 'altro'). */
+  descrizione: string
+  importo: number | null
+}
+
 /** Tutti gli input che alimentano il motore di calcolo. */
 export interface CalcoloInput {
   anno: number
@@ -80,9 +95,17 @@ export interface CalcoloInput {
 
   /**
    * Contributi INPS versati DURANTE l'anno di riferimento (deducibili per
-   * il calcolo dell'imposta sostitutiva dell'anno corrente).
+   * il calcolo dell'imposta sostitutiva dell'anno corrente). È il valore
+   * EFFETTIVO usato dal motore: in modalità 'totale' è il numero inserito a
+   * mano; in modalità 'dettaglio' è la somma di `contributiVersatiDettaglio`.
    */
   contributiVersatiDuranteAnno: number | null
+
+  /** Modalità di inserimento dei contributi versati nell'anno corrente. */
+  modalitaContributiVersati: 'totale' | 'dettaglio'
+
+  /** Righe di dettaglio dei versamenti (usate quando la modalità è 'dettaglio'). */
+  contributiVersatiDettaglio: VersamentoContributo[]
 
   /**
    * Contributi INPS versati DURANTE l'anno precedente (deducibili per il

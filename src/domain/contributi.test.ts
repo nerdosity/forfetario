@@ -7,6 +7,15 @@ describe('getMesiInPeriodo', () => {
   it('mar-dic → 10', () => expect(getMesiInPeriodo(3, 1, 12, 31)).toBe(10))
   it('mese singolo → 1', () => expect(getMesiInPeriodo(6, 1, 6, 30)).toBe(1))
   it('meseInizio > meseFine → 0', () => expect(getMesiInPeriodo(12, 1, 3, 31)).toBe(0))
+
+  // Regola INPS contributi fissi: il mese conta intero anche se attivo un solo
+  // giorno. Il giorno NON cambia il conteggio (vale "dal 1° del mese").
+  it('ingresso a metà mese: gen 1 → feb 14 conta comunque 2 mesi', () =>
+    expect(getMesiInPeriodo(1, 1, 2, 14)).toBe(2))
+  it('uscita a metà mese: feb 15 → dic 31 conta comunque 11 mesi', () =>
+    expect(getMesiInPeriodo(2, 15, 12, 31)).toBe(11))
+  it('stesso mese, frazione di giorni: feb 10 → feb 14 conta 1 mese', () =>
+    expect(getMesiInPeriodo(2, 10, 2, 14)).toBe(1))
 })
 
 describe('applicaRiduzioneIVS', () => {
