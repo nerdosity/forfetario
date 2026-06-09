@@ -33,7 +33,9 @@ function inputDefault(): CalcoloInput {
     modalitaContributiVersati: 'totale',
     contributiVersatiDettaglio: [],
     contributiVersatiDuranteAnnoPrecedente: null,
-    accontiImposteVersatiPerAnnoCorrente: null,
+    impostaSaldoVersatoAnnoCorrente: null,
+    impostaAcconto1VersatoAnnoCorrente: null,
+    impostaAcconto2VersatoAnnoCorrente: null,
     accontiImposteVersatiPerAnnoPrecedente: null,
   }
 }
@@ -187,7 +189,7 @@ export default function App() {
         )}
         {tab === 'riepilogo' && <DettaglioRegimi anno={input.anno} calcoli={calcoli} />}
         {tab === 'regimi' && <DettaglioRegimi anno={input.anno} calcoli={calcoli} />}
-        {tab === 'calendario' && <CalendarioFiscale anno={input.anno} calcoli={calcoli} />}
+        {tab === 'calendario' && <CalendarioFiscale anno={input.anno} calcoli={calcoli} input={input} />}
         {tab === 'saldi' && <SaldiCrediti anno={input.anno} calcoli={calcoli} />}
         {tab === 'precedente' && hasDatiPrecedente && (
           <RiepilogoPrecedente

@@ -28,7 +28,9 @@ function inputDiEsempio(): CalcoloInput {
       { id: 'v2', tipo: 'altro', descrizione: 'Ravvedimento', importo: 234.56 },
     ],
     contributiVersatiDuranteAnnoPrecedente: 1000,
-    accontiImposteVersatiPerAnnoCorrente: 200,
+    impostaSaldoVersatoAnnoCorrente: 100,
+    impostaAcconto1VersatoAnnoCorrente: 200,
+    impostaAcconto2VersatoAnnoCorrente: 180,
     accontiImposteVersatiPerAnnoPrecedente: 150,
   }
 }

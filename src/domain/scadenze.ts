@@ -1,4 +1,4 @@
-import type { Regime, Scadenza } from '@/domain/types'
+import type { CalcoloInput, Regime, Scadenza, RiferimentoScadenza, TipoVersamento } from '@/domain/types'
 import { datiAnno, contributoFissoAnno } from '@/data/taxData'
 import { calcolaRateContributiFissi, applicaRiduzioneIVS } from '@/domain/contributi'
 import { formattaScadenza } from '@/domain/dates'
@@ -40,6 +40,38 @@ export interface RisultatoScadenze {
 }
 
 /**
+ * Importo complessivamente versato a fronte di una scadenza, sommando i
+ * versamenti collegati ai suoi riferimenti. I riferimenti 'imposta-*' guardano
+ * i campi acconti imposta; gli altri le righe tipizzate della lista contributi.
+ * Restituisce null se la scadenza non è tracciabile (nessun riferimento, es.
+ * scadenze future i cui versamenti non sono ancora stati inseriti).
+ */
+export function versatoPerScadenza(scadenza: Scadenza, input: CalcoloInput): number | null {
+  const rif = scadenza.riferimenti
+  if (!rif || rif.length === 0) return null
+
+  const importoVoce = (tipo: TipoVersamento): number =>
+    input.modalitaContributiVersati === 'dettaglio'
+      ? input.contributiVersatiDettaglio
+          .filter((r) => r.tipo === tipo)
+          .reduce((s, r) => s + (r.importo ?? 0), 0)
+      : 0
+
+  return rif.reduce((tot, r) => {
+    if (r === 'imposta-saldo') return tot + (input.impostaSaldoVersatoAnnoCorrente ?? 0)
+    if (r === 'imposta-acconto1') return tot + (input.impostaAcconto1VersatoAnnoCorrente ?? 0)
+    if (r === 'imposta-acconto2') return tot + (input.impostaAcconto2VersatoAnnoCorrente ?? 0)
+    return tot + importoVoce(r)
+  }, 0)
+}
+
+/** Vero se la scadenza risulta saldata (versato ≥ dovuto, con tolleranza). */
+export function scadenzaPagata(scadenza: Scadenza, input: CalcoloInput): boolean {
+  const versato = versatoPerScadenza(scadenza, input)
+  return versato != null && versato + 0.005 >= scadenza.importo && scadenza.importo > 0.005
+}
+
+/**
  * Costruisce il calendario fiscale completo:
  * - Scadenze nell'anno di riferimento (rate fissi correnti + saldo/acconti basati sull'anno precedente)
  * - Scadenze nell'anno successivo (ultima rata fissi correnti + saldo/acconti basati sull'anno corrente
@@ -62,6 +94,11 @@ export function calcolaScadenze({
   const { saldoAccontoImposte, secondoAccontoImposte } = datiAnno(anno).scadenze
   const fissiCorrenti = regimiConFissi(regimiCorrente)
 
+  // Riferimento al versamento per la rata fissi, in base al trimestre.
+  // La 4ª rata (annoOffset → annoSucc) si paga l'anno dopo come 'fissi-4-prec'.
+  const rifRataFissi = (idxTrim: number): RiferimentoScadenza | undefined =>
+    (['fissi-1', 'fissi-2', 'fissi-3', 'fissi-4-prec'] as const)[idxTrim]
+
   // ─── Rate contributi fissi che cadono nell'anno corrente ───────────────────
   for (const regime of fissiCorrenti) {
     for (const rata of calcolaRateContributiFissi(regime, anno).rate) {
@@ -72,6 +109,7 @@ export function calcolaScadenze({
           importo: rata.importo,
           componenti: [{ tipo: `Rata contributi fissi ${labelTipo(regime.tipo)} ${anno}`, importo: rata.importo }],
           annoScadenza: anno,
+          riferimenti: [rifRataFissi(rata.rataIdx)].filter(Boolean) as RiferimentoScadenza[],
         })
       }
     }
@@ -85,20 +123,25 @@ export function calcolaScadenze({
   const accontoImposteAnnoCorrente =
     totaleImpostePrecedente > SOGLIA_ACCONTO ? totaleImpostePrecedente * QUOTA_ACCONTO_IMPOSTE : 0
 
-  if (saldoImpostePrecedente > 0 || accontoImposteAnnoCorrente > 0) {
+  // Saldo e 1° acconto cadono lo stesso giorno ma sono due versamenti distinti
+  if (saldoImpostePrecedente > 0) {
     globali.push({
       data: formattaScadenza(saldoAccontoImposte, anno),
-      descrizione: `Saldo imposte ${anno - 1} + 1° acconto imposte ${anno}`,
-      importo: saldoImpostePrecedente + accontoImposteAnnoCorrente,
-      componenti: [
-        ...(saldoImpostePrecedente > 0
-          ? [{ tipo: `Saldo imposte ${anno - 1}`, importo: saldoImpostePrecedente }]
-          : []),
-        ...(accontoImposteAnnoCorrente > 0
-          ? [{ tipo: `1° acconto imposte ${anno} (su tax netta ${anno - 1})`, importo: accontoImposteAnnoCorrente }]
-          : []),
-      ],
+      descrizione: `Saldo imposte ${anno - 1}`,
+      importo: saldoImpostePrecedente,
+      componenti: [{ tipo: `Saldo imposte ${anno - 1}`, importo: saldoImpostePrecedente }],
       annoScadenza: anno,
+      riferimenti: ['imposta-saldo'],
+    })
+  }
+  if (accontoImposteAnnoCorrente > 0) {
+    globali.push({
+      data: formattaScadenza(saldoAccontoImposte, anno),
+      descrizione: `1° acconto imposte ${anno}`,
+      importo: accontoImposteAnnoCorrente,
+      componenti: [{ tipo: `1° acconto imposte ${anno} (su tax netta ${anno - 1})`, importo: accontoImposteAnnoCorrente }],
+      annoScadenza: anno,
+      riferimenti: ['imposta-acconto1'],
     })
   }
   if (accontoImposteAnnoCorrente > 0) {
@@ -108,8 +151,11 @@ export function calcolaScadenze({
       importo: accontoImposteAnnoCorrente,
       componenti: [{ tipo: `2° acconto imposte ${anno} (su tax netta ${anno - 1})`, importo: accontoImposteAnnoCorrente }],
       annoScadenza: anno,
+      riferimenti: ['imposta-acconto2'],
     })
   }
+  // (le scadenze imposte/contributi dell'anno SUCCESSIVO restano accorpate:
+  //  i loro versamenti non sono nella lista dell'anno corrente, niente riscontro)
 
   // ─── Ultima rata contributi fissi correnti (anno+1) ───────────────────────
   for (const regime of fissiCorrenti) {
@@ -121,6 +167,7 @@ export function calcolaScadenze({
           importo: rata.importo,
           componenti: [{ tipo: `Rata contributi fissi ${labelTipo(regime.tipo)} ${anno}`, importo: rata.importo }],
           annoScadenza: annoSucc,
+          riferimenti: [rifRataFissi(rata.rataIdx)].filter(Boolean) as RiferimentoScadenza[],
         })
       }
     }

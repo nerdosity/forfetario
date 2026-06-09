@@ -170,9 +170,15 @@ export function calcola(input: CalcoloInput): RisultatoCalcolo {
     regimiCorrente,
     regimiPrecedente,
     contributiVersatiDuranteAnnoPrecedente,
-    accontiImposteVersatiPerAnnoCorrente,
+    impostaAcconto1VersatoAnnoCorrente,
+    impostaAcconto2VersatoAnnoCorrente,
     accontiImposteVersatiPerAnnoPrecedente,
   } = input
+
+  // Acconti imposta usati per il saldo: 1° (giugno) + 2° (novembre). Il saldo
+  // dell'anno precedente NON è un acconto, è il saldo a sé.
+  const accontiImposteVersatiPerAnnoCorrente =
+    (impostaAcconto1VersatoAnnoCorrente ?? 0) + (impostaAcconto2VersatoAnnoCorrente ?? 0)
 
   const deducibiliAnnoCorrente = contributiVersatiEffettivi(input)
   const deducibiliAnnoPrecedente = contributiVersatiDuranteAnnoPrecedente ?? 0
@@ -202,7 +208,7 @@ export function calcola(input: CalcoloInput): RisultatoCalcolo {
   // ─── Saldi anno corrente ──────────────────────────────────────────────────
   // Gli acconti imposta restano un campo dedicato (l'imposta non è un contributo);
   // gli acconti contributi si ricavano dalle righe della lista versamenti.
-  const accontiImposteEff = accontiImposteVersatiPerAnnoCorrente ?? 0
+  const accontiImposteEff = accontiImposteVersatiPerAnnoCorrente
   const accontiGSEff = accontoVersatoDaLista(input, 'gs')
   const accontiEccEff = accontoVersatoDaLista(input, 'ecc')
 

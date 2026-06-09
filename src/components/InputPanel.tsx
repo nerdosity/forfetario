@@ -121,23 +121,51 @@ export function InputPanel({ input, calcoli, onChange, onAnniChanged, onAzzeraAn
 
           <div className="space-y-5">
             <div className="space-y-3">
-              <p className={theme.groupLabel}>
-                Acconti versati nel {input.anno}, per il {input.anno}
-              </p>
+              <p className={theme.groupLabel}>Versati nel {input.anno}</p>
               <Field
-                label="Imposta sostitutiva"
+                label="Saldo imposta (anno prec.)"
                 small
-                info={`Acconti d'imposta sostitutiva versati a giugno e novembre ${input.anno}, calcolati sulle imposte ${input.anno - 1}. Usati per determinare il saldo.`}
+                info={`Saldo dell'imposta sostitutiva ${input.anno - 1}, versato a giugno ${input.anno}.`}
               >
                 <MoneyInput
-                  value={input.accontiImposteVersatiPerAnnoCorrente}
-                  onChange={(v) => onChange({ accontiImposteVersatiPerAnnoCorrente: v })}
+                  value={input.impostaSaldoVersatoAnnoCorrente}
+                  onChange={(v) => onChange({ impostaSaldoVersatoAnnoCorrente: v })}
                   placeholder="0"
                   min={0}
                   step={0.01}
                   nullable
                 />
               </Field>
+              <div className="grid grid-cols-2 gap-3">
+                <Field
+                  label="1° acconto"
+                  small
+                  info={`1° acconto d'imposta sostitutiva, versato a giugno ${input.anno} (sulle imposte ${input.anno - 1}).`}
+                >
+                  <MoneyInput
+                    value={input.impostaAcconto1VersatoAnnoCorrente}
+                    onChange={(v) => onChange({ impostaAcconto1VersatoAnnoCorrente: v })}
+                    placeholder="0"
+                    min={0}
+                    step={0.01}
+                    nullable
+                  />
+                </Field>
+                <Field
+                  label="2° acconto"
+                  small
+                  info={`2° acconto d'imposta sostitutiva, versato a novembre ${input.anno}.`}
+                >
+                  <MoneyInput
+                    value={input.impostaAcconto2VersatoAnnoCorrente}
+                    onChange={(v) => onChange({ impostaAcconto2VersatoAnnoCorrente: v })}
+                    placeholder="0"
+                    min={0}
+                    step={0.01}
+                    nullable
+                  />
+                </Field>
+              </div>
             </div>
 
             <hr className="border-slate-100" />

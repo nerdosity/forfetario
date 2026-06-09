@@ -32,7 +32,9 @@ const inputBase: CalcoloInput = {
   modalitaContributiVersati: 'totale',
   contributiVersatiDettaglio: [],
   contributiVersatiDuranteAnnoPrecedente: null,
-  accontiImposteVersatiPerAnnoCorrente: null,
+  impostaSaldoVersatoAnnoCorrente: null,
+  impostaAcconto1VersatoAnnoCorrente: null,
+  impostaAcconto2VersatoAnnoCorrente: null,
   accontiImposteVersatiPerAnnoPrecedente: null,
 }
 
@@ -110,7 +112,7 @@ describe('calcola — deducibilità contributi versati', () => {
 
 describe('calcola — credito imposte', () => {
   it('acconti > dovuto → credito', () => {
-    const r = calcola({ ...inputBase, accontiImposteVersatiPerAnnoCorrente: 99999 })
+    const r = calcola({ ...inputBase, impostaAcconto1VersatoAnnoCorrente: 99999 })
     expect(r.creditoImposteAnnoCorrente).toBeGreaterThan(0)
     expect(r.saldoImposteDaVersareAnnoCorrente).toBe(0)
   })

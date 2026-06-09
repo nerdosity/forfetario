@@ -95,7 +95,9 @@ export function caricaInput(base: CalcoloInput): CalcoloInput | null {
       modalitaContributiVersati: o.modalitaContributiVersati === 'dettaglio' ? 'dettaglio' : 'totale',
       contributiVersatiDettaglio: normalizzaDettaglio(o.contributiVersatiDettaglio),
       contributiVersatiDuranteAnnoPrecedente: numOrNull(o.contributiVersatiDuranteAnnoPrecedente),
-      accontiImposteVersatiPerAnnoCorrente: numOrNull(o.accontiImposteVersatiPerAnnoCorrente),
+      impostaSaldoVersatoAnnoCorrente: numOrNull(o.impostaSaldoVersatoAnnoCorrente),
+      impostaAcconto1VersatoAnnoCorrente: numOrNull(o.impostaAcconto1VersatoAnnoCorrente),
+      impostaAcconto2VersatoAnnoCorrente: numOrNull(o.impostaAcconto2VersatoAnnoCorrente),
       accontiImposteVersatiPerAnnoPrecedente: numOrNull(o.accontiImposteVersatiPerAnnoPrecedente),
     }
   } catch {

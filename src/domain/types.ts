@@ -51,7 +51,26 @@ export interface Scadenza {
   componenti: ComponenteScadenza[]
   /** Anno solare in cui cade la scadenza. */
   annoScadenza: number
+  /**
+   * Voci di versamento che "saldano" questa scadenza. Una scadenza è considerata
+   * pagata se per ciascun riferimento esiste un versamento corrispondente.
+   * Le voci 'imposta-*' fanno riferimento ai campi acconti imposta (pannello a parte),
+   * le altre alle righe tipizzate della lista contributi versati.
+   */
+  riferimenti?: RiferimentoScadenza[]
 }
+
+/**
+ * Identifica cosa "paga" una scadenza, per collegarla ai versamenti inseriti.
+ * Allineato a TipoVersamento (contributi) + le tre voci imposta del pannello
+ * dedicato (saldo, 1° acconto, 2° acconto): tre versamenti distinti, anche se
+ * saldo e 1° acconto cadono lo stesso giorno.
+ */
+export type RiferimentoScadenza =
+  | TipoVersamento
+  | 'imposta-saldo'
+  | 'imposta-acconto1'
+  | 'imposta-acconto2'
 
 /** Dettaglio dei calcoli restituito per un singolo regime/periodo. */
 export interface DettaglioRegime extends Regime {
@@ -131,8 +150,14 @@ export interface CalcoloInput {
    */
   contributiVersatiDuranteAnnoPrecedente: number | null
 
-  /** Acconti imposta sostitutiva versati PER l'anno corrente (giu + nov). */
-  accontiImposteVersatiPerAnnoCorrente: number | null
+  /** Imposta sostitutiva: saldo dell'anno precedente, versato a giugno. */
+  impostaSaldoVersatoAnnoCorrente: number | null
+
+  /** Imposta sostitutiva: 1° acconto per l'anno corrente, versato a giugno. */
+  impostaAcconto1VersatoAnnoCorrente: number | null
+
+  /** Imposta sostitutiva: 2° acconto per l'anno corrente, versato a novembre. */
+  impostaAcconto2VersatoAnnoCorrente: number | null
 
   /** Acconti imposta sostitutiva versati PER l'anno precedente (giu + nov). */
   accontiImposteVersatiPerAnnoPrecedente: number | null

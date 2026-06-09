@@ -79,6 +79,8 @@ export interface RataContributo {
   importo: number
   /** Anno solare in cui la rata va versata (l'ultima cade nell'anno+1). */
   anno: number
+  /** Indice del trimestre (0=1ª rata … 3=4ª rata). */
+  rataIdx: number
 }
 
 export interface RisultatoRate {
@@ -129,6 +131,7 @@ export function calcolaRateContributiFissi(regime: Regime, anno: number): Risult
         descrizione: `Contributi fissi ${label} ${anno} (${mesiAttivi} mes${mesiAttivi > 1 ? 'i' : 'e'} trim. ${trim.rataIdx + 1})`,
         importo,
         anno: annoVers,
+        rataIdx: trim.rataIdx,
       })
     }
   }

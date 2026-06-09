@@ -8,7 +8,8 @@ import {
   TableHeadCell,
   TableRow,
 } from 'flowbite-react'
-import type { RisultatoCalcolo, Scadenza } from '@/domain/types'
+import type { CalcoloInput, RisultatoCalcolo, Scadenza } from '@/domain/types'
+import { scadenzaPagata, versatoPerScadenza } from '@/domain/scadenze'
 import { Card, Tooltip } from '@/components/ui'
 import { formatEuro } from '@/domain/labels'
 import { theme } from '@/theme'
@@ -16,6 +17,7 @@ import { theme } from '@/theme'
 interface Props {
   anno: number
   calcoli: RisultatoCalcolo
+  input: CalcoloInput
 }
 
 const MESE_NUM: Record<string, number> = {
@@ -23,14 +25,16 @@ const MESE_NUM: Record<string, number> = {
   Luglio: 6, Agosto: 7, Settembre: 8, Ottobre: 9, Novembre: 10, Dicembre: 11,
 }
 
-type Stato = 'scaduta' | 'in-scadenza' | 'prevista'
+type Stato = 'pagata' | 'scaduta' | 'in-scadenza' | 'prevista'
 
 const STATO_LABEL: Record<Stato, string> = {
+  pagata: 'Pagata',
   scaduta: 'Scaduta',
   'in-scadenza': 'In scadenza',
   prevista: 'Prevista',
 }
 const STATO_COLOR = {
+  pagata: 'success',
   scaduta: 'failure',
   'in-scadenza': 'warning',
   prevista: 'info',
@@ -55,10 +59,11 @@ function dettaglioUtile(s: Scadenza): string | null {
   return null
 }
 
-function TabellaScadenze({ titolo, sottotitolo, scadenze }: {
+function TabellaScadenze({ titolo, sottotitolo, scadenze, input }: {
   titolo: string
   sottotitolo?: string
   scadenze: Scadenza[]
+  input: CalcoloInput
 }) {
   const totale = scadenze.reduce((s, x) => s + x.importo, 0)
 
@@ -81,18 +86,34 @@ function TabellaScadenze({ titolo, sottotitolo, scadenze }: {
               <TableRow>
                 <TableHeadCell>Adempimento</TableHeadCell>
                 <TableHeadCell>Stato</TableHeadCell>
-                <TableHeadCell className="text-right">Importo</TableHeadCell>
+                <TableHeadCell className="text-right">Dovuto</TableHeadCell>
+                <TableHeadCell className="text-right">Pagato</TableHeadCell>
+                <TableHeadCell className="text-right">Differenza</TableHeadCell>
                 <TableHeadCell className="text-right">Scadenza</TableHeadCell>
               </TableRow>
             </TableHead>
             <TableBody className="divide-y">
               {scadenze.map((s, i) => {
-                const stato = statoScadenza(s.data)
+                const versato = versatoPerScadenza(s, input) // null = non tracciabile
+                const pagata = scadenzaPagata(s, input)
+                const stato: Stato = pagata ? 'pagata' : statoScadenza(s.data)
                 const dettaglio = dettaglioUtile(s)
-                const scaduta = stato === 'scaduta'
+                const tenue = pagata || stato === 'scaduta'
+                const testo = pagata ? 'text-slate-400 line-through' : tenue ? 'text-slate-400' : 'text-slate-800'
+                // Differenza dovuto − pagato: >0 manca, <0 eccedenza, =0 ok
+                const diff = versato == null ? null : s.importo - versato
+                const diffClasse =
+                  diff == null ? 'text-slate-300'
+                  : diff > 0.005 ? 'text-rose-600'
+                  : diff < -0.005 ? 'text-amber-600'
+                  : 'text-emerald-600'
+                const diffTesto =
+                  diff == null ? '—'
+                  : Math.abs(diff) < 0.005 ? '0,00 €'
+                  : diff > 0 ? `− ${formatEuro(diff)}` : `+ ${formatEuro(-diff)}`
                 return (
                   <TableRow key={i} className="bg-white">
-                    <TableCell className={`font-medium ${scaduta ? 'text-slate-400' : 'text-slate-800'}`}>
+                    <TableCell className={`font-medium ${testo}`}>
                       <span className="inline-flex items-center gap-1.5">
                         {s.descrizione}
                         {dettaglio && <Tooltip content={dettaglio} label="Dettaglio componenti" />}
@@ -103,10 +124,16 @@ function TabellaScadenze({ titolo, sottotitolo, scadenze }: {
                         {STATO_LABEL[stato]}
                       </Badge>
                     </TableCell>
-                    <TableCell className={`text-right font-semibold tabular-nums ${scaduta ? 'text-slate-400' : 'text-slate-800'}`}>
+                    <TableCell className={`text-right tabular-nums ${tenue ? 'text-slate-400' : 'text-slate-700'}`}>
                       {formatEuro(s.importo)}
                     </TableCell>
-                    <TableCell className={`whitespace-nowrap text-right tabular-nums ${scaduta ? 'text-slate-400' : 'text-slate-600'}`}>
+                    <TableCell className="text-right tabular-nums text-slate-600">
+                      {versato == null ? '—' : formatEuro(versato)}
+                    </TableCell>
+                    <TableCell className={`text-right font-semibold tabular-nums ${diffClasse}`}>
+                      {diffTesto}
+                    </TableCell>
+                    <TableCell className={`whitespace-nowrap text-right tabular-nums ${tenue ? 'text-slate-400' : 'text-slate-600'}`}>
                       {s.data}
                     </TableCell>
                   </TableRow>
@@ -123,7 +150,7 @@ function TabellaScadenze({ titolo, sottotitolo, scadenze }: {
 }
 
 /** Calendario fiscale: adempimenti dell'anno corrente e del successivo in tabella. */
-export function CalendarioFiscale({ anno, calcoli }: Props) {
+export function CalendarioFiscale({ anno, calcoli, input }: Props) {
   const correnti = calcoli.scadenzeAnnoCorrente.filter((s) => s.importo > 0.005)
   const future = calcoli.scadenzeAnnoSuccessivo.filter((s) => s.importo > 0.005)
 
@@ -132,14 +159,15 @@ export function CalendarioFiscale({ anno, calcoli }: Props) {
       title="Calendario fiscale"
       icon={Calendar}
       iconIntent="warning"
-      info="Le date indicate sono quelle nominali. Se cadono in giorni festivi o prefestivi slittano al primo giorno lavorativo utile."
+      info="Le date indicate sono quelle nominali. Se cadono in giorni festivi o prefestivi slittano al primo giorno lavorativo utile. Le voci già coperte da un versamento inserito appaiono barrate."
     >
       <div className="space-y-8">
-        <TabellaScadenze titolo={`Scadenze ${anno}`} scadenze={correnti} />
+        <TabellaScadenze titolo={`Scadenze ${anno}`} scadenze={correnti} input={input} />
         <TabellaScadenze
           titolo={`Scadenze ${anno + 1}`}
           sottotitolo={`— saldo e acconti su ${anno}`}
           scadenze={future}
+          input={input}
         />
       </div>
     </Card>
