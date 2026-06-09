@@ -189,9 +189,10 @@ export function calcolaScadenze({
     })
   }
 
+  // Acconto eccedenza: 100% del dovuto in due rate da 50% → per rata = totale × 0,5
   const accontoEccCorr =
     attivoADicembre(regimiConFissi(regimiCorrente)) && totaleContributiEccedenzaArtCommPrecedente > 0
-      ? (totaleContributiEccedenzaArtCommPrecedente * QUOTA_ACCONTO_ECC) / 2
+      ? totaleContributiEccedenzaArtCommPrecedente * QUOTA_ACCONTO_ECC
       : 0
   if (accontoEccCorr > 0.005) {
     globali.push({

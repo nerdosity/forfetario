@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Workflow rules (non-negotiable)
+
+- **Never run `git commit` or `git push`.** The user does all commits and pushes manually. Do not offer to commit, do not suggest a "save commit", do not create branches for safety checkpoints. Just make the code changes and stop.
+
 ## What this is
 
 A Vite + React 19 + TypeScript + Tailwind 4 single-page app that calculates Italian *regime forfettario* taxes and INPS social-security contributions for the self-employed. It started life as one ~1400-line component ([remixed-d687e0b7.tsx](remixed-d687e0b7.tsx), kept only as reference — not imported) and was refactored into a layered project. All UI text, identifiers, and domain terms are in **Italian**.
