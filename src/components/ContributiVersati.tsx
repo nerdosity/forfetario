@@ -194,9 +194,6 @@ export function ContributiVersati({
                   options={TIPI.filter((t) => !giaUsato(t.value, r.id))}
                 />
                 <MoneyInput
-                  // Rimonta il campo quando il suggerimento cambia, così il
-                  // placeholder dinamico si aggiorna sempre (solo se il campo è vuoto).
-                  key={r.importo == null ? `ph-${Math.round(suggerimentoRiga(r) ?? 0)}` : 'val'}
                   small
                   value={r.importo}
                   onChange={(v) => aggiorna(r.id, { importo: v })}
