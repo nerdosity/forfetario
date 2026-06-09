@@ -11,8 +11,10 @@ export interface ContributoFisso {
 export interface ScadenzeAnno {
   /** 4 rate trimestrali dei contributi fissi (l'ultima cade l'anno successivo). */
   rateContributiFissi: [string, string, string, string]
-  /** Saldo + primo acconto imposte. */
-  saldoAccontoImposte: string
+  /** Data del saldo imposte/contributi (di norma giugno). */
+  saldoImposte: string
+  /** Data del 1° acconto imposte/contributi (spesso coincide col saldo, ma non sempre). */
+  primoAccontoImposte: string
   /** Secondo acconto imposte. */
   secondoAccontoImposte: string
 }
@@ -97,7 +99,16 @@ export function validaAnno(anno: string, v: unknown): DatiAnno {
       rateContributiFissi: rate.map((d, i) =>
         dataValida(anno, `scadenze.rateContributiFissi[${i}]`, d),
       ) as [string, string, string, string],
-      saldoAccontoImposte: dataValida(anno, 'scadenze.saldoAccontoImposte', scad.saldoAccontoImposte),
+      // Retrocompatibilità: il vecchio campo unico `saldoAccontoImposte` vale per
+      // entrambe le date se i nuovi campi separati non sono presenti.
+      saldoImposte: dataValida(
+        anno, 'scadenze.saldoImposte',
+        scad.saldoImposte ?? scad.saldoAccontoImposte,
+      ),
+      primoAccontoImposte: dataValida(
+        anno, 'scadenze.primoAccontoImposte',
+        scad.primoAccontoImposte ?? scad.saldoAccontoImposte,
+      ),
       secondoAccontoImposte: dataValida(anno, 'scadenze.secondoAccontoImposte', scad.secondoAccontoImposte),
     },
   }

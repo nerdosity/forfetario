@@ -103,7 +103,7 @@ export function calcolaScadenze({
   const globali: Scadenza[] = []
   const annoSucc = anno + 1
   const annoPrec = anno - 1
-  const { saldoAccontoImposte, secondoAccontoImposte } = datiAnno(anno).scadenze
+  const { saldoImposte, primoAccontoImposte, secondoAccontoImposte } = datiAnno(anno).scadenze
   const fissiCorrenti = regimiConFissi(regimiCorrente)
 
   // Riferimento al versamento per la rata fissi, in base al trimestre.
@@ -146,7 +146,7 @@ export function calcolaScadenze({
   // ─── Saldo contributi G.S. anno precedente (versato a giugno anno corrente) ──
   if (totaleContributiSeparataPrecedente > 0.005) {
     globali.push({
-      data: formattaScadenza(saldoAccontoImposte, anno),
+      data: formattaScadenza(saldoImposte, anno),
       descrizione: `Saldo contributi G.S. ${annoPrec}`,
       importo: totaleContributiSeparataPrecedente,
       componenti: [{ tipo: `Saldo contributi G.S. ${annoPrec}`, importo: totaleContributiSeparataPrecedente }],
@@ -158,7 +158,7 @@ export function calcolaScadenze({
   // ─── Saldo contributi eccedenza Art/Comm anno precedente (giugno anno corr.) ──
   if (totaleContributiEccedenzaArtCommPrecedente > 0.005) {
     globali.push({
-      data: formattaScadenza(saldoAccontoImposte, anno),
+      data: formattaScadenza(saldoImposte, anno),
       descrizione: `Saldo contributi ecc. Art/Comm ${annoPrec}`,
       importo: totaleContributiEccedenzaArtCommPrecedente,
       componenti: [{ tipo: `Saldo contributi ecc. Art/Comm ${annoPrec}`, importo: totaleContributiEccedenzaArtCommPrecedente }],
@@ -175,7 +175,7 @@ export function calcolaScadenze({
       : 0
   if (accontoGSCorr > 0.005) {
     globali.push({
-      data: formattaScadenza(saldoAccontoImposte, anno),
+      data: formattaScadenza(primoAccontoImposte, anno),
       descrizione: `1° acconto contributi G.S. ${anno}`,
       importo: accontoGSCorr,
       componenti: [{ tipo: `1° acconto contributi G.S. ${anno}`, importo: accontoGSCorr }],
@@ -199,7 +199,7 @@ export function calcolaScadenze({
       : 0
   if (accontoEccCorr > 0.005) {
     globali.push({
-      data: formattaScadenza(saldoAccontoImposte, anno),
+      data: formattaScadenza(primoAccontoImposte, anno),
       descrizione: `1° acconto contributi ecc. Art/Comm ${anno}`,
       importo: accontoEccCorr,
       componenti: [{ tipo: `1° acconto contributi ecc. Art/Comm ${anno}`, importo: accontoEccCorr }],
@@ -227,7 +227,7 @@ export function calcolaScadenze({
   // Saldo e 1° acconto cadono lo stesso giorno ma sono due versamenti distinti
   if (saldoImpostePrecedente > 0) {
     globali.push({
-      data: formattaScadenza(saldoAccontoImposte, anno),
+      data: formattaScadenza(saldoImposte, anno),
       descrizione: `Saldo imposte ${anno - 1}`,
       importo: saldoImpostePrecedente,
       componenti: [{ tipo: `Saldo imposte ${anno - 1}`, importo: saldoImpostePrecedente }],
@@ -237,7 +237,7 @@ export function calcolaScadenze({
   }
   if (accontoImposteAnnoCorrente > 0) {
     globali.push({
-      data: formattaScadenza(saldoAccontoImposte, anno),
+      data: formattaScadenza(primoAccontoImposte, anno),
       descrizione: `1° acconto imposte ${anno}`,
       importo: accontoImposteAnnoCorrente,
       componenti: [{ tipo: `1° acconto imposte ${anno} (su tax netta ${anno - 1})`, importo: accontoImposteAnnoCorrente }],
@@ -287,7 +287,7 @@ export function calcolaScadenze({
         .filter(Boolean)
         .join(' + ')
     globali.push({
-      data: formattaScadenza(saldoAccontoImposte, annoSucc),
+      data: formattaScadenza(saldoImposte, annoSucc),
       descrizione: desc,
       importo: saldoImposteDaVersare + accontoImposteAnnoSucc,
       componenti: [
@@ -326,7 +326,7 @@ export function calcolaScadenze({
         .filter(Boolean)
         .join(' + ')
     globali.push({
-      data: formattaScadenza(saldoAccontoImposte, annoSucc),
+      data: formattaScadenza(saldoImposte, annoSucc),
       descrizione: desc,
       importo: saldoContributiGS + accontoGSAnnoSucc,
       componenti: [
@@ -365,7 +365,7 @@ export function calcolaScadenze({
         .filter(Boolean)
         .join(' + ')
     globali.push({
-      data: formattaScadenza(saldoAccontoImposte, annoSucc),
+      data: formattaScadenza(saldoImposte, annoSucc),
       descrizione: desc,
       importo: saldoContributiEccArtComm + accontoEccAnnoSucc,
       componenti: [

@@ -13,7 +13,8 @@
       },
       "scadenze": {
         "rateContributiFissi": ["05-16", "08-20", "11-18", "02-17"],
-        "saldoAccontoImposte": "06-30",
+        "saldoImposte": "06-30",
+        "primoAccontoImposte": "06-30",
         "secondoAccontoImposte": "11-30"
       }
     },
@@ -29,7 +30,8 @@
       },
       "scadenze": {
         "rateContributiFissi": ["05-16", "08-20", "11-18", "02-17"],
-        "saldoAccontoImposte": "06-30",
+        "saldoImposte": "06-30",
+        "primoAccontoImposte": "06-30",
         "secondoAccontoImposte": "11-30"
       }
     },
@@ -45,7 +47,8 @@
       },
       "scadenze": {
         "rateContributiFissi": ["05-16", "08-20", "11-18", "02-17"],
-        "saldoAccontoImposte": "06-30",
+        "saldoImposte": "06-30",
+        "primoAccontoImposte": "06-30",
         "secondoAccontoImposte": "11-30"
       }
     },
@@ -61,7 +64,8 @@
       },
       "scadenze": {
         "rateContributiFissi": ["05-16", "08-20", "11-18", "02-17"],
-        "saldoAccontoImposte": "06-30",
+        "saldoImposte": "06-30",
+        "primoAccontoImposte": "06-30",
         "secondoAccontoImposte": "11-30"
       }
     }

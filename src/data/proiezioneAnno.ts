@@ -4,27 +4,31 @@ import { datiAnno, anniDisponibili, type DatiAnno } from './taxData'
  * Proiezione delle costanti INPS per un anno non ancora nel database.
  *
  * Per ogni grandezza numerica (IVS, maternità, minimale, soglia) si stima il
- * valore con una REGRESSIONE LINEARE ai minimi quadrati sui valori storici di
- * tutti gli anni disponibili: cattura la tendenza di crescita reale invece di
- * copiare semplicemente l'ultimo anno. Le aliquote e le date di scadenza, che
- * cambiano molto raramente, si ereditano dall'anno più recente.
+ * valore con una REGRESSIONE LINEARE PESATA sui valori storici: gli anni più
+ * recenti pesano di più, così un rallentamento recente della crescita viene
+ * catturato e non si sovrastima estrapolando i salti più vecchi. Le aliquote e
+ * le date di scadenza, che cambiano per legge, si ereditano dall'anno recente.
  */
 
-/** Retta y = a·x + b ai minimi quadrati. Restituisce la stima in `x`. */
-function regressioneLineare(punti: { x: number; y: number }[], x: number): number {
+/**
+ * Retta y = a·x + b ai minimi quadrati PESATI. Restituisce la stima in `x`.
+ * Ogni punto ha un peso w: gli anni recenti pesano di più (vedi pesoPerAnno).
+ */
+function regressionePesata(punti: { x: number; y: number; w: number }[], x: number): number {
   const n = punti.length
   if (n === 0) return 0
-  if (n === 1) return punti[0].y // un solo dato: nessun trend, resta costante
+  if (n === 1) return punti[0].y
 
-  const sx = punti.reduce((s, p) => s + p.x, 0)
-  const sy = punti.reduce((s, p) => s + p.y, 0)
-  const sxx = punti.reduce((s, p) => s + p.x * p.x, 0)
-  const sxy = punti.reduce((s, p) => s + p.x * p.y, 0)
+  const sw = punti.reduce((s, p) => s + p.w, 0)
+  const swx = punti.reduce((s, p) => s + p.w * p.x, 0)
+  const swy = punti.reduce((s, p) => s + p.w * p.y, 0)
+  const swxx = punti.reduce((s, p) => s + p.w * p.x * p.x, 0)
+  const swxy = punti.reduce((s, p) => s + p.w * p.x * p.y, 0)
 
-  const denom = n * sxx - sx * sx
-  if (denom === 0) return sy / n // x tutti uguali: media
-  const a = (n * sxy - sx * sy) / denom
-  const b = (sy - a * sx) / n
+  const denom = sw * swxx - swx * swx
+  if (denom === 0) return swy / sw // x tutti uguali o pesi degeneri: media pesata
+  const a = (sw * swxy - swx * swy) / denom
+  const b = (swy - a * swx) / sw
   return a * x + b
 }
 
@@ -41,10 +45,20 @@ export function proiettaDatiAnno(anno: number): DatiAnno | null {
 
   const storici = anni.map((a) => ({ anno: a, dati: datiAnno(a) }))
   const recente = storici.reduce((max, s) => (s.anno > max.anno ? s : max)).dati
+  const annoMin = Math.min(...storici.map((s) => s.anno))
+
+  // Peso crescente con l'anno: il più vecchio pesa 1, ogni anno successivo +1.
+  // Così il trend recente domina sui salti più vecchi.
+  const pesoPerAnno = (a: number) => a - annoMin + 1
 
   // Proietta una grandezza estraendola da ogni anno storico
   const proietta = (estrai: (d: DatiAnno) => number): number =>
-    round2(regressioneLineare(storici.map((s) => ({ x: s.anno, y: estrai(s.dati) })), anno))
+    round2(
+      regressionePesata(
+        storici.map((s) => ({ x: s.anno, y: estrai(s.dati), w: pesoPerAnno(s.anno) })),
+        anno,
+      ),
+    )
 
   return {
     minimaleReddito: proietta((d) => d.minimaleReddito),

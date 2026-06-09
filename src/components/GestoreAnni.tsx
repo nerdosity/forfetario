@@ -32,7 +32,8 @@ interface FormAnno {
   ivsCommercianti: number
   maternitaCommercianti: number
   rateContributiFissi: [string, string, string, string]
-  saldoAccontoImposte: string
+  saldoImposte: string
+  primoAccontoImposte: string
   secondoAccontoImposte: string
 }
 
@@ -49,7 +50,8 @@ function formToDatiAnno(f: FormAnno): DatiAnno {
     },
     scadenze: {
       rateContributiFissi: f.rateContributiFissi,
-      saldoAccontoImposte: f.saldoAccontoImposte,
+      saldoImposte: f.saldoImposte,
+      primoAccontoImposte: f.primoAccontoImposte,
       secondoAccontoImposte: f.secondoAccontoImposte,
     },
   }
@@ -68,7 +70,8 @@ function datiAnnoToForm(anno: number, d: DatiAnno): FormAnno {
     ivsCommercianti: d.contributoFisso.commercianti.ivsAnnuale,
     maternitaCommercianti: d.contributoFisso.commercianti.maternitaMensile,
     rateContributiFissi: [...d.scadenze.rateContributiFissi] as [string, string, string, string],
-    saldoAccontoImposte: d.scadenze.saldoAccontoImposte,
+    saldoImposte: d.scadenze.saldoImposte,
+    primoAccontoImposte: d.scadenze.primoAccontoImposte,
     secondoAccontoImposte: d.scadenze.secondoAccontoImposte,
   }
 }
@@ -133,35 +136,48 @@ export function GestoreAnni({ onAnniChanged }: Props) {
     onAnniChanged()
   }
 
+  const personalizzato = new Set(salvati)
+
   return (
     <>
       <div className="flex flex-wrap items-center gap-2">
-        {salvati.map((a) => (
-          <span
-            key={a}
-            className="group inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 py-1 pl-3 pr-1.5 text-xs font-medium text-amber-800"
-          >
-            {a}
-            <span className="inline-flex items-center gap-0.5">
-              <button
-                type="button"
-                onClick={() => apriModifica(a)}
-                className="rounded-full p-0.5 text-amber-500 transition-colors hover:bg-amber-100 hover:text-amber-700"
-                title={`Modifica anno ${a}`}
-              >
-                <Pencil size={12} />
-              </button>
-              <button
-                type="button"
-                onClick={() => rimuovi(a)}
-                className="rounded-full p-0.5 text-amber-500 transition-colors hover:bg-red-100 hover:text-red-600"
-                title={`Rimuovi anno ${a}`}
-              >
-                <Trash2 size={12} />
-              </button>
+        {/* Tutti gli anni disponibili: ognuno modificabile; cestino solo sui custom */}
+        {anniDisponibili().map((a) => {
+          const isCustom = personalizzato.has(a)
+          return (
+            <span
+              key={a}
+              className={`group inline-flex items-center gap-1.5 rounded-full border py-1 pl-3 pr-1.5 text-xs font-medium ${
+                isCustom
+                  ? 'border-amber-200 bg-amber-50 text-amber-800'
+                  : 'border-slate-200 bg-slate-50 text-slate-600'
+              }`}
+              title={isCustom ? `Anno personalizzato ${a}` : `Anno predefinito ${a}`}
+            >
+              {a}
+              <span className="inline-flex items-center gap-0.5">
+                <button
+                  type="button"
+                  onClick={() => apriModifica(a)}
+                  className="rounded-full p-0.5 text-slate-400 transition-colors hover:bg-blue-100 hover:text-blue-600"
+                  title={`Modifica anno ${a}`}
+                >
+                  <Pencil size={12} />
+                </button>
+                {isCustom && (
+                  <button
+                    type="button"
+                    onClick={() => rimuovi(a)}
+                    className="rounded-full p-0.5 text-amber-500 transition-colors hover:bg-red-100 hover:text-red-600"
+                    title={`Rimuovi anno personalizzato ${a}`}
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                )}
+              </span>
             </span>
-          </span>
-        ))}
+          )
+        })}
 
         <Button color="light" size="xs" onClick={apriNuovo}>
           <Plus size={13} className="mr-1" />
@@ -258,11 +274,18 @@ export function GestoreAnni({ onAnniChanged }: Props) {
               </Field>
             </div>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Saldo + 1° acconto imposte" info="Data del saldo imposte anno precedente e del primo acconto.">
+          <div className="grid gap-4 sm:grid-cols-3">
+            <Field label="Saldo imposte" info="Data del saldo imposte dell'anno precedente.">
               <DateInput
-                value={form.saldoAccontoImposte}
-                onChange={(v) => setForm((prev) => ({ ...prev, saldoAccontoImposte: v }))}
+                value={form.saldoImposte}
+                onChange={(v) => setForm((prev) => ({ ...prev, saldoImposte: v }))}
+                anno={form.anno}
+              />
+            </Field>
+            <Field label="1° acconto imposte" info="Data del primo acconto. Spesso coincide col saldo, ma non sempre.">
+              <DateInput
+                value={form.primoAccontoImposte}
+                onChange={(v) => setForm((prev) => ({ ...prev, primoAccontoImposte: v }))}
                 anno={form.anno}
               />
             </Field>
