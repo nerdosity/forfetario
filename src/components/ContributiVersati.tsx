@@ -182,7 +182,7 @@ export function ContributiVersati({
 
           {dettaglio.map((r) => (
             <div key={r.id} className="flex items-start gap-2">
-              <div className="grid flex-1 grid-cols-2 gap-2">
+              <div className="grid flex-1 grid-cols-1 gap-2 sm:grid-cols-2">
                 <Select<TipoVersamento>
                   small
                   value={r.tipo}

@@ -30,15 +30,15 @@ export function InputPanel({ input, calcoli, onChange, onAnniChanged, onAzzeraAn
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Barra: anno di riferimento + azzera */}
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div className="flex flex-wrap items-end gap-4">
+      <div className="flex flex-wrap items-end justify-between gap-3 sm:gap-4">
+        <div className="flex flex-wrap items-end gap-3 sm:gap-4">
           <Field
             label="Anno di riferimento"
             info="Anno per cui si calcolano imposte e contributi. Determina anche quali costanti INPS vengono usate."
           >
-            <div className="w-40">
+            <div className="w-32 sm:w-40">
               <Select<number>
                 value={input.anno}
                 onChange={(v) => onChange({ anno: v })}
@@ -58,7 +58,7 @@ export function InputPanel({ input, calcoli, onChange, onAnniChanged, onAzzeraAn
       </div>
 
       {/* Griglia di card */}
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-4 sm:gap-6 lg:grid-cols-2">
         {/* Regimi anno corrente */}
         <Card title={`Regimi anno ${input.anno}`} icon={CalendarRange} iconIntent="info">
           <RegimeEditor

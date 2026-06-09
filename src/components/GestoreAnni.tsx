@@ -305,7 +305,7 @@ export function GestoreAnni({ onAnniChanged }: Props) {
             <Percent size={16} className="text-indigo-600" aria-hidden />
             Aliquote contributive
           </h3>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <Field label="Gestione separata (%)">
               <NumberInput value={form.aliquotaSeparata} onChange={setNum('aliquotaSeparata')} min={0} max={100} step={0.01} />
             </Field>

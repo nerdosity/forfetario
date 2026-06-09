@@ -16,8 +16,8 @@ export function Metric({ value, label, caption, valueIntent = 'neutral', feature
   if (featured) {
     const s = intentSurface[valueIntent]
     return (
-      <div className={`rounded-xl border p-5 text-center ${s.bg} ${s.border}`}>
-        <div className={`text-2xl font-bold tabular-nums ${s.text}`}>{value}</div>
+      <div className={`rounded-xl border p-4 text-center sm:p-5 ${s.bg} ${s.border}`}>
+        <div className={`text-xl font-bold tabular-nums sm:text-2xl ${s.text}`}>{value}</div>
         <div className={`mt-1 text-xs font-medium ${s.label}`}>{label}</div>
         {caption && <div className={`mt-1 text-xs ${s.label}`}>{caption}</div>}
       </div>

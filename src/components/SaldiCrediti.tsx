@@ -62,12 +62,12 @@ export function SaldiCrediti({ anno, calcoli }: Props) {
       info={`I saldi rappresentano gli importi dovuti per il ${anno} al netto degli acconti già versati. Vengono tipicamente pagati a giugno ${anno + 1}.`}
     >
       {/* Box totale in evidenza */}
-      <div className="mb-5 flex items-center justify-between rounded-xl border border-red-200 bg-red-50 px-5 py-4">
+      <div className="mb-5 flex items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 sm:px-5 sm:py-4">
         <div>
           <p className="text-sm font-medium text-red-700">Totale saldi da versare</p>
           <p className="text-xs text-red-600/80">Scadenza giugno {anno + 1}</p>
         </div>
-        <p className="text-2xl font-bold tabular-nums text-red-700">{formatEuro(totaleSaldi)}</p>
+        <p className="text-xl font-bold tabular-nums text-red-700 sm:text-2xl">{formatEuro(totaleSaldi)}</p>
       </div>
 
       {righe.length > 0 ? (

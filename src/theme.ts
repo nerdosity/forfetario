@@ -11,31 +11,32 @@ export const theme = {
   // --- App shell (barra brand piena + nav orizzontale) ---
   appBg: 'min-h-screen bg-slate-50',
   topbar: 'bg-blue-600',
-  topbarInner: 'mx-auto flex max-w-7xl items-center justify-between gap-4 px-6 py-4',
+  topbarInner: 'mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6 sm:py-4',
   brand: 'flex items-center gap-2.5',
   brandMark: 'inline-flex h-8 w-8 items-center justify-center rounded-lg bg-white/15 text-white ring-1 ring-white/20',
-  brandTitle: 'text-lg font-semibold tracking-tight text-white leading-none',
+  brandTitle: 'text-base font-semibold tracking-tight text-white leading-none sm:text-lg',
   topbarYear: 'flex items-center gap-2 text-sm text-white/90',
   navbar: 'sticky top-0 z-30 border-b border-slate-200 bg-white shadow-sm',
-  navbarInner: 'mx-auto flex max-w-7xl items-center gap-1 px-6',
+  // Su mobile la nav scorre orizzontalmente invece di traboccare
+  navbarInner: 'mx-auto flex max-w-7xl items-center gap-1 overflow-x-auto px-2 sm:px-6',
   navItem:
-    'inline-flex items-center gap-2 border-b-2 border-transparent px-4 py-4 text-sm font-medium ' +
-    'text-slate-500 transition-colors hover:text-slate-800',
+    'inline-flex shrink-0 items-center gap-2 border-b-2 border-transparent px-3 py-3 text-sm font-medium ' +
+    'text-slate-500 transition-colors hover:text-slate-800 sm:px-4 sm:py-4',
   navItemActive: 'border-blue-600 text-blue-700',
   breadcrumb: 'flex items-center gap-1.5 text-sm text-slate-400',
   breadcrumbCurrent: 'text-slate-700 font-medium',
-  shell: 'mx-auto max-w-7xl px-6 py-6 space-y-6',
-  pageTitle: 'text-2xl font-semibold tracking-tight text-blue-700',
+  shell: 'mx-auto max-w-7xl px-4 py-4 space-y-4 sm:px-6 sm:py-6 sm:space-y-6',
+  pageTitle: 'text-xl font-semibold tracking-tight text-blue-700 sm:text-2xl',
 
   // --- KPI (tiles piene) ---
-  kpiStrip: 'grid grid-cols-2 gap-4 sm:grid-cols-4',
-  kpiTile: 'flex flex-col items-center justify-center rounded-xl px-4 py-6 text-center text-white shadow-sm',
-  kpiTileValue: 'text-2xl font-bold tabular-nums tracking-tight leading-none',
-  kpiTileLabel: 'mt-2 text-sm font-medium text-white/90',
+  kpiStrip: 'grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-4',
+  kpiTile: 'flex flex-col items-center justify-center rounded-xl px-3 py-4 text-center text-white shadow-sm sm:px-4 sm:py-6',
+  kpiTileValue: 'text-lg font-bold tabular-nums tracking-tight leading-none sm:text-2xl',
+  kpiTileLabel: 'mt-1.5 text-xs font-medium text-white/90 sm:mt-2 sm:text-sm',
   kpiTileCaption: 'mt-0.5 text-xs text-white/70',
 
   // --- Card / sezioni ---
-  card: 'bg-white rounded-xl border border-slate-200 p-6 shadow-sm',
+  card: 'bg-white rounded-xl border border-slate-200 p-4 shadow-sm sm:p-6',
   // Badge tondo per l'icona nell'intestazione delle card (colore via intent.badge)
   cardIconBadge: 'inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg',
   cardCompact: 'bg-white rounded-lg border border-slate-200 p-4',

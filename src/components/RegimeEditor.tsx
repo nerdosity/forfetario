@@ -136,7 +136,7 @@ export function RegimeEditor({ titolo, anno, regimi, onChange }: RegimeEditorPro
             </Field>
           </div>
 
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             <Field label="Da mese" small>
               <Select<number>
                 small
