@@ -26,8 +26,6 @@ export const theme = {
   breadcrumbCurrent: 'text-slate-700 font-medium',
   shell: 'mx-auto max-w-7xl px-6 py-6 space-y-6',
   pageTitle: 'text-2xl font-semibold tracking-tight text-blue-700',
-  // Blocco di sezione nel drawer dei dati: diviso da un bordo, niente scatole annidate.
-  sidebarBlock: 'px-5 py-4 border-b border-slate-100 last:border-b-0 space-y-3',
 
   // --- KPI (tiles piene) ---
   kpiStrip: 'grid grid-cols-2 gap-4 sm:grid-cols-4',

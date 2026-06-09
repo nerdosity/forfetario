@@ -1,4 +1,5 @@
 import { BarChart3 } from 'lucide-react'
+import { Badge } from 'flowbite-react'
 import type { RisultatoCalcolo } from '@/domain/types'
 import { Card, SummaryRow, Metric, Tooltip } from '@/components/ui'
 import { FunnelImposta } from '@/components/FunnelImposta'
@@ -54,13 +55,17 @@ export function DettaglioRegimi({ anno, calcoli }: Props) {
       <div className="space-y-3">
         {calcoli.dettagliRegimiCalcolati.map((regime, index) => (
           <div key={regime.id} className={theme.cardInner}>
-            <div className="mb-3 flex items-center justify-between">
-              <h3 className={theme.h3}>
-                Periodo {index + 1}: {labelTipo(regime.tipo)} · {regime.aliquota}%
-                {regime.riduzioneContributi !== 'nessuna' && ` · rid. contr. ${regime.riduzioneContributi}%`}
-              </h3>
-              <span className={theme.helpText}>
-                {regime.mesiRegime} mes{regime.mesiRegime > 1 ? 'i' : 'e'} ({regime.giorniRegime} giorni)
+            <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+              <h3 className={theme.h3}>Periodo {index + 1}</h3>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <Badge color="info">{labelTipo(regime.tipo)}</Badge>
+                <Badge color="gray">Imposta {regime.aliquota}%</Badge>
+                {regime.riduzioneContributi !== 'nessuna' && (
+                  <Badge color="warning">Riduzione contributi {regime.riduzioneContributi}%</Badge>
+                )}
+              </div>
+              <span className={`${theme.helpText} ml-auto`}>
+                {regime.mesiRegime} mes{regime.mesiRegime > 1 ? 'i' : 'e'} · {regime.giorniRegime} giorni
               </span>
             </div>
 

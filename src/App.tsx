@@ -9,14 +9,12 @@ import {
   History,
   ChevronRight,
 } from 'lucide-react'
-import { Button, Drawer, DrawerHeader, DrawerItems } from 'flowbite-react'
 import { InputPanel } from '@/components/InputPanel'
 import { KpiStrip } from '@/components/KpiStrip'
 import { RiepilogoPrecedente } from '@/components/RiepilogoPrecedente'
 import { DettaglioRegimi } from '@/components/DettaglioRegimi'
 import { CalendarioFiscale } from '@/components/CalendarioFiscale'
 import { SaldiCrediti } from '@/components/SaldiCrediti'
-import { Select } from '@/components/ui'
 import { calcola } from '@/domain/calcolo'
 import { regimeVuoto } from '@/domain/regimeFactory'
 import type { CalcoloInput } from '@/domain/types'
@@ -46,9 +44,10 @@ function inputIniziale(): CalcoloInput {
   return caricaInput(def) ?? def
 }
 
-type TabId = 'riepilogo' | 'regimi' | 'calendario' | 'saldi' | 'precedente'
+type TabId = 'dati' | 'riepilogo' | 'regimi' | 'calendario' | 'saldi' | 'precedente'
 
 const NAV: { id: TabId; label: string; icon: typeof LayoutDashboard }[] = [
+  { id: 'dati', label: 'Dati', icon: SlidersHorizontal },
   { id: 'riepilogo', label: 'Riepilogo', icon: LayoutDashboard },
   { id: 'regimi', label: 'Dettaglio regimi', icon: BarChart3 },
   { id: 'calendario', label: 'Calendario', icon: Calendar },
@@ -57,6 +56,7 @@ const NAV: { id: TabId; label: string; icon: typeof LayoutDashboard }[] = [
 ]
 
 const TITOLO: Record<TabId, string> = {
+  dati: 'Dati di calcolo',
   riepilogo: 'Riepilogo',
   regimi: 'Dettaglio regimi',
   calendario: 'Calendario fiscale',
@@ -67,8 +67,7 @@ const TITOLO: Record<TabId, string> = {
 export default function App() {
   const [input, setInput] = useInputState(inputIniziale)
   const [, forceUpdate] = useReducer((x: number) => x + 1, 0)
-  const [drawerOpen, setDrawerOpen] = useState(false)
-  const [tab, setTab] = useState<TabId>('riepilogo')
+  const [tab, setTab] = useState<TabId>('dati')
 
   const calcoli = useMemo(() => calcola(input), [input])
 
@@ -101,11 +100,17 @@ export default function App() {
 
   const prev = calcoli.datiAnnoPrecedente
   const hasDatiPrecedente = prev.totaleFatturato > 0 || prev.totaleImponibileLordo > 0
+  // Con un solo periodo, "Dettaglio regimi" coincide con "Riepilogo": è ridondante.
+  const hasPiuRegimi = input.regimiCorrente.length > 1
 
-  // Se il tab "anno precedente" è attivo ma i dati vengono rimossi, torna al riepilogo
+  const tabDisabilitato = (id: TabId): boolean =>
+    (id === 'precedente' && !hasDatiPrecedente) || (id === 'regimi' && !hasPiuRegimi)
+
+  // Se il tab attivo viene disabilitato (dati rimossi o periodo eliminato), torna al riepilogo
   useEffect(() => {
-    if (tab === 'precedente' && !hasDatiPrecedente) setTab('riepilogo')
-  }, [tab, hasDatiPrecedente])
+    if (tabDisabilitato(tab)) setTab('riepilogo')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, hasDatiPrecedente, hasPiuRegimi])
 
   return (
     <div className={theme.appBg}>
@@ -119,14 +124,10 @@ export default function App() {
             <span className={theme.brandTitle}>Forfettario</span>
           </div>
           <div className={theme.topbarYear}>
-            <span className="hidden sm:inline">Anno di riferimento</span>
-            <div className="w-28">
-              <Select<number>
-                value={input.anno}
-                onChange={(v) => setInput((p) => ({ ...p, anno: v }))}
-                options={anniDisponibili().map((a) => ({ value: a, label: String(a) }))}
-              />
-            </div>
+            <span className="hidden sm:inline">Anno</span>
+            <span className="rounded-md bg-white/15 px-2.5 py-1 font-semibold tabular-nums">
+              {input.anno}
+            </span>
           </div>
         </div>
       </div>
@@ -135,14 +136,18 @@ export default function App() {
       <nav className={theme.navbar}>
         <div className={theme.navbarInner}>
           {NAV.map(({ id, label, icon: Icon }) => {
-            const disabled = id === 'precedente' && !hasDatiPrecedente
+            const disabled = tabDisabilitato(id)
+            const motivo =
+              id === 'precedente'
+                ? `Inserisci i dati del ${input.anno - 1} per abilitare questa sezione`
+                : 'Disponibile con più di un periodo nello stesso anno'
             return (
               <button
                 key={id}
                 type="button"
                 onClick={() => !disabled && setTab(id)}
                 disabled={disabled}
-                title={disabled ? `Inserisci i dati del ${input.anno - 1} per abilitare questa sezione` : undefined}
+                title={disabled ? motivo : undefined}
                 className={`${theme.navItem} ${tab === id ? theme.navItemActive : ''} ${
                   disabled ? 'cursor-not-allowed opacity-40 hover:text-slate-500' : ''
                 }`}
@@ -158,24 +163,28 @@ export default function App() {
 
       {/* ── Contenuto ── */}
       <main className={theme.shell}>
-        {/* Intestazione pagina: breadcrumb + titolo + azione */}
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <div className={theme.breadcrumb}>
-              <span>Forfettario</span>
-              <ChevronRight size={14} aria-hidden />
-              <span className={theme.breadcrumbCurrent}>{TITOLO[tab]}</span>
-            </div>
-            <h1 className={`${theme.pageTitle} mt-1`}>{TITOLO[tab]}</h1>
+        {/* Intestazione pagina: breadcrumb + titolo */}
+        <div>
+          <div className={theme.breadcrumb}>
+            <span>Forfettario</span>
+            <ChevronRight size={14} aria-hidden />
+            <span className={theme.breadcrumbCurrent}>{TITOLO[tab]}</span>
           </div>
-          <Button color="blue" onClick={() => setDrawerOpen(true)}>
-            <SlidersHorizontal size={16} className="mr-2" aria-hidden />
-            Modifica dati
-          </Button>
+          <h1 className={`${theme.pageTitle} mt-1`}>{TITOLO[tab]}</h1>
         </div>
 
-        <KpiStrip anno={input.anno} calcoli={calcoli} />
+        {/* La striscia KPI ha senso solo sulle viste di risultato, non sul form */}
+        {tab !== 'dati' && <KpiStrip anno={input.anno} calcoli={calcoli} />}
 
+        {tab === 'dati' && (
+          <InputPanel
+            input={input}
+            calcoli={calcoli}
+            onChange={(partial) => setInput((p) => ({ ...p, ...partial }))}
+            onAnniChanged={handleAnniChanged}
+            onAzzeraAnnoCorrente={handleAzzeraAnnoCorrente}
+          />
+        )}
         {tab === 'riepilogo' && <DettaglioRegimi anno={input.anno} calcoli={calcoli} />}
         {tab === 'regimi' && <DettaglioRegimi anno={input.anno} calcoli={calcoli} />}
         {tab === 'calendario' && <CalendarioFiscale anno={input.anno} calcoli={calcoli} />}
@@ -188,20 +197,6 @@ export default function App() {
           />
         )}
       </main>
-
-      {/* ── Drawer input dati (componente Flowbite) ── */}
-      <Drawer open={drawerOpen} onClose={() => setDrawerOpen(false)} position="right" className="w-full max-w-md">
-        <DrawerHeader title="Dati di calcolo" titleIcon={SlidersHorizontal} />
-        <DrawerItems>
-          <InputPanel
-            input={input}
-            calcoli={calcoli}
-            onChange={(partial) => setInput((p) => ({ ...p, ...partial }))}
-            onAnniChanged={handleAnniChanged}
-            onAzzeraAnnoCorrente={handleAzzeraAnnoCorrente}
-          />
-        </DrawerItems>
-      </Drawer>
     </div>
   )
 }

@@ -42,7 +42,7 @@ export function RegimeEditor({
   return (
     <div className={theme.sectionFlat}>
       <div className="flex items-center justify-between">
-        <h3 className={theme.h3}>{titolo}</h3>
+        {titolo ? <h3 className={theme.h3}>{titolo}</h3> : <span className={theme.helpText}>Periodi</span>}
         <button type="button" onClick={aggiungi} className={theme.btnIcon} aria-label="Aggiungi periodo">
           <Plus size={18} aria-hidden />
         </button>
