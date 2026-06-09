@@ -9,11 +9,10 @@ import { theme } from '@/theme'
 interface Props {
   anno: number
   calcoli: RisultatoCalcolo | null
-  /** Modalità attiva: cifra unica oppure lista di versamenti. */
+  /** Vero se l'anno corrente ha almeno un periodo in gestione separata. */
+  hasGSCorrente: boolean
   modalita: 'totale' | 'dettaglio'
-  /** Totale unico (usato in modalità 'totale'). */
   totale: number | null
-  /** Righe di dettaglio (usate in modalità 'dettaglio'). */
   dettaglio: VersamentoContributo[]
   onChangeModalita: (m: 'totale' | 'dettaglio') => void
   onChangeTotale: (v: number | null) => void
@@ -22,31 +21,72 @@ interface Props {
 
 const TIPI: { value: TipoVersamento; label: string }[] = [
   { value: 'separata', label: 'Gestione separata' },
-  { value: 'fissi', label: 'Fissi Art/Comm' },
+  { value: 'fissi-1', label: 'Fissi · 1ª rata' },
+  { value: 'fissi-2', label: 'Fissi · 2ª rata' },
+  { value: 'fissi-3', label: 'Fissi · 3ª rata' },
+  { value: 'fissi-4-prec', label: 'Fissi · 4ª rata (anno prec.)' },
   { value: 'eccedenza', label: 'Eccedenza Art/Comm' },
   { value: 'altro', label: 'Altro' },
 ]
 
 const labelTipo = (t: TipoVersamento) => TIPI.find((x) => x.value === t)?.label ?? 'Altro'
 
-/** Importo "dovuto" stimato per tipologia, usato come placeholder sensato. */
-function dovutoPerTipo(calcoli: RisultatoCalcolo | null, tipo: TipoVersamento): number {
-  if (!calcoli) return 0
+// Bottoni di aggiunta rapida (raggruppano le tipologie più frequenti)
+const PRESET: { tipo: TipoVersamento; label: string }[] = [
+  { tipo: 'separata', label: 'Gestione separata' },
+  { tipo: 'fissi-1', label: '1ª rata' },
+  { tipo: 'fissi-2', label: '2ª rata' },
+  { tipo: 'fissi-3', label: '3ª rata' },
+  { tipo: 'fissi-4-prec', label: '4ª rata (anno prec.)' },
+  { tipo: 'eccedenza', label: 'Eccedenza' },
+  { tipo: 'altro', label: 'Altro' },
+]
+
+/**
+ * Importo suggerito (placeholder) per una tipologia di versamento, secondo le
+ * regole di cassa INPS:
+ * - G.S.: nel forfettario si versa l'anno dopo → saldo G.S. dell'anno precedente,
+ *   PIÙ gli acconti per l'anno corrente solo se esiste ancora un periodo in G.S.
+ * - Fissi rate 1-3: quota del totale fissi dell'anno corrente.
+ * - Fissi 4ª rata: appartiene all'anno precedente (si versa a febbraio).
+ * - Eccedenza: totale eccedenza dell'anno corrente.
+ */
+function suggerimento(
+  tipo: TipoVersamento,
+  calcoli: RisultatoCalcolo | null,
+  hasGSCorrente: boolean,
+): number | null {
+  if (!calcoli) return null
+  const prec = calcoli.datiAnnoPrecedente
   switch (tipo) {
-    case 'separata': return calcoli.totaleContributiSeparata
-    case 'fissi': return calcoli.totaleContributiFissiArtComm
-    case 'eccedenza': return calcoli.totaleContributiEccedenzaArtComm
-    default: return 0
+    case 'separata': {
+      // Saldo G.S. dell'anno precedente + (acconti per l'anno corrente, solo se ancora in G.S.)
+      const saldoPrec = prec?.totaleContributiSeparata ?? 0
+      const acconti = hasGSCorrente ? calcoli.totaleContributiSeparata : 0
+      return saldoPrec + acconti
+    }
+    // Rate fisse esatte (mensile × mesi attivi nel trimestre), non stime /4
+    case 'fissi-1': return calcoli.rateFisse[0]
+    case 'fissi-2': return calcoli.rateFisse[1]
+    case 'fissi-3': return calcoli.rateFisse[2]
+    // La 4ª rata versata nell'anno corrente appartiene all'anno precedente
+    case 'fissi-4-prec': return prec?.rateFisse[3] ?? 0
+    case 'eccedenza':
+      return calcoli.totaleContributiEccedenzaArtComm
+    default:
+      return null
   }
 }
 
 /**
  * Inserimento dei contributi versati nell'anno: o una cifra unica modificabile,
  * o una lista di versamenti la cui somma (non modificabile) è il valore usato.
+ * Le due modalità conservano i rispettivi dati: cambiare scheda non cancella nulla.
  */
 export function ContributiVersati({
   anno,
   calcoli,
+  hasGSCorrente,
   modalita,
   totale,
   dettaglio,
@@ -62,9 +102,15 @@ export function ContributiVersati({
   const aggiorna = (id: string, patch: Partial<VersamentoContributo>) =>
     onChangeDettaglio(dettaglio.map((r) => (r.id === id ? { ...r, ...patch } : r)))
 
+  const placeholderRiga = (r: VersamentoContributo): string => {
+    if (r.tipo === 'altro') return '0'
+    const s = suggerimento(r.tipo, calcoli, hasGSCorrente)
+    return s && s > 0.005 ? `Suggerito: ${formatEuro(s)}` : '0'
+  }
+
   return (
     <div className="space-y-4">
-      {/* Selettore modalità */}
+      {/* Selettore modalità (radio) */}
       <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5 text-sm">
         <button
           type="button"
@@ -121,11 +167,7 @@ export function ContributiVersati({
                   small
                   value={r.importo}
                   onChange={(v) => aggiorna(r.id, { importo: v })}
-                  placeholder={
-                    r.tipo === 'altro'
-                      ? '0'
-                      : `Dovuto: ${formatEuro(dovutoPerTipo(calcoli, r.tipo))}`
-                  }
+                  placeholder={placeholderRiga(r)}
                   min={0}
                   step={0.01}
                   nullable
@@ -153,10 +195,10 @@ export function ContributiVersati({
 
           {/* Aggiunta righe pre-etichettate */}
           <div className="flex flex-wrap gap-2">
-            {TIPI.map((t) => (
-              <Button key={t.value} color="light" size="xs" onClick={() => aggiungi(t.value)}>
+            {PRESET.map((p) => (
+              <Button key={p.tipo} color="light" size="xs" onClick={() => aggiungi(p.tipo)}>
                 <Plus size={13} className="mr-1" />
-                {t.label}
+                {p.label}
               </Button>
             ))}
           </div>

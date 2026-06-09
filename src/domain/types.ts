@@ -73,10 +73,19 @@ export interface DettaglioRegime extends Regime {
 // ---------------------------------------------------------------------------
 
 /**
- * Tipologia di un versamento di contributi. Le prime tre sono allineate ai
- * "dovuti" calcolati (per suggerire un placeholder sensato); 'altro' è libero.
+ * Tipologia di un versamento di contributi, usata per suggerire un placeholder
+ * sensato. Le rate fisse sono distinte per trimestre per via dello sfasamento
+ * temporale: la 4ª rata di un anno si versa a febbraio dell'anno successivo,
+ * quindi i versamenti di un anno includono la 4ª rata dell'anno precedente.
  */
-export type TipoVersamento = 'separata' | 'fissi' | 'eccedenza' | 'altro'
+export type TipoVersamento =
+  | 'separata'
+  | 'fissi-1'
+  | 'fissi-2'
+  | 'fissi-3'
+  | 'fissi-4-prec'
+  | 'eccedenza'
+  | 'altro'
 
 /** Una singola voce di contributo versato durante l'anno. */
 export interface VersamentoContributo {
@@ -94,10 +103,10 @@ export interface CalcoloInput {
   regimiPrecedente: Regime[]
 
   /**
-   * Contributi INPS versati DURANTE l'anno di riferimento (deducibili per
-   * il calcolo dell'imposta sostitutiva dell'anno corrente). È il valore
-   * EFFETTIVO usato dal motore: in modalità 'totale' è il numero inserito a
-   * mano; in modalità 'dettaglio' è la somma di `contributiVersatiDettaglio`.
+   * Cifra unica dei contributi INPS versati durante l'anno (modalità 'totale').
+   * NON è il valore effettivo usato dal motore: quello dipende dalla modalità
+   * selezionata (vedi `contributiVersatiEffettivi`). Conservato a parte così da
+   * non perdere la cifra manuale quando si passa alla lista di dettaglio.
    */
   contributiVersatiDuranteAnno: number | null
 
@@ -141,6 +150,12 @@ export interface RisultatoAnno {
   totaleImposte: number
   totaleFatturato: number
   imponibileNettoTotalePerImposte: number
+  /**
+   * Importo dei contributi fissi per trimestre [1ª, 2ª, 3ª, 4ª], sommato su
+   * tutti i regimi Art/Comm dell'anno. Per la 4ª rata il versamento materiale
+   * cade a febbraio dell'anno successivo.
+   */
+  rateFisse: [number, number, number, number]
 }
 
 // ---------------------------------------------------------------------------

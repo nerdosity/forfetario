@@ -7,7 +7,7 @@ import type {
 } from '@/domain/types'
 import { aliquotaContributi, datiAnno } from '@/data/taxData'
 import { giorniPermanenza } from '@/domain/dates'
-import { getMesiInPeriodo, applicaRiduzioneIVS } from '@/domain/contributi'
+import { getMesiInPeriodo, applicaRiduzioneIVS, contributiVersatiEffettivi, rateFissePerTrimestre } from '@/domain/contributi'
 import { calcolaScadenze } from '@/domain/scadenze'
 import { contributoFissoAnno } from '@/data/taxData'
 
@@ -138,6 +138,13 @@ function calcolaDatiAnno(
     totaleImposte += regime.imposteRegime
   }
 
+  // Rate fisse trimestrali aggregate su tutti i regimi (per i suggerimenti UI)
+  const rateFisse: [number, number, number, number] = [0, 0, 0, 0]
+  for (const regime of regimi) {
+    const rate = rateFissePerTrimestre(regime, anno)
+    for (let i = 0; i < 4; i++) rateFisse[i] += rate[i]
+  }
+
   return {
     dettagliRegimiCalcolati,
     totaleImponibileLordo,
@@ -148,6 +155,7 @@ function calcolaDatiAnno(
     totaleImposte,
     totaleFatturato,
     imponibileNettoTotalePerImposte,
+    rateFisse,
   }
 }
 
@@ -161,7 +169,6 @@ export function calcola(input: CalcoloInput): RisultatoCalcolo {
     anno,
     regimiCorrente,
     regimiPrecedente,
-    contributiVersatiDuranteAnno,
     contributiVersatiDuranteAnnoPrecedente,
     accontiImposteVersatiPerAnnoCorrente,
     accontiImposteVersatiPerAnnoPrecedente,
@@ -169,7 +176,7 @@ export function calcola(input: CalcoloInput): RisultatoCalcolo {
     accontiContributiEccedenzaArtCommVersatiPerAnnoCorrente,
   } = input
 
-  const deducibiliAnnoCorrente = contributiVersatiDuranteAnno ?? 0
+  const deducibiliAnnoCorrente = contributiVersatiEffettivi(input)
   const deducibiliAnnoPrecedente = contributiVersatiDuranteAnnoPrecedente ?? 0
 
   const datiCorrente = calcolaDatiAnno(regimiCorrente, anno, deducibiliAnnoCorrente)
@@ -190,6 +197,7 @@ export function calcola(input: CalcoloInput): RisultatoCalcolo {
       totaleImposte: 0,
       totaleFatturato: 0,
       imponibileNettoTotalePerImposte: 0,
+      rateFisse: [0, 0, 0, 0],
     }
   }
 

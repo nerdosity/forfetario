@@ -1,7 +1,19 @@
-import type { Regime, RiduzioneContributi } from '@/domain/types'
+import type { CalcoloInput, Regime, RiduzioneContributi } from '@/domain/types'
 import { contributoFissoAnno, datiAnno } from '@/data/taxData'
 import { formattaScadenza } from '@/domain/dates'
 import { labelTipo } from '@/domain/labels'
+
+/**
+ * Valore effettivo dei contributi versati nell'anno, usato per la deducibilità.
+ * Dipende dalla modalità: cifra unica manuale oppure somma delle righe di
+ * dettaglio. Tenere separate le due fonti evita di perdere dati allo switch.
+ */
+export function contributiVersatiEffettivi(input: CalcoloInput): number {
+  if (input.modalitaContributiVersati === 'dettaglio') {
+    return input.contributiVersatiDettaglio.reduce((s, r) => s + (r.importo ?? 0), 0)
+  }
+  return input.contributiVersatiDuranteAnno ?? 0
+}
 
 // ---------------------------------------------------------------------------
 // Conteggio mesi (base per i contributi fissi Art/Comm)
@@ -113,4 +125,24 @@ export function calcolaRateContributiFissi(regime: Regime, anno: number): Risult
   const totaleContributi = mensileEffettivo * mesiTotali
 
   return { rate, totaleContributi }
+}
+
+const TRIMESTRI_MESI: number[][] = [[1, 2, 3], [4, 5, 6], [7, 8, 9], [10, 11, 12]]
+
+/**
+ * Importo di ciascuna delle 4 rate trimestrali per un singolo regime Art/Comm.
+ * Ogni rata = contributo mensile × mesi attivi nel trimestre (mesi INTERI,
+ * regola INPS: il mese conta intero anche se attivo un solo giorno). Per i
+ * regimi in gestione separata restituisce tutte zero.
+ */
+export function rateFissePerTrimestre(regime: Regime, anno: number): [number, number, number, number] {
+  if (regime.tipo === 'separata') return [0, 0, 0, 0]
+  const { ivsAnnuale, maternitaMensile } = contributoFissoAnno(anno, regime.tipo)
+  const ivsMensileRidotto = applicaRiduzioneIVS(ivsAnnuale / 12, 0, regime.riduzioneContributi)
+  const mensileEffettivo = ivsMensileRidotto + maternitaMensile
+
+  return TRIMESTRI_MESI.map((mesi) => {
+    const mesiAttivi = mesi.filter((m) => m >= regime.meseInizio && m <= regime.meseFine).length
+    return mensileEffettivo * mesiAttivi
+  }) as [number, number, number, number]
 }

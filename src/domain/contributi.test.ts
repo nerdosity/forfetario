@@ -1,6 +1,12 @@
 import { describe, it, expect } from 'vitest'
-import { getMesiInPeriodo, applicaRiduzioneIVS, calcolaRateContributiFissi } from './contributi'
-import type { Regime } from './types'
+import {
+  getMesiInPeriodo,
+  applicaRiduzioneIVS,
+  calcolaRateContributiFissi,
+  rateFissePerTrimestre,
+  contributiVersatiEffettivi,
+} from './contributi'
+import type { CalcoloInput, Regime } from './types'
 
 describe('getMesiInPeriodo', () => {
   it('anno intero → 12', () => expect(getMesiInPeriodo(1, 1, 12, 31)).toBe(12))
@@ -74,5 +80,62 @@ describe('calcolaRateContributiFissi', () => {
     const { totaleContributi: pieno } = calcolaRateContributiFissi(regimeArtigianoAnnoIntero, 2024)
     const { totaleContributi: rid } = calcolaRateContributiFissi(ridotto, 2024)
     expect(rid).toBeLessThan(pieno)
+  })
+})
+
+describe('rateFissePerTrimestre', () => {
+  it('anno intero: 4 rate uguali e positive', () => {
+    const r = rateFissePerTrimestre(regimeArtigianoAnnoIntero, 2024)
+    expect(r).toHaveLength(4)
+    expect(r[0]).toBeGreaterThan(0)
+    expect(r[0]).toBeCloseTo(r[1])
+    expect(r[1]).toBeCloseTo(r[2])
+    expect(r[2]).toBeCloseTo(r[3])
+  })
+
+  it('gestione separata → tutte zero', () => {
+    const gs: Regime = { ...regimeArtigianoAnnoIntero, tipo: 'separata' }
+    expect(rateFissePerTrimestre(gs, 2024)).toEqual([0, 0, 0, 0])
+  })
+
+  it('trimestre parziale: febbraio (mese intero) conta 2 mesi nel 1° trim', () => {
+    // gen 1 → feb 14: trim 1 ha gen+feb attivi (2 mesi), trim 2-4 zero
+    const regime: Regime = { ...regimeArtigianoAnnoIntero, meseInizio: 1, giornoInizio: 1, meseFine: 2, giornoFine: 14 }
+    const r = rateFissePerTrimestre(regime, 2024)
+    // la prima rata = 2/3 di un trimestre pieno (2 mesi su 3)
+    const pieno = rateFissePerTrimestre(regimeArtigianoAnnoIntero, 2024)[0]
+    expect(r[0]).toBeCloseTo((pieno / 3) * 2)
+    expect(r[1]).toBe(0)
+    expect(r[2]).toBe(0)
+    expect(r[3]).toBe(0)
+  })
+
+  it('somma delle 4 rate = totale fissi del regime', () => {
+    const r = rateFissePerTrimestre(regimeArtigianoAnnoIntero, 2024)
+    const somma = r[0] + r[1] + r[2] + r[3]
+    const { totaleContributi } = calcolaRateContributiFissi(regimeArtigianoAnnoIntero, 2024)
+    expect(somma).toBeCloseTo(totaleContributi)
+  })
+})
+
+describe('contributiVersatiEffettivi', () => {
+  const base = { contributiVersatiDuranteAnno: 1000 } as CalcoloInput
+
+  it('modalità totale: usa la cifra unica', () => {
+    const input = { ...base, modalitaContributiVersati: 'totale', contributiVersatiDettaglio: [] } as CalcoloInput
+    expect(contributiVersatiEffettivi(input)).toBe(1000)
+  })
+
+  it('modalità dettaglio: somma le righe (ignora la cifra unica)', () => {
+    const input = {
+      ...base,
+      modalitaContributiVersati: 'dettaglio',
+      contributiVersatiDettaglio: [
+        { id: 'a', tipo: 'fissi-1', descrizione: '', importo: 300 },
+        { id: 'b', tipo: 'altro', descrizione: 'x', importo: 250 },
+        { id: 'c', tipo: 'altro', descrizione: 'vuoto', importo: null },
+      ],
+    } as CalcoloInput
+    expect(contributiVersatiEffettivi(input)).toBe(550)
   })
 })

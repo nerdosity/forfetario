@@ -49,7 +49,9 @@ function normalizzaRegimi(raw: unknown): Regime[] {
   return raw.map(normalizzaRegime)
 }
 
-const TIPI_VERS: TipoVersamento[] = ['separata', 'fissi', 'eccedenza', 'altro']
+const TIPI_VERS: TipoVersamento[] = [
+  'separata', 'fissi-1', 'fissi-2', 'fissi-3', 'fissi-4-prec', 'eccedenza', 'altro',
+]
 
 /** Ricostruisce una riga di versamento valida da dati grezzi. */
 function normalizzaVersamento(raw: unknown): VersamentoContributo {

@@ -6,14 +6,10 @@ import { GestoreAnni } from '@/components/GestoreAnni'
 import { ContributiVersati } from '@/components/ContributiVersati'
 import { Card, Field, MoneyInput, Select } from '@/components/ui'
 import { anniDisponibili } from '@/data/taxData'
-import type { CalcoloInput, RisultatoCalcolo, VersamentoContributo } from '@/domain/types'
+import type { CalcoloInput, RisultatoCalcolo } from '@/domain/types'
 import { theme } from '@/theme'
 
 type InputState = Omit<CalcoloInput, 'anno'> & { anno: number }
-
-/** Somma degli importi delle righe di dettaglio (null contano come 0). */
-const sommaDettaglio = (righe: VersamentoContributo[]): number =>
-  righe.reduce((s, r) => s + (r.importo ?? 0), 0)
 
 interface InputPanelProps {
   input: InputState
@@ -78,26 +74,13 @@ export function InputPanel({ input, calcoli, onChange, onAnniChanged, onAzzeraAn
           <ContributiVersati
             anno={input.anno}
             calcoli={calcoli}
+            hasGSCorrente={input.regimiCorrente.some((r) => r.tipo === 'separata')}
             modalita={input.modalitaContributiVersati}
             totale={input.contributiVersatiDuranteAnno}
             dettaglio={input.contributiVersatiDettaglio}
-            onChangeModalita={(m) =>
-              onChange(
-                m === 'dettaglio'
-                  ? {
-                      modalitaContributiVersati: 'dettaglio',
-                      contributiVersatiDuranteAnno: sommaDettaglio(input.contributiVersatiDettaglio),
-                    }
-                  : { modalitaContributiVersati: 'totale' },
-              )
-            }
+            onChangeModalita={(m) => onChange({ modalitaContributiVersati: m })}
             onChangeTotale={(v) => onChange({ contributiVersatiDuranteAnno: v })}
-            onChangeDettaglio={(righe) =>
-              onChange({
-                contributiVersatiDettaglio: righe,
-                contributiVersatiDuranteAnno: sommaDettaglio(righe),
-              })
-            }
+            onChangeDettaglio={(righe) => onChange({ contributiVersatiDettaglio: righe })}
           />
         </Card>
 
