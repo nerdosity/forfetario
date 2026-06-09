@@ -1,5 +1,5 @@
 import { Plus, Trash2 } from 'lucide-react'
-import { Button, Dropdown, DropdownItem, DropdownDivider } from 'flowbite-react'
+import { Button, Dropdown, DropdownItem } from 'flowbite-react'
 import type { RisultatoCalcolo, TipoVersamento, VersamentoContributo } from '@/domain/types'
 import { versamentoVuoto } from '@/domain/regimeFactory'
 import { Field, MoneyInput, Select } from '@/components/ui'
@@ -32,6 +32,28 @@ const TIPI: { value: TipoVersamento; label: string }[] = [
 ]
 
 const labelTipo = (t: TipoVersamento) => TIPI.find((x) => x.value === t)?.label ?? 'Altro'
+
+// Menu di aggiunta raggruppati per categoria (le voci 'altro' restano un bottone a sé)
+const MENU: { label: string; voci: { tipo: TipoVersamento; label: string }[] }[] = [
+  {
+    label: 'Gestione separata',
+    voci: [
+      { tipo: 'gs-saldo', label: 'Saldo (anno prec.)' },
+      { tipo: 'gs-acconto', label: 'Acconto' },
+    ],
+  },
+  {
+    label: 'Artigiani/Commercianti',
+    voci: [
+      { tipo: 'fissi-1', label: 'Fissi · 1ª rata' },
+      { tipo: 'fissi-2', label: 'Fissi · 2ª rata' },
+      { tipo: 'fissi-3', label: 'Fissi · 3ª rata' },
+      { tipo: 'fissi-4-prec', label: 'Fissi · 4ª rata (anno prec.)' },
+      { tipo: 'ecc-saldo', label: 'Eccedenza · saldo (anno prec.)' },
+      { tipo: 'ecc-acconto', label: 'Eccedenza · acconto' },
+    ],
+  },
+]
 
 /**
  * Importo suggerito (placeholder) per una tipologia di versamento, secondo le
@@ -95,9 +117,11 @@ export function ContributiVersati({
   const aggiorna = (id: string, patch: Partial<VersamentoContributo>) =>
     onChangeDettaglio(dettaglio.map((r) => (r.id === id ? { ...r, ...patch } : r)))
 
+  const suggerimentoRiga = (r: VersamentoContributo): number | null =>
+    r.tipo === 'altro' ? null : suggerimento(r.tipo, calcoli, hasGSCorrente)
+
   const placeholderRiga = (r: VersamentoContributo): string => {
-    if (r.tipo === 'altro') return '0'
-    const s = suggerimento(r.tipo, calcoli, hasGSCorrente)
+    const s = suggerimentoRiga(r)
     return s && s > 0.005 ? `Suggerito: ${formatEuro(s)}` : '0'
   }
 
@@ -157,9 +181,13 @@ export function ContributiVersati({
                     if (giaUsato(v, r.id)) return // tipo già presente in un'altra riga
                     aggiorna(r.id, { tipo: v })
                   }}
-                  options={TIPI}
+                  // Mostra solo i tipi non già usati altrove (più quello corrente)
+                  options={TIPI.filter((t) => !giaUsato(t.value, r.id))}
                 />
                 <MoneyInput
+                  // Rimonta il campo quando il suggerimento cambia, così il
+                  // placeholder dinamico si aggiorna sempre (solo se il campo è vuoto).
+                  key={r.importo == null ? `ph-${Math.round(suggerimentoRiga(r) ?? 0)}` : 'val'}
                   small
                   value={r.importo}
                   onChange={(v) => aggiorna(r.id, { importo: v })}
@@ -189,44 +217,31 @@ export function ContributiVersati({
             </div>
           ))}
 
-          {/* Aggiunta per categoria: ogni pulsante apre un menu di voci */}
+          {/* Aggiunta per categoria: le voci già inserite spariscono dai menu */}
           <div className="flex flex-wrap gap-2">
-            <Dropdown
-              size="xs"
-              color="light"
-              label={
-                <span className="inline-flex items-center">
-                  <Plus size={13} className="mr-1" /> Gestione separata
-                </span>
-              }
-              dismissOnClick
-            >
-              <DropdownItem disabled={giaUsato('gs-saldo')} onClick={() => aggiungi('gs-saldo')}>
-                Saldo (anno prec.)
-              </DropdownItem>
-              <DropdownItem disabled={giaUsato('gs-acconto')} onClick={() => aggiungi('gs-acconto')}>
-                Acconto
-              </DropdownItem>
-            </Dropdown>
-
-            <Dropdown
-              size="xs"
-              color="light"
-              label={
-                <span className="inline-flex items-center">
-                  <Plus size={13} className="mr-1" /> Artigiani/Commercianti
-                </span>
-              }
-              dismissOnClick
-            >
-              <DropdownItem disabled={giaUsato('fissi-1')} onClick={() => aggiungi('fissi-1')}>Fissi · 1ª rata</DropdownItem>
-              <DropdownItem disabled={giaUsato('fissi-2')} onClick={() => aggiungi('fissi-2')}>Fissi · 2ª rata</DropdownItem>
-              <DropdownItem disabled={giaUsato('fissi-3')} onClick={() => aggiungi('fissi-3')}>Fissi · 3ª rata</DropdownItem>
-              <DropdownItem disabled={giaUsato('fissi-4-prec')} onClick={() => aggiungi('fissi-4-prec')}>Fissi · 4ª rata (anno prec.)</DropdownItem>
-              <DropdownDivider />
-              <DropdownItem disabled={giaUsato('ecc-saldo')} onClick={() => aggiungi('ecc-saldo')}>Eccedenza · saldo (anno prec.)</DropdownItem>
-              <DropdownItem disabled={giaUsato('ecc-acconto')} onClick={() => aggiungi('ecc-acconto')}>Eccedenza · acconto</DropdownItem>
-            </Dropdown>
+            {MENU.map((m) => {
+              const disponibili = m.voci.filter((v) => !giaUsato(v.tipo))
+              if (disponibili.length === 0) return null // tutte usate → nascondi il menu
+              return (
+                <Dropdown
+                  key={m.label}
+                  size="xs"
+                  color="light"
+                  label={
+                    <span className="inline-flex items-center">
+                      <Plus size={13} className="mr-1" /> {m.label}
+                    </span>
+                  }
+                  dismissOnClick
+                >
+                  {disponibili.map((v) => (
+                    <DropdownItem key={v.tipo} onClick={() => aggiungi(v.tipo)}>
+                      {v.label}
+                    </DropdownItem>
+                  ))}
+                </Dropdown>
+              )
+            })}
 
             <Button color="light" size="xs" onClick={() => aggiungi('altro')}>
               <Plus size={13} className="mr-1" />
