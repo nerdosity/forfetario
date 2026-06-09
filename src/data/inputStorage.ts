@@ -50,8 +50,9 @@ function normalizzaRegimi(raw: unknown): Regime[] {
 }
 
 const TIPI_VERS: TipoVersamento[] = [
-  'gs-saldo', 'gs-acconto', 'fissi-1', 'fissi-2', 'fissi-3', 'fissi-4-prec',
-  'ecc-saldo', 'ecc-acconto', 'altro',
+  'gs-saldo', 'gs-acconto-1', 'gs-acconto-2',
+  'fissi-1', 'fissi-2', 'fissi-3', 'fissi-4-prec',
+  'ecc-saldo', 'ecc-acconto-1', 'ecc-acconto-2', 'altro',
 ]
 
 /** Ricostruisce una riga di versamento valida da dati grezzi. */

@@ -1,4 +1,4 @@
-import type { CalcoloInput, Regime, RiduzioneContributi } from '@/domain/types'
+import type { CalcoloInput, Regime, RiduzioneContributi, TipoVersamento } from '@/domain/types'
 import { contributoFissoAnno, datiAnno } from '@/data/taxData'
 import { formattaScadenza } from '@/domain/dates'
 import { labelTipo } from '@/domain/labels'
@@ -17,13 +17,16 @@ export function contributiVersatiEffettivi(input: CalcoloInput): number {
 
 /**
  * Somma degli acconti versati per una categoria, estratti dalla lista di
- * dettaglio (solo in modalità 'dettaglio'). Usati per calcolare i saldi netti
- * dei contributi: in modalità 'cifra unica' non c'è dettaglio, quindi 0.
+ * dettaglio (solo in modalità 'dettaglio'). Ogni acconto ha due rate (giugno e
+ * novembre): le sommiamo entrambe. In modalità 'cifra unica' non c'è dettaglio,
+ * quindi 0.
  */
-export function accontoVersatoDaLista(input: CalcoloInput, tipo: 'gs-acconto' | 'ecc-acconto'): number {
+export function accontoVersatoDaLista(input: CalcoloInput, categoria: 'gs' | 'ecc'): number {
   if (input.modalitaContributiVersati !== 'dettaglio') return 0
+  const tipi: TipoVersamento[] =
+    categoria === 'gs' ? ['gs-acconto-1', 'gs-acconto-2'] : ['ecc-acconto-1', 'ecc-acconto-2']
   return input.contributiVersatiDettaglio
-    .filter((r) => r.tipo === tipo)
+    .filter((r) => tipi.includes(r.tipo))
     .reduce((s, r) => s + (r.importo ?? 0), 0)
 }
 

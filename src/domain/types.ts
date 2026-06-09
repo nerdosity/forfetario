@@ -84,13 +84,15 @@ export interface DettaglioRegime extends Regime {
  */
 export type TipoVersamento =
   | 'gs-saldo'
-  | 'gs-acconto'
+  | 'gs-acconto-1'
+  | 'gs-acconto-2'
   | 'fissi-1'
   | 'fissi-2'
   | 'fissi-3'
   | 'fissi-4-prec'
   | 'ecc-saldo'
-  | 'ecc-acconto'
+  | 'ecc-acconto-1'
+  | 'ecc-acconto-2'
   | 'altro'
 
 /** Una singola voce di contributo versato durante l'anno. */

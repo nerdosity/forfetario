@@ -142,17 +142,19 @@ describe('contributiVersatiEffettivi', () => {
 })
 
 describe('accontoVersatoDaLista', () => {
-  it('estrae l\'acconto G.S. dalle righe gs-acconto', () => {
+  it('somma entrambe le rate d\'acconto G.S. (1° e 2°)', () => {
     const input = {
       modalitaContributiVersati: 'dettaglio',
       contributiVersatiDettaglio: [
-        { id: 'a', tipo: 'gs-acconto', descrizione: '', importo: 500 },
-        { id: 'b', tipo: 'gs-saldo', descrizione: '', importo: 800 },
-        { id: 'c', tipo: 'ecc-acconto', descrizione: '', importo: 300 },
+        { id: 'a', tipo: 'gs-acconto-1', descrizione: '', importo: 500 },
+        { id: 'b', tipo: 'gs-acconto-2', descrizione: '', importo: 450 },
+        { id: 'c', tipo: 'gs-saldo', descrizione: '', importo: 800 },
+        { id: 'd', tipo: 'ecc-acconto-1', descrizione: '', importo: 300 },
+        { id: 'e', tipo: 'ecc-acconto-2', descrizione: '', importo: 300 },
       ],
     } as CalcoloInput
-    expect(accontoVersatoDaLista(input, 'gs-acconto')).toBe(500)
-    expect(accontoVersatoDaLista(input, 'ecc-acconto')).toBe(300)
+    expect(accontoVersatoDaLista(input, 'gs')).toBe(950)
+    expect(accontoVersatoDaLista(input, 'ecc')).toBe(600)
   })
 
   it('in modalità cifra unica non ci sono acconti da lista → 0', () => {
@@ -161,6 +163,6 @@ describe('accontoVersatoDaLista', () => {
       contributiVersatiDuranteAnno: 1000,
       contributiVersatiDettaglio: [],
     } as unknown as CalcoloInput
-    expect(accontoVersatoDaLista(input, 'gs-acconto')).toBe(0)
+    expect(accontoVersatoDaLista(input, 'gs')).toBe(0)
   })
 })

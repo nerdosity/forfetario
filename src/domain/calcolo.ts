@@ -203,8 +203,8 @@ export function calcola(input: CalcoloInput): RisultatoCalcolo {
   // Gli acconti imposta restano un campo dedicato (l'imposta non è un contributo);
   // gli acconti contributi si ricavano dalle righe della lista versamenti.
   const accontiImposteEff = accontiImposteVersatiPerAnnoCorrente ?? 0
-  const accontiGSEff = accontoVersatoDaLista(input, 'gs-acconto')
-  const accontiEccEff = accontoVersatoDaLista(input, 'ecc-acconto')
+  const accontiGSEff = accontoVersatoDaLista(input, 'gs')
+  const accontiEccEff = accontoVersatoDaLista(input, 'ecc')
 
   const saldoImposteDaVersare = Math.max(0, datiCorrente.totaleImposte - accontiImposteEff)
   const creditoImposte = Math.max(0, accontiImposteEff - datiCorrente.totaleImposte)

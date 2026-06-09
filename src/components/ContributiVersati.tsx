@@ -21,13 +21,15 @@ interface Props {
 
 const TIPI: { value: TipoVersamento; label: string }[] = [
   { value: 'gs-saldo', label: 'G.S. · saldo (anno prec.)' },
-  { value: 'gs-acconto', label: 'G.S. · acconto' },
+  { value: 'gs-acconto-1', label: 'G.S. · 1° acconto' },
+  { value: 'gs-acconto-2', label: 'G.S. · 2° acconto' },
   { value: 'fissi-1', label: 'Fissi · 1ª rata' },
   { value: 'fissi-2', label: 'Fissi · 2ª rata' },
   { value: 'fissi-3', label: 'Fissi · 3ª rata' },
   { value: 'fissi-4-prec', label: 'Fissi · 4ª rata (anno prec.)' },
   { value: 'ecc-saldo', label: 'Eccedenza · saldo (anno prec.)' },
-  { value: 'ecc-acconto', label: 'Eccedenza · acconto' },
+  { value: 'ecc-acconto-1', label: 'Eccedenza · 1° acconto' },
+  { value: 'ecc-acconto-2', label: 'Eccedenza · 2° acconto' },
   { value: 'altro', label: 'Altro' },
 ]
 
@@ -39,7 +41,8 @@ const MENU: { label: string; voci: { tipo: TipoVersamento; label: string }[] }[]
     label: 'Gestione separata',
     voci: [
       { tipo: 'gs-saldo', label: 'Saldo (anno prec.)' },
-      { tipo: 'gs-acconto', label: 'Acconto' },
+      { tipo: 'gs-acconto-1', label: '1° acconto' },
+      { tipo: 'gs-acconto-2', label: '2° acconto' },
     ],
   },
   {
@@ -50,7 +53,8 @@ const MENU: { label: string; voci: { tipo: TipoVersamento; label: string }[] }[]
       { tipo: 'fissi-3', label: 'Fissi · 3ª rata' },
       { tipo: 'fissi-4-prec', label: 'Fissi · 4ª rata (anno prec.)' },
       { tipo: 'ecc-saldo', label: 'Eccedenza · saldo (anno prec.)' },
-      { tipo: 'ecc-acconto', label: 'Eccedenza · acconto' },
+      { tipo: 'ecc-acconto-1', label: 'Eccedenza · 1° acconto' },
+      { tipo: 'ecc-acconto-2', label: 'Eccedenza · 2° acconto' },
     ],
   },
 ]
@@ -73,15 +77,20 @@ function suggerimento(
 ): number | null {
   if (!calcoli) return null
   const prec = calcoli.datiAnnoPrecedente
+  // Gli acconti si versano in due rate (giugno e novembre), 50% ciascuna
+  const accGS = hasGSCorrente ? calcoli.totaleContributiSeparata / 2 : 0
+  const accEcc = calcoli.totaleContributiEccedenzaArtComm / 2
   switch (tipo) {
     case 'gs-saldo': return prec?.totaleContributiSeparata ?? 0
-    case 'gs-acconto': return hasGSCorrente ? calcoli.totaleContributiSeparata : 0
+    case 'gs-acconto-1':
+    case 'gs-acconto-2': return accGS
     case 'fissi-1': return calcoli.rateFisse[0]
     case 'fissi-2': return calcoli.rateFisse[1]
     case 'fissi-3': return calcoli.rateFisse[2]
     case 'fissi-4-prec': return prec?.rateFisse[3] ?? 0
     case 'ecc-saldo': return prec?.totaleContributiEccedenzaArtComm ?? 0
-    case 'ecc-acconto': return calcoli.totaleContributiEccedenzaArtComm
+    case 'ecc-acconto-1':
+    case 'ecc-acconto-2': return accEcc
     default: return null
   }
 }
