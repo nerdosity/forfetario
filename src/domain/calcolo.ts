@@ -222,6 +222,7 @@ export function calcola(input: CalcoloInput): RisultatoCalcolo {
   const { scadenzeAnnoCorrente, scadenzeAnnoSuccessivo } = calcolaScadenze({
     anno,
     regimiCorrente,
+    regimiPrecedente,
     saldoImposteDaVersare,
     saldoContributiGS,
     saldoContributiEccArtComm,
@@ -230,6 +231,8 @@ export function calcola(input: CalcoloInput): RisultatoCalcolo {
     totaleContributiEccedenzaArtCommCorrente: datiCorrente.totaleContributiEccedenzaArtComm,
     totaleImpostePrecedente: datiPrecedente.totaleImposte,
     accontiImposteVersatiPerAnnoPrecedente: accontiImposteVersatiPerAnnoPrecedente ?? 0,
+    totaleContributiSeparataPrecedente: datiPrecedente.totaleContributiSeparata,
+    totaleContributiEccedenzaArtCommPrecedente: datiPrecedente.totaleContributiEccedenzaArtComm,
   })
 
   return {
