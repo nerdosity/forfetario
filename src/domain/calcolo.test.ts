@@ -38,6 +38,37 @@ const inputBase: CalcoloInput = {
   accontiContributiEccedenzaArtCommVersatiPerAnnoCorrente: null,
 }
 
+describe('rate fisse — competenza temporale', () => {
+  // Artigiano a regime tutto l'anno, sia nel corrente sia nel precedente
+  const artInteroAnno: Regime = { ...regimeArtigiani, meseInizio: 1, giornoInizio: 1, riduzioneContributi: '35' }
+  const input2025: CalcoloInput = {
+    ...inputBase,
+    anno: 2025,
+    regimiCorrente: [{ ...artInteroAnno, id: 'cur' }],
+    regimiPrecedente: [{ ...artInteroAnno, id: 'prev' }],
+  }
+
+  it('4ª rata dell\'anno precedente usa le tariffe 2024, non 2025', () => {
+    const r = calcola(input2025)
+    // IVS 2024 = 4419.60, riduzione 35%, maternità 0.62/mese → rata trim (3 mesi)
+    const attesa2024 = ((4419.6 / 12) * 0.65 + 0.62) * 3
+    expect(r.datiAnnoPrecedente.rateFisse[3]).toBeCloseTo(attesa2024) // ≈ 720.05
+  })
+
+  it('le rate dell\'anno corrente usano le tariffe 2025', () => {
+    const r = calcola(input2025)
+    const attesa2025 = ((4453.2 / 12) * 0.65 + 0.62) * 3
+    expect(r.rateFisse[0]).toBeCloseTo(attesa2025) // ≈ 725.50
+  })
+
+  it('la maternità NON è ridotta dallo sconto 35%', () => {
+    const r = calcola(input2025)
+    // Se la maternità fosse erroneamente ridotta, la rata sarebbe più bassa
+    const conMatRidotta = ((4453.2 / 12 + 0.62) * 0.65) * 3
+    expect(r.rateFisse[0]).toBeGreaterThan(conMatRidotta)
+  })
+})
+
 describe('calcola — regime separata base', () => {
   it('totaleImposte > 0', () => {
     const r = calcola(inputBase)
