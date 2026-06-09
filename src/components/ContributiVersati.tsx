@@ -1,5 +1,5 @@
 import { Plus, Trash2 } from 'lucide-react'
-import { Button } from 'flowbite-react'
+import { Button, Dropdown, DropdownItem, DropdownDivider } from 'flowbite-react'
 import type { RisultatoCalcolo, TipoVersamento, VersamentoContributo } from '@/domain/types'
 import { versamentoVuoto } from '@/domain/regimeFactory'
 import { Field, MoneyInput, Select } from '@/components/ui'
@@ -20,36 +20,29 @@ interface Props {
 }
 
 const TIPI: { value: TipoVersamento; label: string }[] = [
-  { value: 'separata', label: 'Gestione separata' },
+  { value: 'gs-saldo', label: 'G.S. · saldo (anno prec.)' },
+  { value: 'gs-acconto', label: 'G.S. · acconto' },
   { value: 'fissi-1', label: 'Fissi · 1ª rata' },
   { value: 'fissi-2', label: 'Fissi · 2ª rata' },
   { value: 'fissi-3', label: 'Fissi · 3ª rata' },
   { value: 'fissi-4-prec', label: 'Fissi · 4ª rata (anno prec.)' },
-  { value: 'eccedenza', label: 'Eccedenza Art/Comm' },
+  { value: 'ecc-saldo', label: 'Eccedenza · saldo (anno prec.)' },
+  { value: 'ecc-acconto', label: 'Eccedenza · acconto' },
   { value: 'altro', label: 'Altro' },
 ]
 
 const labelTipo = (t: TipoVersamento) => TIPI.find((x) => x.value === t)?.label ?? 'Altro'
 
-// Bottoni di aggiunta rapida (raggruppano le tipologie più frequenti)
-const PRESET: { tipo: TipoVersamento; label: string }[] = [
-  { tipo: 'separata', label: 'Gestione separata' },
-  { tipo: 'fissi-1', label: '1ª rata' },
-  { tipo: 'fissi-2', label: '2ª rata' },
-  { tipo: 'fissi-3', label: '3ª rata' },
-  { tipo: 'fissi-4-prec', label: '4ª rata (anno prec.)' },
-  { tipo: 'eccedenza', label: 'Eccedenza' },
-  { tipo: 'altro', label: 'Altro' },
-]
-
 /**
  * Importo suggerito (placeholder) per una tipologia di versamento, secondo le
- * regole di cassa INPS:
- * - G.S.: nel forfettario si versa l'anno dopo → saldo G.S. dell'anno precedente,
- *   PIÙ gli acconti per l'anno corrente solo se esiste ancora un periodo in G.S.
- * - Fissi rate 1-3: quota del totale fissi dell'anno corrente.
- * - Fissi 4ª rata: appartiene all'anno precedente (si versa a febbraio).
- * - Eccedenza: totale eccedenza dell'anno corrente.
+ * regole di cassa INPS (nel forfettario i contributi a percentuale si versano
+ * a saldo l'anno dopo, con acconti per l'anno in corso):
+ * - G.S. saldo  → dovuto G.S. dell'anno precedente.
+ * - G.S. acconto → dovuto G.S. dell'anno corrente, solo se ancora in G.S.
+ * - Fissi 1-3 → rata trimestrale esatta dell'anno corrente.
+ * - Fissi 4ª  → rata trimestrale dell'anno precedente (si versa a febbraio).
+ * - Eccedenza saldo → eccedenza dovuta dell'anno precedente.
+ * - Eccedenza acconto → eccedenza dovuta dell'anno corrente.
  */
 function suggerimento(
   tipo: TipoVersamento,
@@ -59,22 +52,15 @@ function suggerimento(
   if (!calcoli) return null
   const prec = calcoli.datiAnnoPrecedente
   switch (tipo) {
-    case 'separata': {
-      // Saldo G.S. dell'anno precedente + (acconti per l'anno corrente, solo se ancora in G.S.)
-      const saldoPrec = prec?.totaleContributiSeparata ?? 0
-      const acconti = hasGSCorrente ? calcoli.totaleContributiSeparata : 0
-      return saldoPrec + acconti
-    }
-    // Rate fisse esatte (mensile × mesi attivi nel trimestre), non stime /4
+    case 'gs-saldo': return prec?.totaleContributiSeparata ?? 0
+    case 'gs-acconto': return hasGSCorrente ? calcoli.totaleContributiSeparata : 0
     case 'fissi-1': return calcoli.rateFisse[0]
     case 'fissi-2': return calcoli.rateFisse[1]
     case 'fissi-3': return calcoli.rateFisse[2]
-    // La 4ª rata versata nell'anno corrente appartiene all'anno precedente
     case 'fissi-4-prec': return prec?.rateFisse[3] ?? 0
-    case 'eccedenza':
-      return calcoli.totaleContributiEccedenzaArtComm
-    default:
-      return null
+    case 'ecc-saldo': return prec?.totaleContributiEccedenzaArtComm ?? 0
+    case 'ecc-acconto': return calcoli.totaleContributiEccedenzaArtComm
+    default: return null
   }
 }
 
@@ -193,14 +179,45 @@ export function ContributiVersati({
             </div>
           ))}
 
-          {/* Aggiunta righe pre-etichettate */}
+          {/* Aggiunta per categoria: ogni pulsante apre un menu di voci */}
           <div className="flex flex-wrap gap-2">
-            {PRESET.map((p) => (
-              <Button key={p.tipo} color="light" size="xs" onClick={() => aggiungi(p.tipo)}>
-                <Plus size={13} className="mr-1" />
-                {p.label}
-              </Button>
-            ))}
+            <Dropdown
+              size="xs"
+              color="light"
+              label={
+                <span className="inline-flex items-center">
+                  <Plus size={13} className="mr-1" /> Gestione separata
+                </span>
+              }
+              dismissOnClick
+            >
+              <DropdownItem onClick={() => aggiungi('gs-saldo')}>Saldo (anno prec.)</DropdownItem>
+              <DropdownItem onClick={() => aggiungi('gs-acconto')}>Acconto</DropdownItem>
+            </Dropdown>
+
+            <Dropdown
+              size="xs"
+              color="light"
+              label={
+                <span className="inline-flex items-center">
+                  <Plus size={13} className="mr-1" /> Artigiani/Commercianti
+                </span>
+              }
+              dismissOnClick
+            >
+              <DropdownItem onClick={() => aggiungi('fissi-1')}>Fissi · 1ª rata</DropdownItem>
+              <DropdownItem onClick={() => aggiungi('fissi-2')}>Fissi · 2ª rata</DropdownItem>
+              <DropdownItem onClick={() => aggiungi('fissi-3')}>Fissi · 3ª rata</DropdownItem>
+              <DropdownItem onClick={() => aggiungi('fissi-4-prec')}>Fissi · 4ª rata (anno prec.)</DropdownItem>
+              <DropdownDivider />
+              <DropdownItem onClick={() => aggiungi('ecc-saldo')}>Eccedenza · saldo (anno prec.)</DropdownItem>
+              <DropdownItem onClick={() => aggiungi('ecc-acconto')}>Eccedenza · acconto</DropdownItem>
+            </Dropdown>
+
+            <Button color="light" size="xs" onClick={() => aggiungi('altro')}>
+              <Plus size={13} className="mr-1" />
+              Altro
+            </Button>
           </div>
 
           {/* Somma (non modificabile) */}

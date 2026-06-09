@@ -74,17 +74,23 @@ export interface DettaglioRegime extends Regime {
 
 /**
  * Tipologia di un versamento di contributi, usata per suggerire un placeholder
- * sensato. Le rate fisse sono distinte per trimestre per via dello sfasamento
- * temporale: la 4ª rata di un anno si versa a febbraio dell'anno successivo,
- * quindi i versamenti di un anno includono la 4ª rata dell'anno precedente.
+ * sensato. Le voci riflettono il flusso di cassa reale dell'anno:
+ * - G.S.: saldo (dell'anno precedente) e acconto (per l'anno corrente).
+ * - Fissi Art/Comm: le 4 rate trimestrali. La 4ª di un anno si versa a febbraio
+ *   dell'anno successivo, quindi nei versamenti dell'anno rientra la 4ª rata
+ *   dell'anno PRECEDENTE.
+ * - Eccedenza Art/Comm: saldo (anno precedente) e acconto (anno corrente).
+ * - 'altro': voce libera con descrizione.
  */
 export type TipoVersamento =
-  | 'separata'
+  | 'gs-saldo'
+  | 'gs-acconto'
   | 'fissi-1'
   | 'fissi-2'
   | 'fissi-3'
   | 'fissi-4-prec'
-  | 'eccedenza'
+  | 'ecc-saldo'
+  | 'ecc-acconto'
   | 'altro'
 
 /** Una singola voce di contributo versato durante l'anno. */
