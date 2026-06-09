@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { isBisestile, giorniInAnno, giorniInMese, giorniPermanenza } from './dates'
+import { isBisestile, giorniInAnno, giorniInMese, giorniPermanenza, validaPeriodo } from './dates'
 
 describe('isBisestile', () => {
   it('2024 è bisestile', () => expect(isBisestile(2024)).toBe(true))
@@ -26,4 +26,33 @@ describe('giorniPermanenza', () => {
   it('stesso mese', () => expect(giorniPermanenza(3, 1, 3, 31, 2025)).toBe(31))
   it('gen-mar 2025', () => expect(giorniPermanenza(1, 1, 3, 31, 2025)).toBe(31 + 28 + 31))
   it('gen 1 - mar 15 2025', () => expect(giorniPermanenza(1, 1, 3, 15, 2025)).toBe(31 + 28 + 15))
+})
+
+describe('validaPeriodo', () => {
+  it('periodo valido (anno intero) → null', () =>
+    expect(validaPeriodo(1, 1, 12, 31, 2025)).toBeNull())
+
+  it('29 febbraio valido in anno bisestile', () =>
+    expect(validaPeriodo(2, 29, 12, 31, 2024)).toBeNull())
+
+  it('29 febbraio NON valido in anno non bisestile', () =>
+    expect(validaPeriodo(2, 29, 12, 31, 2025)).toMatch(/non valido/))
+
+  it('31 aprile non valido (aprile ha 30 giorni)', () =>
+    expect(validaPeriodo(4, 31, 12, 31, 2025)).toMatch(/non valido/))
+
+  it('giorno di inizio > 31 non valido', () =>
+    expect(validaPeriodo(1, 59, 12, 31, 2025)).toMatch(/inizio non valido/))
+
+  it('giorno di fine > giorni del mese non valido', () =>
+    expect(validaPeriodo(1, 1, 12, 44, 2025)).toMatch(/fine non valido/))
+
+  it('giorno < 1 non valido', () =>
+    expect(validaPeriodo(1, 0, 12, 31, 2025)).toMatch(/inizio non valido/))
+
+  it('fine prima di inizio (mesi invertiti) → errore di ordine', () =>
+    expect(validaPeriodo(6, 1, 3, 1, 2025)).toMatch(/precede/))
+
+  it('fine prima di inizio nello stesso mese → errore di ordine', () =>
+    expect(validaPeriodo(3, 20, 3, 10, 2025)).toMatch(/precede/))
 })

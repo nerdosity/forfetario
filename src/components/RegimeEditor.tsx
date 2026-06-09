@@ -1,7 +1,7 @@
-import { Plus, Trash2 } from 'lucide-react'
+import { Plus, Trash2, TriangleAlert } from 'lucide-react'
 import type { Aliquota, Regime, RiduzioneContributi, TipoRegime } from '@/domain/types'
 import { regimeVuoto } from '@/domain/regimeFactory'
-import { NOMI_MESI, giorniPermanenza } from '@/domain/dates'
+import { NOMI_MESI, giorniPermanenza, giorniInMese, validaPeriodo } from '@/domain/dates'
 import { getMesiInPeriodo } from '@/domain/contributi'
 import { labelTipo, formatEuro } from '@/domain/labels'
 import { Field, NumberInput, MoneyInput, Select } from '@/components/ui'
@@ -22,22 +22,34 @@ interface RegimeEditorProps {
   anno: number
   regimi: Regime[]
   onChange: (regimi: Regime[]) => void
-  /** Mostra i campi periodo (mese/giorno inizio-fine). */
-  mostraDate?: boolean
 }
 
-/** Editor riutilizzabile dei periodi/regimi di un anno. */
-export function RegimeEditor({
-  titolo,
-  anno,
-  regimi,
-  onChange,
-  mostraDate = false,
-}: RegimeEditorProps) {
+/**
+ * Editor riutilizzabile dei periodi/regimi di un anno. Le date di inizio/fine
+ * periodo sono sempre richieste: il calcolo prorata i contributi sui giorni/mesi
+ * di permanenza, quindi servono anche per l'anno precedente con più periodi.
+ */
+export function RegimeEditor({ titolo, anno, regimi, onChange }: RegimeEditorProps) {
   const aggiungi = () => onChange([...regimi, regimeVuoto()])
   const rimuovi = (id: string) => onChange(regimi.filter((r) => r.id !== id))
   const aggiorna = <K extends keyof Regime>(id: string, campo: K, valore: Regime[K]) =>
     onChange(regimi.map((r) => (r.id === id ? { ...r, [campo]: valore } : r)))
+
+  // Cambiando il mese, riduce il giorno se eccede i giorni di quel mese (es. 31 → 28 a febbraio)
+  const aggiornaMese = (id: string, campoMese: 'meseInizio' | 'meseFine', campoGiorno: 'giornoInizio' | 'giornoFine', mese: number) =>
+    onChange(
+      regimi.map((r) => {
+        if (r.id !== id) return r
+        const maxGiorno = giorniInMese(mese, anno)
+        return { ...r, [campoMese]: mese, [campoGiorno]: Math.min(r[campoGiorno], maxGiorno) }
+      }),
+    )
+
+  // Imposta un giorno limitandolo all'intervallo [1, giorni del mese]
+  const aggiornaGiorno = (id: string, campoGiorno: 'giornoInizio' | 'giornoFine', mese: number, giorno: number) => {
+    const maxGiorno = giorniInMese(mese, anno)
+    aggiorna(id, campoGiorno, Math.max(1, Math.min(giorno, maxGiorno)))
+  }
 
   return (
     <div className={theme.sectionFlat}>
@@ -48,7 +60,12 @@ export function RegimeEditor({
         </button>
       </div>
 
-      {regimi.map((regime, index) => (
+      {regimi.map((regime, index) => {
+        const erroreData = validaPeriodo(
+          regime.meseInizio, regime.giornoInizio,
+          regime.meseFine, regime.giornoFine, anno,
+        )
+        return (
         <div key={regime.id} className={theme.cardInner}>
           <div className="flex items-center justify-between">
             <span className={theme.labelSmall}>Periodo {index + 1}</span>
@@ -119,44 +136,42 @@ export function RegimeEditor({
             </Field>
           </div>
 
-          {mostraDate && (
-            <div className="grid grid-cols-4 gap-2">
-              <Field label="Da mese" small>
-                <Select<number>
-                  small
-                  value={regime.meseInizio}
-                  onChange={(v) => aggiorna(regime.id, 'meseInizio', v)}
-                  options={NOMI_MESI.map((m, i) => ({ value: i + 1, label: m }))}
-                />
-              </Field>
-              <Field label="Giorno" small>
-                <NumberInput
-                  small
-                  value={regime.giornoInizio}
-                  onChange={(v) => aggiorna(regime.id, 'giornoInizio', v ?? 1)}
-                  min={1}
-                  max={31}
-                />
-              </Field>
-              <Field label="A mese" small>
-                <Select<number>
-                  small
-                  value={regime.meseFine}
-                  onChange={(v) => aggiorna(regime.id, 'meseFine', v)}
-                  options={NOMI_MESI.map((m, i) => ({ value: i + 1, label: m }))}
-                />
-              </Field>
-              <Field label="Giorno" small>
-                <NumberInput
-                  small
-                  value={regime.giornoFine}
-                  onChange={(v) => aggiorna(regime.id, 'giornoFine', v ?? 1)}
-                  min={1}
-                  max={31}
-                />
-              </Field>
-            </div>
-          )}
+          <div className="grid grid-cols-4 gap-2">
+            <Field label="Da mese" small>
+              <Select<number>
+                small
+                value={regime.meseInizio}
+                onChange={(v) => aggiornaMese(regime.id, 'meseInizio', 'giornoInizio', v)}
+                options={NOMI_MESI.map((m, i) => ({ value: i + 1, label: m }))}
+              />
+            </Field>
+            <Field label="Giorno" small>
+              <NumberInput
+                small
+                value={regime.giornoInizio}
+                onChange={(v) => aggiornaGiorno(regime.id, 'giornoInizio', regime.meseInizio, v ?? 1)}
+                min={1}
+                max={giorniInMese(regime.meseInizio, anno)}
+              />
+            </Field>
+            <Field label="A mese" small>
+              <Select<number>
+                small
+                value={regime.meseFine}
+                onChange={(v) => aggiornaMese(regime.id, 'meseFine', 'giornoFine', v)}
+                options={NOMI_MESI.map((m, i) => ({ value: i + 1, label: m }))}
+              />
+            </Field>
+            <Field label="Giorno" small>
+              <NumberInput
+                small
+                value={regime.giornoFine}
+                onChange={(v) => aggiornaGiorno(regime.id, 'giornoFine', regime.meseFine, v ?? 1)}
+                min={1}
+                max={giorniInMese(regime.meseFine, anno)}
+              />
+            </Field>
+          </div>
 
           <Field label="Fatturato periodo" small info="Compensi incassati nel periodo, al lordo di imposte e contributi.">
             <MoneyInput
@@ -168,7 +183,12 @@ export function RegimeEditor({
             />
           </Field>
 
-          {mostraDate && (
+          {erroreData ? (
+            <div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 p-2 text-xs text-red-700">
+              <TriangleAlert size={14} className="mt-0.5 shrink-0" aria-hidden />
+              <span>{erroreData}</span>
+            </div>
+          ) : (
             <div className="rounded-md bg-white border border-slate-200 p-2 text-xs text-slate-500">
               <span>{labelTipo(regime.tipo)} · {regime.aliquota}% · </span>
               <span>
@@ -185,7 +205,8 @@ export function RegimeEditor({
             </div>
           )}
         </div>
-      ))}
+        )
+      })}
     </div>
   )
 }

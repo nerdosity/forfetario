@@ -66,7 +66,6 @@ export function InputPanel({ input, calcoli, onChange, onAnniChanged, onAzzeraAn
             anno={input.anno}
             regimi={input.regimiCorrente}
             onChange={(r) => onChange({ regimiCorrente: r })}
-            mostraDate
           />
         </Card>
 
@@ -116,7 +115,6 @@ export function InputPanel({ input, calcoli, onChange, onAnniChanged, onAzzeraAn
               anno={input.anno - 1}
               regimi={input.regimiPrecedente}
               onChange={(r) => onChange({ regimiPrecedente: r })}
-              mostraDate={false}
             />
           </div>
         </Card>

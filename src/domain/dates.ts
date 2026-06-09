@@ -44,6 +44,33 @@ export function giorniPermanenza(
   return giorni
 }
 
+/**
+ * Valida la coerenza di un periodo (inizio/fine) all'interno di un anno.
+ * Controlla che i giorni esistano nel rispettivo mese (con bisestile) e che
+ * la fine non preceda l'inizio. Restituisce un messaggio d'errore o null.
+ */
+export function validaPeriodo(
+  meseInizio: number,
+  giornoInizio: number,
+  meseFine: number,
+  giornoFine: number,
+  anno: number,
+): string | null {
+  const maxInizio = giorniInMese(meseInizio, anno)
+  const maxFine = giorniInMese(meseFine, anno)
+
+  if (giornoInizio < 1 || giornoInizio > maxInizio) {
+    return `Giorno di inizio non valido: ${NOMI_MESI_ESTESI[meseInizio - 1]} ${anno} ha ${maxInizio} giorni.`
+  }
+  if (giornoFine < 1 || giornoFine > maxFine) {
+    return `Giorno di fine non valido: ${NOMI_MESI_ESTESI[meseFine - 1]} ${anno} ha ${maxFine} giorni.`
+  }
+  if (meseFine < meseInizio || (meseFine === meseInizio && giornoFine < giornoInizio)) {
+    return 'La data di fine periodo precede quella di inizio.'
+  }
+  return null
+}
+
 /** Converte una data "MM-GG" + anno in stringa leggibile "GG Mese AAAA". */
 export function formattaScadenza(mmGiorno: string, anno: number): string {
   const [mm, gg] = mmGiorno.split('-').map(Number)
