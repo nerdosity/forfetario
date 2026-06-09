@@ -116,16 +116,22 @@ function TabellaScadenze({ titolo, sottotitolo, scadenze, input }: {
                     <TableCell className={`font-medium ${testo}`}>
                       <span className="inline-flex items-center gap-1.5">
                         {s.descrizione}
+                        {s.stimata && (
+                          <Tooltip
+                            content={`Importo e data sono una proiezione basata sulle costanti dell'anno corrente: i valori ufficiali ${s.annoScadenza} non sono ancora disponibili.`}
+                            label="Valore stimato"
+                          />
+                        )}
                         {dettaglio && <Tooltip content={dettaglio} label="Dettaglio componenti" />}
                       </span>
                     </TableCell>
                     <TableCell>
-                      <Badge color={STATO_COLOR[stato]} className="w-fit">
-                        {STATO_LABEL[stato]}
+                      <Badge color={s.stimata ? 'gray' : STATO_COLOR[stato]} className="w-fit">
+                        {s.stimata ? 'Stima' : STATO_LABEL[stato]}
                       </Badge>
                     </TableCell>
                     <TableCell className={`text-right tabular-nums ${tenue ? 'text-slate-400' : 'text-slate-700'}`}>
-                      {formatEuro(s.importo)}
+                      {s.stimata ? '≈ ' : ''}{formatEuro(s.importo)}
                     </TableCell>
                     <TableCell className="text-right tabular-nums text-slate-600">
                       {versato == null ? '—' : formatEuro(versato)}

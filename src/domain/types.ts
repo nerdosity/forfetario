@@ -52,6 +52,12 @@ export interface Scadenza {
   /** Anno solare in cui cade la scadenza. */
   annoScadenza: number
   /**
+   * Vero se data e importo sono una PROIEZIONE: l'anno di competenza non è
+   * ancora nel database fiscale, quindi si stimano con le costanti dell'anno
+   * corrente. Da aggiornare quando INPS pubblica i valori ufficiali.
+   */
+  stimata?: boolean
+  /**
    * Voci di versamento che "saldano" questa scadenza. Una scadenza è considerata
    * pagata se per ciascun riferimento esiste un versamento corrispondente.
    * Le voci 'imposta-*' fanno riferimento ai campi acconti imposta (pannello a parte),

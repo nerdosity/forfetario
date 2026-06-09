@@ -1,8 +1,10 @@
 import type { CalcoloInput, Regime, Scadenza, RiferimentoScadenza, TipoVersamento } from '@/domain/types'
-import { datiAnno, contributoFissoAnno } from '@/data/taxData'
+import { datiAnno, contributoFissoAnno, anniDisponibili } from '@/data/taxData'
 import { calcolaRateContributiFissi, applicaRiduzioneIVS } from '@/domain/contributi'
 import { formattaScadenza } from '@/domain/dates'
 import { labelTipo } from '@/domain/labels'
+
+const annoEsisteNelDatabase = (anno: number) => anniDisponibili().includes(anno)
 
 const SOGLIA_ACCONTO = 257 // soglia minima per generare acconti
 const QUOTA_ACCONTO_IMPOSTE = 0.5
@@ -387,6 +389,9 @@ export function calcolaScadenze({
   }
 
   // ─── Prime 3 rate contributi fissi dell'anno successivo ───────────────────
+  // Se l'anno successivo non è ancora nel database fiscale, si proietta usando
+  // le costanti dell'anno corrente (stima). Le scadenze restano "Previste".
+  const annoFonteFissi = annoEsisteNelDatabase(annoSucc) ? annoSucc : anno
   const fissiAttiviADicembre = fissiCorrenti.filter((r) => r.meseFine === 12)
   for (const regime of fissiAttiviADicembre) {
     const regimeSimulato: Regime = {
@@ -394,25 +399,21 @@ export function calcolaScadenze({
       meseInizio: 1, giornoInizio: 1,
       meseFine: 12, giornoFine: 31,
     }
-    // Tentiamo di avere i dati dell'anno successivo; se non esistono saltiamo
-    try {
-      const { rate } = calcolaRateContributiFissi(regimeSimulato, annoSucc)
-      const { ivsAnnuale, maternitaMensile } = contributoFissoAnno(annoSucc, regime.tipo)
-      const mensile = applicaRiduzioneIVS(ivsAnnuale / 12, maternitaMensile, regime.riduzioneContributi)
-      for (const rata of rate) {
-        if (rata.anno === annoSucc && !rata.data.includes('Febbraio')) {
-          const rataAnnotata = { ...rata, importo: mensile * 3 }
-          globali.push({
-            data: rataAnnotata.data,
-            descrizione: rata.descrizione.replace(String(anno), String(annoSucc)),
-            importo: mensile * 3,
-            componenti: [{ tipo: `Rata contributi fissi ${labelTipo(regime.tipo)} ${annoSucc}`, importo: mensile * 3 }],
-            annoScadenza: annoSucc,
-          })
-        }
+    const { ivsAnnuale, maternitaMensile } = contributoFissoAnno(annoFonteFissi, regime.tipo)
+    const mensile = applicaRiduzioneIVS(ivsAnnuale / 12, maternitaMensile, regime.riduzioneContributi)
+    const stimata = annoFonteFissi !== annoSucc
+    // Le date trimestrali (1ª-3ª) provengono dalle scadenze dell'anno fonte
+    for (const rata of calcolaRateContributiFissi(regimeSimulato, annoFonteFissi).rate) {
+      if (rata.rataIdx < 3) {
+        globali.push({
+          data: formattaScadenza(datiAnno(annoFonteFissi).scadenze.rateContributiFissi[rata.rataIdx], annoSucc),
+          descrizione: `Contributi fissi ${labelTipo(regime.tipo)} ${annoSucc} (3 mesi trim. ${rata.rataIdx + 1})`,
+          importo: mensile * 3,
+          componenti: [{ tipo: `Rata contributi fissi ${labelTipo(regime.tipo)} ${annoSucc}`, importo: mensile * 3 }],
+          annoScadenza: annoSucc,
+          stimata,
+        })
       }
-    } catch {
-      // Anno successivo non ancora nel database fiscale — nessuna proiezione
     }
   }
 
