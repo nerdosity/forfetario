@@ -35,8 +35,6 @@ function inputDefault(): CalcoloInput {
     contributiVersatiDuranteAnnoPrecedente: null,
     accontiImposteVersatiPerAnnoCorrente: null,
     accontiImposteVersatiPerAnnoPrecedente: null,
-    accontiContributiSeparataVersatiPerAnnoCorrente: null,
-    accontiContributiEccedenzaArtCommVersatiPerAnnoCorrente: null,
   }
 }
 

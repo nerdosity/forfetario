@@ -82,8 +82,15 @@ export function ContributiVersati({
 }: Props) {
   const somma = dettaglio.reduce((s, r) => s + (r.importo ?? 0), 0)
 
-  const aggiungi = (tipo: TipoVersamento) =>
+  // Ogni voce tipizzata (saldo, acconto, singola rata) è unica per anno; solo
+  // 'altro' può ripetersi. Un tipo già presente non è riaggiungibile/riselezionabile.
+  const giaUsato = (tipo: TipoVersamento, escludiId?: string) =>
+    tipo !== 'altro' && dettaglio.some((r) => r.tipo === tipo && r.id !== escludiId)
+
+  const aggiungi = (tipo: TipoVersamento) => {
+    if (giaUsato(tipo)) return
     onChangeDettaglio([...dettaglio, versamentoVuoto(tipo)])
+  }
   const rimuovi = (id: string) => onChangeDettaglio(dettaglio.filter((r) => r.id !== id))
   const aggiorna = (id: string, patch: Partial<VersamentoContributo>) =>
     onChangeDettaglio(dettaglio.map((r) => (r.id === id ? { ...r, ...patch } : r)))
@@ -146,7 +153,10 @@ export function ContributiVersati({
                 <Select<TipoVersamento>
                   small
                   value={r.tipo}
-                  onChange={(v) => aggiorna(r.id, { tipo: v })}
+                  onChange={(v) => {
+                    if (giaUsato(v, r.id)) return // tipo già presente in un'altra riga
+                    aggiorna(r.id, { tipo: v })
+                  }}
                   options={TIPI}
                 />
                 <MoneyInput
@@ -191,8 +201,12 @@ export function ContributiVersati({
               }
               dismissOnClick
             >
-              <DropdownItem onClick={() => aggiungi('gs-saldo')}>Saldo (anno prec.)</DropdownItem>
-              <DropdownItem onClick={() => aggiungi('gs-acconto')}>Acconto</DropdownItem>
+              <DropdownItem disabled={giaUsato('gs-saldo')} onClick={() => aggiungi('gs-saldo')}>
+                Saldo (anno prec.)
+              </DropdownItem>
+              <DropdownItem disabled={giaUsato('gs-acconto')} onClick={() => aggiungi('gs-acconto')}>
+                Acconto
+              </DropdownItem>
             </Dropdown>
 
             <Dropdown
@@ -205,13 +219,13 @@ export function ContributiVersati({
               }
               dismissOnClick
             >
-              <DropdownItem onClick={() => aggiungi('fissi-1')}>Fissi · 1ª rata</DropdownItem>
-              <DropdownItem onClick={() => aggiungi('fissi-2')}>Fissi · 2ª rata</DropdownItem>
-              <DropdownItem onClick={() => aggiungi('fissi-3')}>Fissi · 3ª rata</DropdownItem>
-              <DropdownItem onClick={() => aggiungi('fissi-4-prec')}>Fissi · 4ª rata (anno prec.)</DropdownItem>
+              <DropdownItem disabled={giaUsato('fissi-1')} onClick={() => aggiungi('fissi-1')}>Fissi · 1ª rata</DropdownItem>
+              <DropdownItem disabled={giaUsato('fissi-2')} onClick={() => aggiungi('fissi-2')}>Fissi · 2ª rata</DropdownItem>
+              <DropdownItem disabled={giaUsato('fissi-3')} onClick={() => aggiungi('fissi-3')}>Fissi · 3ª rata</DropdownItem>
+              <DropdownItem disabled={giaUsato('fissi-4-prec')} onClick={() => aggiungi('fissi-4-prec')}>Fissi · 4ª rata (anno prec.)</DropdownItem>
               <DropdownDivider />
-              <DropdownItem onClick={() => aggiungi('ecc-saldo')}>Eccedenza · saldo (anno prec.)</DropdownItem>
-              <DropdownItem onClick={() => aggiungi('ecc-acconto')}>Eccedenza · acconto</DropdownItem>
+              <DropdownItem disabled={giaUsato('ecc-saldo')} onClick={() => aggiungi('ecc-saldo')}>Eccedenza · saldo (anno prec.)</DropdownItem>
+              <DropdownItem disabled={giaUsato('ecc-acconto')} onClick={() => aggiungi('ecc-acconto')}>Eccedenza · acconto</DropdownItem>
             </Dropdown>
 
             <Button color="light" size="xs" onClick={() => aggiungi('altro')}>

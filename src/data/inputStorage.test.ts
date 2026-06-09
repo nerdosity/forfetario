@@ -30,8 +30,6 @@ function inputDiEsempio(): CalcoloInput {
     contributiVersatiDuranteAnnoPrecedente: 1000,
     accontiImposteVersatiPerAnnoCorrente: 200,
     accontiImposteVersatiPerAnnoPrecedente: 150,
-    accontiContributiSeparataVersatiPerAnnoCorrente: 80,
-    accontiContributiEccedenzaArtCommVersatiPerAnnoCorrente: 90,
   }
 }
 

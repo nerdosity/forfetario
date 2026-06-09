@@ -135,11 +135,9 @@ export interface CalcoloInput {
   /** Acconti imposta sostitutiva versati PER l'anno precedente (giu + nov). */
   accontiImposteVersatiPerAnnoPrecedente: number | null
 
-  /** Acconti contributi Gestione Separata versati PER l'anno corrente. */
-  accontiContributiSeparataVersatiPerAnnoCorrente: number | null
-
-  /** Acconti contributi eccedenza Art/Comm versati PER l'anno corrente. */
-  accontiContributiEccedenzaArtCommVersatiPerAnnoCorrente: number | null
+  // Gli acconti contributi (G.S. ed eccedenza Art/Comm) NON sono campi a sé:
+  // si ricavano dalle righe 'gs-acconto' / 'ecc-acconto' di contributiVersatiDettaglio
+  // (vedi accontoVersatoDaLista). Così non si inseriscono due volte.
 }
 
 // ---------------------------------------------------------------------------

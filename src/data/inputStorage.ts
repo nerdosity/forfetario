@@ -96,10 +96,6 @@ export function caricaInput(base: CalcoloInput): CalcoloInput | null {
       contributiVersatiDuranteAnnoPrecedente: numOrNull(o.contributiVersatiDuranteAnnoPrecedente),
       accontiImposteVersatiPerAnnoCorrente: numOrNull(o.accontiImposteVersatiPerAnnoCorrente),
       accontiImposteVersatiPerAnnoPrecedente: numOrNull(o.accontiImposteVersatiPerAnnoPrecedente),
-      accontiContributiSeparataVersatiPerAnnoCorrente: numOrNull(o.accontiContributiSeparataVersatiPerAnnoCorrente),
-      accontiContributiEccedenzaArtCommVersatiPerAnnoCorrente: numOrNull(
-        o.accontiContributiEccedenzaArtCommVersatiPerAnnoCorrente,
-      ),
     }
   } catch {
     return null

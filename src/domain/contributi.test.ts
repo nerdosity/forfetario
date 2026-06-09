@@ -5,6 +5,7 @@ import {
   calcolaRateContributiFissi,
   rateFissePerTrimestre,
   contributiVersatiEffettivi,
+  accontoVersatoDaLista,
 } from './contributi'
 import type { CalcoloInput, Regime } from './types'
 
@@ -137,5 +138,29 @@ describe('contributiVersatiEffettivi', () => {
       ],
     } as CalcoloInput
     expect(contributiVersatiEffettivi(input)).toBe(550)
+  })
+})
+
+describe('accontoVersatoDaLista', () => {
+  it('estrae l\'acconto G.S. dalle righe gs-acconto', () => {
+    const input = {
+      modalitaContributiVersati: 'dettaglio',
+      contributiVersatiDettaglio: [
+        { id: 'a', tipo: 'gs-acconto', descrizione: '', importo: 500 },
+        { id: 'b', tipo: 'gs-saldo', descrizione: '', importo: 800 },
+        { id: 'c', tipo: 'ecc-acconto', descrizione: '', importo: 300 },
+      ],
+    } as CalcoloInput
+    expect(accontoVersatoDaLista(input, 'gs-acconto')).toBe(500)
+    expect(accontoVersatoDaLista(input, 'ecc-acconto')).toBe(300)
+  })
+
+  it('in modalità cifra unica non ci sono acconti da lista → 0', () => {
+    const input = {
+      modalitaContributiVersati: 'totale',
+      contributiVersatiDuranteAnno: 1000,
+      contributiVersatiDettaglio: [],
+    } as unknown as CalcoloInput
+    expect(accontoVersatoDaLista(input, 'gs-acconto')).toBe(0)
   })
 })

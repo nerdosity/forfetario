@@ -7,7 +7,7 @@ import type {
 } from '@/domain/types'
 import { aliquotaContributi, datiAnno } from '@/data/taxData'
 import { giorniPermanenza } from '@/domain/dates'
-import { getMesiInPeriodo, applicaRiduzioneIVS, contributiVersatiEffettivi, rateFissePerTrimestre } from '@/domain/contributi'
+import { getMesiInPeriodo, applicaRiduzioneIVS, contributiVersatiEffettivi, rateFissePerTrimestre, accontoVersatoDaLista } from '@/domain/contributi'
 import { calcolaScadenze } from '@/domain/scadenze'
 import { contributoFissoAnno } from '@/data/taxData'
 
@@ -172,8 +172,6 @@ export function calcola(input: CalcoloInput): RisultatoCalcolo {
     contributiVersatiDuranteAnnoPrecedente,
     accontiImposteVersatiPerAnnoCorrente,
     accontiImposteVersatiPerAnnoPrecedente,
-    accontiContributiSeparataVersatiPerAnnoCorrente,
-    accontiContributiEccedenzaArtCommVersatiPerAnnoCorrente,
   } = input
 
   const deducibiliAnnoCorrente = contributiVersatiEffettivi(input)
@@ -202,9 +200,11 @@ export function calcola(input: CalcoloInput): RisultatoCalcolo {
   }
 
   // ─── Saldi anno corrente ──────────────────────────────────────────────────
+  // Gli acconti imposta restano un campo dedicato (l'imposta non è un contributo);
+  // gli acconti contributi si ricavano dalle righe della lista versamenti.
   const accontiImposteEff = accontiImposteVersatiPerAnnoCorrente ?? 0
-  const accontiGSEff = accontiContributiSeparataVersatiPerAnnoCorrente ?? 0
-  const accontiEccEff = accontiContributiEccedenzaArtCommVersatiPerAnnoCorrente ?? 0
+  const accontiGSEff = accontoVersatoDaLista(input, 'gs-acconto')
+  const accontiEccEff = accontoVersatoDaLista(input, 'ecc-acconto')
 
   const saldoImposteDaVersare = Math.max(0, datiCorrente.totaleImposte - accontiImposteEff)
   const creditoImposte = Math.max(0, accontiImposteEff - datiCorrente.totaleImposte)

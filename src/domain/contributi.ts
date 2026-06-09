@@ -15,6 +15,18 @@ export function contributiVersatiEffettivi(input: CalcoloInput): number {
   return input.contributiVersatiDuranteAnno ?? 0
 }
 
+/**
+ * Somma degli acconti versati per una categoria, estratti dalla lista di
+ * dettaglio (solo in modalità 'dettaglio'). Usati per calcolare i saldi netti
+ * dei contributi: in modalità 'cifra unica' non c'è dettaglio, quindi 0.
+ */
+export function accontoVersatoDaLista(input: CalcoloInput, tipo: 'gs-acconto' | 'ecc-acconto'): number {
+  if (input.modalitaContributiVersati !== 'dettaglio') return 0
+  return input.contributiVersatiDettaglio
+    .filter((r) => r.tipo === tipo)
+    .reduce((s, r) => s + (r.importo ?? 0), 0)
+}
+
 // ---------------------------------------------------------------------------
 // Conteggio mesi (base per i contributi fissi Art/Comm)
 // ---------------------------------------------------------------------------
