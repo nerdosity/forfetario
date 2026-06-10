@@ -53,11 +53,18 @@ describe('calcolaPianoRateazione — da giugno', () => {
     expect(piano.maggiorazione).toBe(0)
   })
 
-  it('interessi per rata arrotondati al centesimo (round, come il software AdE)', () => {
-    // round(14176 × aliquota) in centesimi
-    expect(piano.rate.map((r) => r.interessi)).toEqual([0, 0.26, 0.72, 1.19, 1.66, 2.13, 2.59])
-    expect(piano.totaleInteressi).toBeCloseTo(8.55, 2)
-    expect(piano.totale).toBeCloseTo(1000.9, 2)
+  it('interessi per rata arrotondati al centesimo; sotto 1,03 € non dovuti (regola AdE)', () => {
+    // round(14176 × aliquota) in centesimi: [0, 26, 72, 119, 166, 213, 259];
+    // 26 e 72 non superano la soglia di 103 centesimi → azzerati.
+    expect(piano.rate.map((r) => r.interessi)).toEqual([0, 0, 0, 1.19, 1.66, 2.13, 2.59])
+    expect(piano.totaleInteressi).toBeCloseTo(7.57, 2)
+    expect(piano.totale).toBeCloseTo(999.92, 2)
+  })
+
+  it('soglia interessi: con importi alti gli interessi maturano da subito', () => {
+    // 60.000 €: quota rata 2 = floor(6000000/7) = 857142 → round(× 0.0018) = 1543 > 103.
+    const grande = calcolaPianoRateazione(60000, { inizio: 'giugno', numeroRate: 7 })
+    expect(grande.rate[1].interessi).toBeCloseTo(15.43, 2)
   })
 
   it('date nominali: 30/06 poi il 16 del mese (20 ad agosto)', () => {
@@ -119,7 +126,7 @@ describe('espandiRateazione', () => {
     const out = espandiRateazione(scadenza, { inizio: 'giugno', numeroRate: 7 })
     expect(out).toHaveLength(7)
     const totale = out.reduce((s, r) => s + r.importo, 0)
-    expect(totale).toBeCloseTo(1000.9, 2)
+    expect(totale).toBeCloseTo(999.92, 2)
     expect(out[0].data).toBe('30 Giugno 2026')
     expect(out[1].data).toBe('16 Luglio 2026')
     expect(out[2].data).toBe('20 Agosto 2026')

@@ -55,6 +55,13 @@ export const theme = {
   // --- Bottoni icona (azioni inline nei card) ---
   btnIcon: 'inline-flex items-center justify-center rounded-md p-1.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700',
   btnIconDanger: 'inline-flex items-center justify-center rounded-md p-1.5 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600',
+  // Bottone icona con bordo, per azioni evidenti nelle tabelle (es. rateazione)
+  btnIconOutline:
+    'inline-flex items-center justify-center rounded-md border border-slate-200 p-1.5 text-slate-500 ' +
+    'transition-colors hover:border-blue-300 hover:bg-blue-50 hover:text-blue-600',
+  btnIconOutlineActive:
+    'inline-flex items-center justify-center rounded-md border border-blue-300 bg-blue-50 p-1.5 text-blue-600 ' +
+    'transition-colors hover:bg-blue-100',
 
   // --- Sezione di form con intestazione (dentro il modal anno) ---
   formSection: 'space-y-3',

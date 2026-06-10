@@ -18,6 +18,13 @@ import { formattaScadenza } from '@/domain/dates'
 /** Maggiorazione dovuta versando alla scadenza differita di luglio. */
 export const MAGGIORAZIONE_LUGLIO = 0.004
 
+/**
+ * Soglia (in centesimi) sotto la quale gli interessi di una rata non sono
+ * dovuti: il software ufficiale non iscrive la riga interessi (codice 1668)
+ * se l'importo non supera 1,03 € e lo azzera.
+ */
+export const SOGLIA_INTERESSI_CENTS = 103
+
 /** Date nominali "MM-GG" delle rate, prima scadenza inclusa. */
 const DATE_RATE: Record<InizioRateazione, string[]> = {
   giugno: ['06-30', '07-16', '08-20', '09-16', '10-16', '11-16', '12-16'],
@@ -96,7 +103,9 @@ export function calcolaPianoRateazione(importo: number, opzioni: OpzioniRateazio
   for (let i = 0; i < numeroRate; i++) {
     const quota = quotaBase + (i === 0 ? resto : 0)
     const aliquota = INTERESSI_RATE[inizio][i]
-    const interessi = Math.round(quota * aliquota)
+    const calcolati = Math.round(quota * aliquota)
+    // Sotto la soglia gli interessi della rata non sono dovuti (regola AdE).
+    const interessi = calcolati > SOGLIA_INTERESSI_CENTS ? calcolati : 0
     totaleInteressi += interessi
     rate.push({
       numero: i + 1,

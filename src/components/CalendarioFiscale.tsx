@@ -100,6 +100,8 @@ function TabellaScadenze({ titolo, sottotitolo, scadenze, input, mostraBilancio,
   const hasBilancio =
     mostraBilancio &&
     (bilancio.contributi.dovuto > 0.005 || bilancio.imposte.dovuto > 0.005)
+  // Colonna rateazione: solo se almeno una voce della tabella è rateizzabile.
+  const hasRateazione = !!onRateizza && scadenze.some((s) => s.chiaveRateazione)
 
   return (
     <div>
@@ -119,6 +121,7 @@ function TabellaScadenze({ titolo, sottotitolo, scadenze, input, mostraBilancio,
             <TableHead>
               <TableRow>
                 <TableHeadCell>Adempimento</TableHeadCell>
+                {hasRateazione && <TableHeadCell className="w-12 text-center">Rate</TableHeadCell>}
                 <TableHeadCell>Stato</TableHeadCell>
                 <TableHeadCell className="text-right">Dovuto</TableHeadCell>
                 <TableHeadCell className="text-right">Pagato</TableHeadCell>
@@ -168,6 +171,10 @@ function TabellaScadenze({ titolo, sottotitolo, scadenze, input, mostraBilancio,
                           />
                         )}
                         {dettaglio && <Tooltip content={dettaglio} label="Dettaglio componenti" />}
+                      </span>
+                    </TableCell>
+                    {hasRateazione && (
+                      <TableCell className="text-center">
                         {s.chiaveRateazione && onRateizza && (
                           <button
                             type="button"
@@ -178,15 +185,17 @@ function TabellaScadenze({ titolo, sottotitolo, scadenze, input, mostraBilancio,
                                 : 'Rateizza il versamento'
                             }
                             aria-label="Rateizza il versamento"
-                            className={`${theme.btnIcon} ${
-                              input.rateazioniImposta[s.chiaveRateazione] ? 'text-blue-600 hover:text-blue-700' : ''
-                            }`}
+                            className={
+                              input.rateazioniImposta[s.chiaveRateazione]
+                                ? theme.btnIconOutlineActive
+                                : theme.btnIconOutline
+                            }
                           >
-                            <CalendarClock size={15} aria-hidden />
+                            <CalendarClock size={16} aria-hidden />
                           </button>
                         )}
-                      </span>
-                    </TableCell>
+                      </TableCell>
+                    )}
                     <TableCell>
                       <Badge color={s.stimata ? 'gray' : STATO_COLOR[stato]} className="w-fit">
                         {s.stimata ? 'Stima' : STATO_LABEL[stato]}

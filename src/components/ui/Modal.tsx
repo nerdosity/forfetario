@@ -6,15 +6,17 @@ interface ModalProps {
   onClose: () => void
   title: string
   subtitle?: string
+  /** Larghezza del dialog (default '2xl'). */
+  size?: 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl' | '5xl'
   /** Contenuto del footer (azioni). */
   footer?: ReactNode
   children: ReactNode
 }
 
 /** Dialog modale basato sul Modal di Flowbite. */
-export function Modal({ open, onClose, title, subtitle, footer, children }: ModalProps) {
+export function Modal({ open, onClose, title, subtitle, size = '2xl', footer, children }: ModalProps) {
   return (
-    <FbModal show={open} onClose={onClose} size="2xl">
+    <FbModal show={open} onClose={onClose} size={size}>
       <ModalHeader>
         <span className="flex flex-col">
           <span>{title}</span>

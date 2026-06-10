@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Download } from 'lucide-react'
 import { Badge, Button, Label, Radio, Table, TableBody, TableCell, TableHead, TableHeadCell, TableRow } from 'flowbite-react'
 import type { InizioRateazione, OpzioniRateazione, Scadenza } from '@/domain/types'
 import { calcolaPianoRateazione, numeroRateMax, rateazioneNeutra } from '@/domain/rateazione'
@@ -6,6 +7,19 @@ import { formattaScadenza } from '@/domain/dates'
 import { formatEuro } from '@/domain/labels'
 import { Modal, Select, Tooltip } from '@/components/ui'
 import { theme } from '@/theme'
+
+/** Voce della scadenza senza l'eventuale suffisso di rata (per titoli e PDF). */
+const voceBase = (s: Scadenza): string =>
+  (s.voce ?? '').replace(/ · rata \d+ di \d+$/, '').replace(/ · differito al 30 luglio$/, '')
+
+/**
+ * Ricava tipo di versamento e anno di competenza dalla chiave di rateazione
+ * (es. "saldo-2025", "acconto1-2026"). Null se la chiave non è riconosciuta.
+ */
+function parseChiave(chiave?: string): { tipo: 'saldo' | 'acconto1'; annoCompetenza: number } | null {
+  const m = chiave?.match(/^(saldo|acconto1)-(\d{4})$/)
+  return m ? { tipo: m[1] as 'saldo' | 'acconto1', annoCompetenza: Number(m[2]) } : null
+}
 
 interface Props {
   /** Scadenza da rateizzare (anche una riga-rata: si risale all'importo originario). */
@@ -39,6 +53,20 @@ export function RateazioneModal({ scadenza, opzioniAttuali, onClose, onSave }: P
   const opzioni: OpzioniRateazione = { inizio, numeroRate }
   const piano = calcolaPianoRateazione(importoBase, opzioni)
   const neutra = rateazioneNeutra(opzioni)
+  const datiChiave = parseChiave(scadenza.chiaveRateazione)
+
+  // jsPDF è caricato solo alla prima richiesta (chunk separato).
+  const scaricaPdf = async () => {
+    if (!datiChiave) return
+    const { generaPdfRateazione } = await import('@/pdf/rateazionePdf')
+    generaPdfRateazione({
+      intestazione: `${scadenza.categoria ?? scadenza.descrizione} · ${voceBase(scadenza)} · ${formatEuro(importoBase)}`,
+      tipoVersamento: datiChiave.tipo,
+      annoCompetenza: datiChiave.annoCompetenza,
+      annoScadenza: anno,
+      piano,
+    })
+  }
 
   const opzioniRate = Array.from({ length: numeroRateMax(inizio) }, (_, i) => ({
     value: i + 1,
@@ -49,15 +77,24 @@ export function RateazioneModal({ scadenza, opzioniAttuali, onClose, onSave }: P
     <Modal
       open
       onClose={onClose}
+      size="4xl"
       title="Rateazione del versamento"
-      subtitle={`${scadenza.categoria ?? scadenza.descrizione} · ${scadenza.voce ?? ''} · ${formatEuro(importoBase)}`}
+      subtitle={`${scadenza.categoria ?? scadenza.descrizione} · ${voceBase(scadenza)} · ${formatEuro(importoBase)}`}
       footer={
         <>
-          {opzioniAttuali && (
-            <Button color="light" onClick={() => onSave(null)} className="mr-auto">
-              Rimuovi rateazione
-            </Button>
-          )}
+          <span className="mr-auto flex items-center gap-2">
+            {datiChiave && (
+              <Button color="light" onClick={scaricaPdf}>
+                <Download size={16} className="mr-2" aria-hidden />
+                Scarica PDF
+              </Button>
+            )}
+            {opzioniAttuali && (
+              <Button color="light" onClick={() => onSave(null)}>
+                Rimuovi rateazione
+              </Button>
+            )}
+          </span>
           <Button color="light" onClick={onClose}>
             Annulla
           </Button>
@@ -74,6 +111,8 @@ export function RateazioneModal({ scadenza, opzioniAttuali, onClose, onSave }: P
             <Tooltip
               content="Il versamento può essere differito di 30 giorni rispetto alla scadenza ordinaria applicando la maggiorazione dello 0,4% sull'intero importo."
               label="Informazioni sulla prima scadenza"
+              posizione="sotto"
+              allinea="sinistra"
             />
           </legend>
           <div className="flex items-center gap-2">
@@ -106,6 +145,8 @@ export function RateazioneModal({ scadenza, opzioniAttuali, onClose, onSave }: P
             <Tooltip
               content="Le rate successive alla prima scadono il giorno 16 di ciascun mese (il 20 ad agosto) e maturano interessi di rateazione del 4% annuo (0,33% al mese), come nel software ufficiale dell'Agenzia delle Entrate. L'ultima rata cade entro il 16 dicembre."
               label="Informazioni sul numero di rate"
+              posizione="sotto"
+              allinea="sinistra"
             />
           </Label>
           <Select id="rateazione-numero" value={numeroRate} options={opzioniRate} onChange={setNumeroRate} />
