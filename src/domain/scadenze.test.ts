@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { versatoPerScadenza, scadenzaPagata, bilancioPagamenti } from './scadenze'
+import { versatoPerScadenza, scadenzaPagata, bilancioPagamenti, calcolaScadenze } from './scadenze'
 import type { CalcoloInput, Scadenza } from './types'
 
 function scadenza(over: Partial<Scadenza>): Scadenza {
@@ -132,5 +132,58 @@ describe('bilancioPagamenti', () => {
     const b = bilancioPagamenti(scadenze, input({}))
     expect(b.contributi.dovuto).toBe(0)
     expect(b.imposte.dovuto).toBe(0)
+  })
+})
+
+describe('calcolaScadenze — rateazione imposta', () => {
+  const params = {
+    anno: 2025,
+    regimiCorrente: [],
+    regimiPrecedente: [],
+    saldoImposteDaVersare: 992.35,
+    saldoContributiGS: 0,
+    saldoContributiEccArtComm: 0,
+    totaleImposteCorrente: 4059.5, // genera 1° e 2° acconto 2026 da 2029,75
+    totaleContributiSeparataCorrente: 0,
+    totaleContributiEccedenzaArtCommCorrente: 0,
+    totaleImpostePrecedente: 0,
+    accontiImposteVersatiPerAnnoPrecedente: 0,
+    totaleContributiSeparataPrecedente: 0,
+    totaleContributiEccedenzaArtCommPrecedente: 0,
+  }
+
+  it('senza rateazione: voci singole con la chiave di rateazione', () => {
+    const { scadenzeAnnoSuccessivo } = calcolaScadenze(params)
+    const saldo = scadenzeAnnoSuccessivo.filter((s) => s.chiaveRateazione === 'saldo-2025')
+    expect(saldo).toHaveLength(1)
+    expect(saldo[0].data).toBe('30 Giugno 2026')
+  })
+
+  it('con rateazione applicata: il calendario espone le rate con le loro date', () => {
+    const { scadenzeAnnoSuccessivo } = calcolaScadenze({
+      ...params,
+      rateazioniImposta: { 'acconto1-2026': { inizio: 'giugno', numeroRate: 6 } },
+    })
+    const rate = scadenzeAnnoSuccessivo.filter((s) => s.chiaveRateazione === 'acconto1-2026')
+    expect(rate).toHaveLength(6)
+    expect(rate.map((r) => r.data)).toEqual([
+      '30 Giugno 2026', '16 Luglio 2026', '20 Agosto 2026',
+      '16 Settembre 2026', '16 Ottobre 2026', '16 Novembre 2026',
+    ])
+    // importo totale = acconto + interessi; il saldo resta una voce unica
+    const totale = rate.reduce((s, r) => s + r.importo, 0)
+    expect(totale).toBeGreaterThan(2029.75)
+    expect(scadenzeAnnoSuccessivo.filter((s) => s.chiaveRateazione === 'saldo-2025')).toHaveLength(1)
+  })
+
+  it('rateazione da luglio: la prima rata slitta al 30 luglio', () => {
+    const { scadenzeAnnoSuccessivo } = calcolaScadenze({
+      ...params,
+      rateazioniImposta: { 'saldo-2025': { inizio: 'luglio', numeroRate: 1 } },
+    })
+    const saldo = scadenzeAnnoSuccessivo.filter((s) => s.chiaveRateazione === 'saldo-2025')
+    expect(saldo).toHaveLength(1)
+    expect(saldo[0].data).toBe('30 Luglio 2026')
+    expect(saldo[0].importo).toBeCloseTo(996.32, 2)
   })
 })
