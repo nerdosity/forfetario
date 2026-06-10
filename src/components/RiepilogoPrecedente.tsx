@@ -8,11 +8,10 @@ import { theme } from '@/theme'
 interface Props {
   anno: number
   calcoli: RisultatoCalcolo
-  contributiVersatiDuranteAnnoPrecedente: number | null
 }
 
 /** Riepilogo simulato dell'anno precedente, con funnel da fatturato a imposta. */
-export function RiepilogoPrecedente({ anno, calcoli, contributiVersatiDuranteAnnoPrecedente }: Props) {
+export function RiepilogoPrecedente({ anno, calcoli }: Props) {
   const prev = calcoli.datiAnnoPrecedente
   if (!prev) return null
 
@@ -29,9 +28,8 @@ export function RiepilogoPrecedente({ anno, calcoli, contributiVersatiDuranteAnn
           <FunnelImposta
             fatturato={prev.totaleFatturato}
             imponibileLordo={prev.totaleImponibileLordo}
-            imponibileNetto={prev.imponibileNettoTotalePerImposte}
+            contributiINPS={prev.totaleContributiINPS}
             imposta={prev.totaleImposte}
-            contributiDedotti={contributiVersatiDuranteAnnoPrecedente ?? 0}
           />
         </div>
 

@@ -45,9 +45,8 @@ export function DettaglioRegimi({ anno, calcoli }: Props) {
         <FunnelImposta
           fatturato={calcoli.totaleFatturato}
           imponibileLordo={calcoli.totaleImponibileLordo}
-          imponibileNetto={calcoli.imponibileNettoTotalePerImposte}
+          contributiINPS={calcoli.totaleContributiINPS}
           imposta={calcoli.totaleImposte}
-          contributiDedotti={calcoli.contributiVersatiAnnoImpostaPerDeducibilita}
         />
       </div>
 

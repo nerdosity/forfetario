@@ -192,11 +192,7 @@ export default function App() {
         {tab === 'calendario' && <CalendarioFiscale anno={input.anno} calcoli={calcoli} input={input} />}
         {tab === 'saldi' && <SaldiCrediti anno={input.anno} calcoli={calcoli} />}
         {tab === 'precedente' && hasDatiPrecedente && (
-          <RiepilogoPrecedente
-            anno={input.anno}
-            calcoli={calcoli}
-            contributiVersatiDuranteAnnoPrecedente={input.contributiVersatiDuranteAnnoPrecedente}
-          />
+          <RiepilogoPrecedente anno={input.anno} calcoli={calcoli} />
         )}
       </main>
     </div>
