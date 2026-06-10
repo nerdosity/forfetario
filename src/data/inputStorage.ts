@@ -1,5 +1,6 @@
-import type { CalcoloInput, Regime, TipoVersamento, VersamentoContributo } from '@/domain/types'
+import type { CalcoloInput, OpzioniRateazione, Regime, TipoVersamento, VersamentoContributo } from '@/domain/types'
 import { regimeVuoto, versamentoVuoto } from '@/domain/regimeFactory'
+import { normalizzaOpzioni, rateazioneNeutra } from '@/domain/rateazione'
 import { anniDisponibili } from '@/data/taxData'
 
 const LS_KEY = 'forfettario_input'
@@ -73,6 +74,22 @@ function normalizzaDettaglio(raw: unknown): VersamentoContributo[] {
   return raw.map(normalizzaVersamento)
 }
 
+/** Ricostruisce le scelte di rateazione valide, scartando quelle neutre. */
+function normalizzaRateazioni(raw: unknown): Record<string, OpzioniRateazione> {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return {}
+  const out: Record<string, OpzioniRateazione> = {}
+  for (const [chiave, valore] of Object.entries(raw as Record<string, unknown>)) {
+    if (typeof valore !== 'object' || valore === null) continue
+    const o = valore as Record<string, unknown>
+    const opzioni = normalizzaOpzioni({
+      inizio: o.inizio === 'luglio' ? 'luglio' : 'giugno',
+      numeroRate: num(o.numeroRate, 1),
+    })
+    if (!rateazioneNeutra(opzioni)) out[chiave] = opzioni
+  }
+  return out
+}
+
 /**
  * Carica l'input salvato, fondendolo con uno stato di default. Restituisce
  * `null` se non c'è nulla di valido in localStorage (l'app userà il default).
@@ -99,6 +116,7 @@ export function caricaInput(base: CalcoloInput): CalcoloInput | null {
       impostaAcconto1VersatoAnnoCorrente: numOrNull(o.impostaAcconto1VersatoAnnoCorrente),
       impostaAcconto2VersatoAnnoCorrente: numOrNull(o.impostaAcconto2VersatoAnnoCorrente),
       accontiImposteVersatiPerAnnoPrecedente: numOrNull(o.accontiImposteVersatiPerAnnoPrecedente),
+      rateazioniImposta: normalizzaRateazioni(o.rateazioniImposta),
     }
   } catch {
     return null

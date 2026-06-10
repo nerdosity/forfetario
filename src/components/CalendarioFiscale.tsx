@@ -1,4 +1,5 @@
-import { Calendar } from 'lucide-react'
+import { useState } from 'react'
+import { Calendar, CalendarClock } from 'lucide-react'
 import {
   Badge,
   Table,
@@ -8,9 +9,10 @@ import {
   TableHeadCell,
   TableRow,
 } from 'flowbite-react'
-import type { CalcoloInput, RisultatoCalcolo, Scadenza } from '@/domain/types'
+import type { CalcoloInput, OpzioniRateazione, RisultatoCalcolo, Scadenza } from '@/domain/types'
 import { scadenzaPagata, versatoPerScadenza, bilancioPagamenti, type BilancioCategoria } from '@/domain/scadenze'
 import { Card, Tooltip } from '@/components/ui'
+import { RateazioneModal } from '@/components/RateazioneModal'
 import { formatEuro } from '@/domain/labels'
 import { theme } from '@/theme'
 
@@ -18,6 +20,8 @@ interface Props {
   anno: number
   calcoli: RisultatoCalcolo
   input: CalcoloInput
+  /** Salva (o rimuove, con null) la scelta di rateazione per una chiave. */
+  onRateazioneChange?: (chiave: string, opzioni: OpzioniRateazione | null) => void
 }
 
 const MESE_NUM: Record<string, number> = {
@@ -82,12 +86,14 @@ function RigaBilancio({ etichetta, cat }: { etichetta: string; cat: BilancioCate
   )
 }
 
-function TabellaScadenze({ titolo, sottotitolo, scadenze, input, mostraBilancio }: {
+function TabellaScadenze({ titolo, sottotitolo, scadenze, input, mostraBilancio, onRateizza }: {
   titolo: string
   sottotitolo?: string
   scadenze: Scadenza[]
   input: CalcoloInput
   mostraBilancio?: boolean
+  /** Apre il popup di rateazione per la scadenza (presente solo se gestita). */
+  onRateizza?: (scadenza: Scadenza) => void
 }) {
   const totale = scadenze.reduce((s, x) => s + x.importo, 0)
   const bilancio = bilancioPagamenti(scadenze, input)
@@ -162,6 +168,23 @@ function TabellaScadenze({ titolo, sottotitolo, scadenze, input, mostraBilancio 
                           />
                         )}
                         {dettaglio && <Tooltip content={dettaglio} label="Dettaglio componenti" />}
+                        {s.chiaveRateazione && onRateizza && (
+                          <button
+                            type="button"
+                            onClick={() => onRateizza(s)}
+                            title={
+                              input.rateazioniImposta[s.chiaveRateazione]
+                                ? 'Modifica la rateazione del versamento'
+                                : 'Rateizza il versamento'
+                            }
+                            aria-label="Rateizza il versamento"
+                            className={`${theme.btnIcon} ${
+                              input.rateazioniImposta[s.chiaveRateazione] ? 'text-blue-600 hover:text-blue-700' : ''
+                            }`}
+                          >
+                            <CalendarClock size={15} aria-hidden />
+                          </button>
+                        )}
                       </span>
                     </TableCell>
                     <TableCell>
@@ -209,9 +232,13 @@ function TabellaScadenze({ titolo, sottotitolo, scadenze, input, mostraBilancio 
 }
 
 /** Calendario fiscale: adempimenti dell'anno corrente e del successivo in tabella. */
-export function CalendarioFiscale({ anno, calcoli, input }: Props) {
+export function CalendarioFiscale({ anno, calcoli, input, onRateazioneChange }: Props) {
   const correnti = calcoli.scadenzeAnnoCorrente.filter((s) => s.importo > 0.005)
   const future = calcoli.scadenzeAnnoSuccessivo.filter((s) => s.importo > 0.005)
+
+  // Scadenza per cui è aperto il popup di rateazione (null = chiuso).
+  const [daRateizzare, setDaRateizzare] = useState<Scadenza | null>(null)
+  const onRateizza = onRateazioneChange ? setDaRateizzare : undefined
 
   return (
     <Card
@@ -221,14 +248,33 @@ export function CalendarioFiscale({ anno, calcoli, input }: Props) {
       info="Le date indicate sono quelle nominali. Se cadono in giorni festivi o prefestivi slittano al primo giorno lavorativo utile. Le voci già coperte da un versamento inserito appaiono barrate."
     >
       <div className="space-y-8">
-        <TabellaScadenze titolo={`Scadenze ${anno}`} scadenze={correnti} input={input} mostraBilancio />
+        <TabellaScadenze
+          titolo={`Scadenze ${anno}`}
+          scadenze={correnti}
+          input={input}
+          mostraBilancio
+          onRateizza={onRateizza}
+        />
         <TabellaScadenze
           titolo={`Scadenze ${anno + 1}`}
           sottotitolo={`— saldo e acconti su ${anno}`}
           scadenze={future}
           input={input}
+          onRateizza={onRateizza}
         />
       </div>
+
+      {daRateizzare?.chiaveRateazione && onRateazioneChange && (
+        <RateazioneModal
+          scadenza={daRateizzare}
+          opzioniAttuali={input.rateazioniImposta[daRateizzare.chiaveRateazione]}
+          onClose={() => setDaRateizzare(null)}
+          onSave={(opzioni) => {
+            onRateazioneChange(daRateizzare.chiaveRateazione!, opzioni)
+            setDaRateizzare(null)
+          }}
+        />
+      )}
     </Card>
   )
 }

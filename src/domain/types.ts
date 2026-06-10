@@ -43,6 +43,20 @@ export interface ComponenteScadenza {
   importo: number
 }
 
+/**
+ * Prima scadenza scelta per il versamento delle imposte:
+ * - 'giugno' → data ordinaria (30/06), fino a 7 rate
+ * - 'luglio' → entro i 30 giorni successivi (30/07) con maggiorazione dello 0,4%, fino a 6 rate
+ */
+export type InizioRateazione = 'giugno' | 'luglio'
+
+/** Scelta di rateazione per un versamento d'imposta (saldo o 1° acconto). */
+export interface OpzioniRateazione {
+  inizio: InizioRateazione
+  /** Numero di rate richieste; 1 = versamento unico. */
+  numeroRate: number
+}
+
 /** Una scadenza con data, importo e breakdown delle sue componenti. */
 export interface Scadenza {
   data: string
@@ -72,6 +86,17 @@ export interface Scadenza {
    * le altre alle righe tipizzate della lista contributi versati.
    */
   riferimenti?: RiferimentoScadenza[]
+  /**
+   * Presente solo sui versamenti d'imposta rateizzabili (saldo e 1° acconto).
+   * È la chiave con cui la scelta di rateazione viene salvata in
+   * CalcoloInput.rateazioniImposta (es. "saldo-2025", "acconto1-2026").
+   */
+  chiaveRateazione?: string
+  /**
+   * Sulle righe-rata generate da una rateazione: importo originario del
+   * versamento (prima di maggiorazione e interessi), per riconfigurare il piano.
+   */
+  importoRateazioneBase?: number
 }
 
 /**
@@ -175,6 +200,13 @@ export interface CalcoloInput {
 
   /** Acconti imposta sostitutiva versati PER l'anno precedente (giu + nov). */
   accontiImposteVersatiPerAnnoPrecedente: number | null
+
+  /**
+   * Scelte di rateazione dei versamenti d'imposta, per chiave (vedi
+   * Scadenza.chiaveRateazione). Assente o {inizio:'giugno', numeroRate:1}
+   * equivale al versamento unico ordinario.
+   */
+  rateazioniImposta: Record<string, OpzioniRateazione>
 
   // Gli acconti contributi (G.S. ed eccedenza Art/Comm) NON sono campi a sé:
   // si ricavano dalle righe 'gs-acconto' / 'ecc-acconto' di contributiVersatiDettaglio

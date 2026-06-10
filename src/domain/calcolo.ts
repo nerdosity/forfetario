@@ -233,6 +233,7 @@ export function calcola(input: CalcoloInput): RisultatoCalcolo {
     accontiImposteVersatiPerAnnoPrecedente: accontiImposteVersatiPerAnnoPrecedente ?? 0,
     totaleContributiSeparataPrecedente: datiPrecedente.totaleContributiSeparata,
     totaleContributiEccedenzaArtCommPrecedente: datiPrecedente.totaleContributiEccedenzaArtComm,
+    rateazioniImposta: input.rateazioniImposta,
   })
 
   return {

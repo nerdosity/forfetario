@@ -37,6 +37,7 @@ function inputDefault(): CalcoloInput {
     impostaAcconto1VersatoAnnoCorrente: null,
     impostaAcconto2VersatoAnnoCorrente: null,
     accontiImposteVersatiPerAnnoPrecedente: null,
+    rateazioniImposta: {},
   }
 }
 
@@ -190,7 +191,21 @@ export default function App() {
         )}
         {tab === 'riepilogo' && <DettaglioRegimi anno={input.anno} calcoli={calcoli} />}
         {tab === 'regimi' && <DettaglioRegimi anno={input.anno} calcoli={calcoli} />}
-        {tab === 'calendario' && <CalendarioFiscale anno={input.anno} calcoli={calcoli} input={input} />}
+        {tab === 'calendario' && (
+          <CalendarioFiscale
+            anno={input.anno}
+            calcoli={calcoli}
+            input={input}
+            onRateazioneChange={(chiave, opzioni) =>
+              setInput((p) => {
+                const rateazioni = { ...p.rateazioniImposta }
+                if (opzioni) rateazioni[chiave] = opzioni
+                else delete rateazioni[chiave]
+                return { ...p, rateazioniImposta: rateazioni }
+              })
+            }
+          />
+        )}
         {tab === 'saldi' && <SaldiCrediti anno={input.anno} calcoli={calcoli} />}
         {tab === 'precedente' && hasDatiPrecedente && (
           <RiepilogoPrecedente anno={input.anno} calcoli={calcoli} />

@@ -1,7 +1,8 @@
-import type { CalcoloInput, Regime, Scadenza, RiferimentoScadenza, TipoVersamento } from '@/domain/types'
+import type { CalcoloInput, OpzioniRateazione, Regime, Scadenza, RiferimentoScadenza, TipoVersamento } from '@/domain/types'
 import { datiAnno, anniDisponibili, type ScadenzeAnno } from '@/data/taxData'
 import { proiettaDatiAnno } from '@/data/proiezioneAnno'
 import { calcolaRateContributiFissi, applicaRiduzioneIVS } from '@/domain/contributi'
+import { espandiRateazione } from '@/domain/rateazione'
 import { formattaScadenza } from '@/domain/dates'
 import { labelTipo } from '@/domain/labels'
 
@@ -45,6 +46,8 @@ interface ParamsScadenze {
   // contributi dovuti anno precedente: si versano a saldo NELL'anno corrente
   totaleContributiSeparataPrecedente: number
   totaleContributiEccedenzaArtCommPrecedente: number
+  /** Scelte di rateazione dei versamenti d'imposta, per chiave. */
+  rateazioniImposta?: Record<string, OpzioniRateazione>
 }
 
 export interface RisultatoScadenze {
@@ -156,10 +159,18 @@ export function calcolaScadenze({
   accontiImposteVersatiPerAnnoPrecedente,
   totaleContributiSeparataPrecedente,
   totaleContributiEccedenzaArtCommPrecedente,
+  rateazioniImposta,
 }: ParamsScadenze): RisultatoScadenze {
   const globali: Scadenza[] = []
   const annoSucc = anno + 1
   const annoPrec = anno - 1
+
+  // Espande una scadenza d'imposta nelle sue rate, se l'utente ha scelto
+  // una rateazione per la sua chiave; altrimenti la lascia invariata.
+  const pushImposta = (s: Scadenza) => {
+    const opzioni = s.chiaveRateazione ? rateazioniImposta?.[s.chiaveRateazione] : undefined
+    globali.push(...(opzioni ? espandiRateazione(s, opzioni) : [s]))
+  }
 
   /**
    * Date di scadenza dell'anno indicato. Ogni scadenza usa le date del PROPRIO
@@ -313,7 +324,7 @@ export function calcolaScadenze({
 
   // Saldo e 1° acconto cadono lo stesso giorno ma sono due versamenti distinti
   if (saldoImpostePrecedente > 0) {
-    globali.push({
+    pushImposta({
       data: formattaScadenza(dCorr.saldoImposte, anno),
       descrizione: `Saldo imposta sostitutiva ${anno - 1}`,
       categoria: 'Imposta sostitutiva',
@@ -322,10 +333,11 @@ export function calcolaScadenze({
       componenti: [{ tipo: `Saldo imposte ${anno - 1}`, importo: saldoImpostePrecedente }],
       annoScadenza: anno,
       riferimenti: ['imposta-saldo'],
+      chiaveRateazione: `saldo-${anno - 1}`,
     })
   }
   if (accontoImposteAnnoCorrente > 0) {
-    globali.push({
+    pushImposta({
       data: formattaScadenza(dCorr.primoAccontoImposte, anno),
       descrizione: `1° acconto imposta sostitutiva ${anno}`,
       categoria: 'Imposta sostitutiva',
@@ -334,6 +346,7 @@ export function calcolaScadenze({
       componenti: [{ tipo: `1° acconto imposte ${anno} (su tax netta ${anno - 1})`, importo: accontoImposteAnnoCorrente }],
       annoScadenza: anno,
       riferimenti: ['imposta-acconto1'],
+      chiaveRateazione: `acconto1-${anno}`,
     })
   }
   if (accontoImposteAnnoCorrente > 0) {
@@ -372,7 +385,7 @@ export function calcolaScadenze({
 
   // Saldo e 1° acconto: righe separate (le date possono divergere)
   if (saldoImposteDaVersare > 0) {
-    globali.push({
+    pushImposta({
       data: formattaScadenza(dSucc.saldoImposte, annoSucc),
       descrizione: `Saldo imposta sostitutiva ${anno}`,
       categoria: 'Imposta sostitutiva',
@@ -380,10 +393,11 @@ export function calcolaScadenze({
       importo: saldoImposteDaVersare,
       componenti: [{ tipo: `Saldo imposte ${anno}`, importo: saldoImposteDaVersare }],
       annoScadenza: annoSucc,
+      chiaveRateazione: `saldo-${anno}`,
     })
   }
   if (accontoImposteAnnoSucc > 0) {
-    globali.push({
+    pushImposta({
       data: formattaScadenza(dSucc.primoAccontoImposte, annoSucc),
       descrizione: `1° acconto imposta sostitutiva ${annoSucc}`,
       categoria: 'Imposta sostitutiva',
@@ -391,6 +405,7 @@ export function calcolaScadenze({
       importo: accontoImposteAnnoSucc,
       componenti: [{ tipo: `1° acconto imposte ${annoSucc} (su tax ${anno})`, importo: accontoImposteAnnoSucc }],
       annoScadenza: annoSucc,
+      chiaveRateazione: `acconto1-${annoSucc}`,
     })
   }
   if (accontoImposteAnnoSucc > 0) {
