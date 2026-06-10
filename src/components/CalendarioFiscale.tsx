@@ -9,7 +9,7 @@ import {
   TableRow,
 } from 'flowbite-react'
 import type { CalcoloInput, RisultatoCalcolo, Scadenza } from '@/domain/types'
-import { scadenzaPagata, versatoPerScadenza } from '@/domain/scadenze'
+import { scadenzaPagata, versatoPerScadenza, bilancioPagamenti, type BilancioCategoria } from '@/domain/scadenze'
 import { Card, Tooltip } from '@/components/ui'
 import { formatEuro } from '@/domain/labels'
 import { theme } from '@/theme'
@@ -59,13 +59,41 @@ function dettaglioUtile(s: Scadenza): string | null {
   return null
 }
 
-function TabellaScadenze({ titolo, sottotitolo, scadenze, input }: {
+/** Riga del bilancio: categoria + dovuto/pagato + badge saldo (più/meno/in pari). */
+function RigaBilancio({ etichetta, cat }: { etichetta: string; cat: BilancioCategoria }) {
+  if (cat.dovuto < 0.005 && cat.pagato < 0.005) return null
+  const inPari = Math.abs(cat.saldo) <= 1 // entro arrotondamento
+  const colore = inPari ? 'success' : cat.saldo > 0 ? 'warning' : 'failure'
+  const testo = inPari
+    ? 'In pari'
+    : cat.saldo > 0
+      ? `+ ${formatEuro(cat.saldo)} in più`
+      : `− ${formatEuro(-cat.saldo)} in meno`
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2 py-1.5 text-sm">
+      <span className="text-slate-600">{etichetta}</span>
+      <span className="flex items-center gap-3">
+        <span className="text-xs text-slate-400">
+          dovuto {formatEuro(cat.dovuto)} · pagato {formatEuro(cat.pagato)}
+        </span>
+        <Badge color={colore} className="w-fit">{testo}</Badge>
+      </span>
+    </div>
+  )
+}
+
+function TabellaScadenze({ titolo, sottotitolo, scadenze, input, mostraBilancio }: {
   titolo: string
   sottotitolo?: string
   scadenze: Scadenza[]
   input: CalcoloInput
+  mostraBilancio?: boolean
 }) {
   const totale = scadenze.reduce((s, x) => s + x.importo, 0)
+  const bilancio = bilancioPagamenti(scadenze, input)
+  const hasBilancio =
+    mostraBilancio &&
+    (bilancio.contributi.dovuto > 0.005 || bilancio.imposte.dovuto > 0.005)
 
   return (
     <div>
@@ -100,13 +128,15 @@ function TabellaScadenze({ titolo, sottotitolo, scadenze, input }: {
                 const dettaglio = dettaglioUtile(s)
                 const tenue = pagata || stato === 'scaduta'
                 const testo = pagata ? 'text-slate-400 line-through' : tenue ? 'text-slate-400' : 'text-slate-800'
-                // Differenza dovuto − pagato: >0 manca, <0 eccedenza, =0 ok
+                // Differenza dovuto − pagato. Entro ±1 € è solo arrotondamento (F24
+                // si paga all'euro): si mostra in verde, non come mancanza/eccedenza.
                 const diff = versato == null ? null : s.importo - versato
+                const entroArrotond = diff != null && Math.abs(diff) <= 1
                 const diffClasse =
                   diff == null ? 'text-slate-300'
-                  : diff > 0.005 ? 'text-rose-600'
-                  : diff < -0.005 ? 'text-amber-600'
-                  : 'text-emerald-600'
+                  : entroArrotond ? 'text-emerald-600'
+                  : diff > 0 ? 'text-rose-600'
+                  : 'text-amber-600'
                 const diffTesto =
                   diff == null ? '—'
                   : Math.abs(diff) < 0.005 ? '0,00 €'
@@ -151,6 +181,20 @@ function TabellaScadenze({ titolo, sottotitolo, scadenze, input }: {
       ) : (
         <p className={theme.helpText}>Nessuna scadenza rilevante calcolata.</p>
       )}
+
+      {/* Bilancio dell'anno: quanto versato in più/meno rispetto al dovuto */}
+      {hasBilancio && (
+        <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+          <p className={`${theme.groupLabel} mb-1`}>Bilancio pagamenti {titolo.replace('Scadenze ', '')}</p>
+          <div className="divide-y divide-slate-200/70">
+            <RigaBilancio etichetta="Contributi INPS" cat={bilancio.contributi} />
+            <RigaBilancio etichetta="Imposta sostitutiva" cat={bilancio.imposte} />
+          </div>
+          <p className="mt-2 text-xs text-slate-400">
+            Calcolato sulle voci con un versamento collegato. Differenze entro ~1 € sono arrotondamenti F24.
+          </p>
+        </div>
+      )}
     </div>
   )
 }
@@ -168,7 +212,7 @@ export function CalendarioFiscale({ anno, calcoli, input }: Props) {
       info="Le date indicate sono quelle nominali. Se cadono in giorni festivi o prefestivi slittano al primo giorno lavorativo utile. Le voci già coperte da un versamento inserito appaiono barrate."
     >
       <div className="space-y-8">
-        <TabellaScadenze titolo={`Scadenze ${anno}`} scadenze={correnti} input={input} />
+        <TabellaScadenze titolo={`Scadenze ${anno}`} scadenze={correnti} input={input} mostraBilancio />
         <TabellaScadenze
           titolo={`Scadenze ${anno + 1}`}
           sottotitolo={`— saldo e acconti su ${anno}`}

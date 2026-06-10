@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { versatoPerScadenza, scadenzaPagata } from './scadenze'
+import { versatoPerScadenza, scadenzaPagata, bilancioPagamenti } from './scadenze'
 import type { CalcoloInput, Scadenza } from './types'
 
 function scadenza(over: Partial<Scadenza>): Scadenza {
@@ -96,5 +96,40 @@ describe('scadenzaPagata', () => {
 
   it('non pagata senza riferimenti', () => {
     expect(scadenzaPagata(scadenza({ riferimenti: undefined }), input({}))).toBe(false)
+  })
+
+  it('tollera l\'arrotondamento all\'euro (pagato 244 su dovuto 244,60 → pagata)', () => {
+    const s = scadenza({ importo: 244.6, riferimenti: ['gs-saldo'] })
+    const i = input({ contributiVersatiDettaglio: [{ id: 'a', tipo: 'gs-saldo', descrizione: '', importo: 244 }] })
+    expect(scadenzaPagata(s, i)).toBe(true)
+  })
+
+  it('oltre la tolleranza resta non pagata (pagato 240 su 244,60)', () => {
+    const s = scadenza({ importo: 244.6, riferimenti: ['gs-saldo'] })
+    const i = input({ contributiVersatiDettaglio: [{ id: 'a', tipo: 'gs-saldo', descrizione: '', importo: 240 }] })
+    expect(scadenzaPagata(s, i)).toBe(false)
+  })
+})
+
+describe('bilancioPagamenti', () => {
+  it('separa contributi e imposte, calcola il saldo (più/meno)', () => {
+    const scadenze: Scadenza[] = [
+      scadenza({ importo: 725.5, riferimenti: ['fissi-1'] }),
+      scadenza({ importo: 1000, riferimenti: ['imposta-acconto1'] }),
+    ]
+    const i = input({
+      contributiVersatiDettaglio: [{ id: 'a', tipo: 'fissi-1', descrizione: '', importo: 800 }],
+      impostaAcconto1VersatoAnnoCorrente: 950,
+    })
+    const b = bilancioPagamenti(scadenze, i)
+    expect(b.contributi.saldo).toBeCloseTo(800 - 725.5) // +74.5 in più
+    expect(b.imposte.saldo).toBeCloseTo(950 - 1000) // −50 in meno
+  })
+
+  it('ignora le scadenze non tracciabili (senza riferimenti)', () => {
+    const scadenze: Scadenza[] = [scadenza({ importo: 500, riferimenti: undefined })]
+    const b = bilancioPagamenti(scadenze, input({}))
+    expect(b.contributi.dovuto).toBe(0)
+    expect(b.imposte.dovuto).toBe(0)
   })
 })

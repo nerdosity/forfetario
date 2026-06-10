@@ -68,6 +68,23 @@
         "primoAccontoImposte": "06-30",
         "secondoAccontoImposte": "11-30"
       }
+    },
+    "2026": {
+      "minimaleReddito": 18808,
+      "sogliaPrimaFascia": 55448,
+      "aliquotaSeparata": 26.07,
+      "aliquotaArtigiani": 24,
+      "aliquotaCommercianti": 24.48,
+      "contributoFisso": {
+        "artigiani": { "ivsAnnuale": 4521.36, "maternitaMensile": 0.62 },
+        "commercianti": { "ivsAnnuale": 4611.64, "maternitaMensile": 0.62 }
+      },
+      "scadenze": {
+        "rateContributiFissi": ["05-16", "08-20", "11-16", "02-16"],
+        "saldoImposte": "06-30",
+        "primoAccontoImposte": "06-30",
+        "secondoAccontoImposte": "11-30"
+      }
     }
   }
 }

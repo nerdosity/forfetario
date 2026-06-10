@@ -73,10 +73,62 @@ export function versatoPerScadenza(scadenza: Scadenza, input: CalcoloInput): num
   }, 0)
 }
 
-/** Vero se la scadenza risulta saldata (versato ≥ dovuto, con tolleranza). */
+/**
+ * Tolleranza sul "pagato": i contributi al modello F24 si versano arrotondati
+ * all'euro, quindi una differenza fino a ~1 € (arrotondamento) NON significa
+ * scadenza non saldata.
+ */
+const TOLLERANZA_PAGAMENTO = 1.0
+
+/** Vero se la scadenza risulta saldata (versato ≥ dovuto, a meno dell'arrotondamento). */
 export function scadenzaPagata(scadenza: Scadenza, input: CalcoloInput): boolean {
   const versato = versatoPerScadenza(scadenza, input)
-  return versato != null && versato + 0.005 >= scadenza.importo && scadenza.importo > 0.005
+  return (
+    versato != null &&
+    versato >= scadenza.importo - TOLLERANZA_PAGAMENTO &&
+    scadenza.importo > 0.005
+  )
+}
+
+/** Vero se la scadenza riguarda l'imposta sostitutiva (anziché i contributi INPS). */
+function isImposta(s: Scadenza): boolean {
+  return (s.riferimenti ?? []).some((r) => r.startsWith('imposta-'))
+}
+
+export interface BilancioCategoria {
+  /** Totale dovuto sulle scadenze tracciabili (con versamento collegato). */
+  dovuto: number
+  /** Totale effettivamente versato. */
+  pagato: number
+  /** pagato − dovuto: positivo = versato in più, negativo = in meno. */
+  saldo: number
+}
+
+export interface BilancioAnno {
+  contributi: BilancioCategoria
+  imposte: BilancioCategoria
+}
+
+/**
+ * Bilancio dei pagamenti di un anno: confronta dovuto e pagato separando i
+ * contributi INPS dalle imposte. Considera solo le scadenze TRACCIABILI (quelle
+ * con un versamento collegato); le altre (es. previsioni future) sono escluse.
+ */
+export function bilancioPagamenti(scadenze: Scadenza[], input: CalcoloInput): BilancioAnno {
+  const vuoto = (): BilancioCategoria => ({ dovuto: 0, pagato: 0, saldo: 0 })
+  const contributi = vuoto()
+  const imposte = vuoto()
+
+  for (const s of scadenze) {
+    const versato = versatoPerScadenza(s, input)
+    if (versato == null) continue // non tracciabile → fuori dal bilancio
+    const cat = isImposta(s) ? imposte : contributi
+    cat.dovuto += s.importo
+    cat.pagato += versato
+  }
+  contributi.saldo = contributi.pagato - contributi.dovuto
+  imposte.saldo = imposte.pagato - imposte.dovuto
+  return { contributi, imposte }
 }
 
 /**
