@@ -89,16 +89,16 @@ export function FunnelImposta({
 
               {/* Ramo che "cade fuori": freccia ↘ + importo che esce */}
               {uscita && (
-                <div className="flex items-center gap-2 py-2 pl-6">
-                  <span className="text-slate-300" aria-hidden>
+                <div className="flex items-center gap-2 py-2 pl-4 sm:pl-6">
+                  <span className="shrink-0 text-slate-300" aria-hidden>
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
                       <path d="M4 4 v8 a4 4 0 0 0 4 4 h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                       <path d="m14 12 5 4-5 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                   </span>
                   <span className={`inline-flex h-2.5 w-2.5 shrink-0 rounded-full ${uscita.bg}`} aria-hidden />
-                  <span className="text-xs text-slate-500">{uscita.label}</span>
-                  <span className={`text-sm font-semibold tabular-nums ${uscita.color}`}>− {formatEuro(uscita.value)}</span>
+                  <span className="min-w-0 flex-1 truncate text-xs text-slate-500">{uscita.label}</span>
+                  <span className={`shrink-0 text-sm font-semibold tabular-nums ${uscita.color}`}>− {formatEuro(uscita.value)}</span>
                 </div>
               )}
             </div>
@@ -106,12 +106,12 @@ export function FunnelImposta({
         })}
 
         {/* Risultato: guadagno netto in tasca */}
-        <div className="mt-3 flex items-center justify-between rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3">
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3">
           <div>
             <p className="text-sm font-semibold text-emerald-800">Guadagno netto in tasca</p>
             <p className="text-xs text-emerald-600/80">Fatturato − contributi INPS − imposta</p>
           </div>
-          <p className="text-xl font-bold tabular-nums text-emerald-700">{formatEuro(nettoInTasca)}</p>
+          <p className="text-lg font-bold tabular-nums text-emerald-700 sm:text-xl">{formatEuro(nettoInTasca)}</p>
         </div>
       </div>
     </div>

@@ -70,9 +70,9 @@ function RigaBilancio({ etichetta, cat }: { etichetta: string; cat: BilancioCate
       ? `+ ${formatEuro(cat.saldo)} in più`
       : `− ${formatEuro(-cat.saldo)} in meno`
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2 py-1.5 text-sm">
-      <span className="text-slate-600">{etichetta}</span>
-      <span className="flex items-center gap-3">
+    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 py-1.5 text-sm">
+      <span className="font-medium text-slate-600">{etichetta}</span>
+      <span className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
         <span className="text-xs text-slate-400">
           dovuto {formatEuro(cat.dovuto)} · pagato {formatEuro(cat.pagato)}
         </span>
