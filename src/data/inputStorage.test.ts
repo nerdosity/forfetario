@@ -32,6 +32,7 @@ function inputDiEsempio(): CalcoloInput {
     impostaAcconto1VersatoAnnoCorrente: 200,
     impostaAcconto2VersatoAnnoCorrente: 180,
     accontiImposteVersatiPerAnnoPrecedente: 150,
+    rateazioniImposta: { 'saldo-2024': { inizio: 'luglio', numeroRate: 4 } },
   }
 }
 

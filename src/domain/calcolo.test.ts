@@ -36,6 +36,7 @@ const inputBase: CalcoloInput = {
   impostaAcconto1VersatoAnnoCorrente: null,
   impostaAcconto2VersatoAnnoCorrente: null,
   accontiImposteVersatiPerAnnoPrecedente: null,
+  rateazioniImposta: {},
 }
 
 describe('rate fisse — competenza temporale', () => {

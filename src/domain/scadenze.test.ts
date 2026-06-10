@@ -26,6 +26,7 @@ function input(over: Partial<CalcoloInput>): CalcoloInput {
     impostaAcconto1VersatoAnnoCorrente: null,
     impostaAcconto2VersatoAnnoCorrente: null,
     accontiImposteVersatiPerAnnoPrecedente: null,
+    rateazioniImposta: {},
     ...over,
   }
 }
