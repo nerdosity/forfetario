@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeft, Download } from 'lucide-react'
+import { ArrowLeft, ExternalLink, FileText } from 'lucide-react'
 import { Badge, Button, Label, Radio, Table, TableBody, TableCell, TableHead, TableHeadCell, TableRow, TextInput } from 'flowbite-react'
 import type { InizioRateazione, OpzioniRateazione, Scadenza } from '@/domain/types'
 import { calcolaPianoRateazione, numeroRateMax, rateazioneNeutra } from '@/domain/rateazione'
@@ -72,11 +72,14 @@ export function RateazioneModal({ scadenza, opzioniAttuali, onClose, onSave }: P
   const cfNonValido =
     anagrafica.codiceFiscale !== '' && !/^[A-Z0-9]{16}$/.test(anagrafica.codiceFiscale)
 
-  // jsPDF è caricato solo alla prima richiesta (chunk separato).
+  // Il PDF si apre in una nuova scheda: da lì si può salvare o stampare.
+  // La scheda va aperta SUBITO (dentro il gesto utente), prima degli await,
+  // altrimenti il blocco popup del browser la sopprime.
   const generaPdf = async () => {
     if (!datiChiave) return
+    const scheda = window.open('', '_blank')
     const { generaPdfRateazione } = await import('@/pdf/rateazionePdf')
-    generaPdfRateazione({
+    const url = await generaPdfRateazione({
       intestazione: `${scadenza.categoria ?? scadenza.descrizione} · ${voceBase(scadenza)} · ${formatEuro(importoBase)}`,
       tipoVersamento: datiChiave.tipo,
       annoCompetenza: datiChiave.annoCompetenza,
@@ -84,6 +87,8 @@ export function RateazioneModal({ scadenza, opzioniAttuali, onClose, onSave }: P
       piano,
       anagrafica,
     })
+    if (scheda) scheda.location.replace(url)
+    else window.open(url, '_blank', 'noopener')
     setPasso('opzioni')
   }
 
@@ -92,8 +97,8 @@ export function RateazioneModal({ scadenza, opzioniAttuali, onClose, onSave }: P
       <span className="mr-auto flex items-center gap-2">
         {datiChiave && (
           <Button color="light" onClick={() => setPasso('anagrafica')}>
-            <Download size={16} className="mr-2" aria-hidden />
-            Scarica PDF
+            <FileText size={16} className="mr-2" aria-hidden />
+            Genera PDF
           </Button>
         )}
         {opzioniAttuali && (
@@ -118,8 +123,8 @@ export function RateazioneModal({ scadenza, opzioniAttuali, onClose, onSave }: P
         Indietro
       </Button>
       <Button onClick={generaPdf} disabled={cfNonValido}>
-        <Download size={16} className="mr-2" aria-hidden />
-        Genera PDF
+        <ExternalLink size={16} className="mr-2" aria-hidden />
+        Apri PDF
       </Button>
     </>
   )
@@ -246,7 +251,8 @@ export function RateazioneModal({ scadenza, opzioniAttuali, onClose, onSave }: P
       ) : (
         <>
           <p className="text-sm text-slate-600">
-            Il PDF contiene il piano di rateazione e una delega F24 in facsimile per ogni rata
+            Il PDF si apre in una nuova scheda — da lì puoi salvarlo o stamparlo — e contiene il piano
+            di rateazione più una delega F24 in facsimile sul modello ufficiale per ogni rata
             ({piano.opzioni.numeroRate === 1 ? 'versamento unico' : `${piano.opzioni.numeroRate} rate`}, prima scadenza{' '}
             {formattaScadenza(piano.rate[0].dataMMGG, anno)}). I dati restano sul tuo dispositivo e
             vengono ricordati per i prossimi PDF; i campi lasciati vuoti resteranno da compilare a mano.
