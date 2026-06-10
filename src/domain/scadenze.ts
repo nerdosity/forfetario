@@ -1,5 +1,5 @@
 import type { CalcoloInput, Regime, Scadenza, RiferimentoScadenza, TipoVersamento } from '@/domain/types'
-import { datiAnno, anniDisponibili } from '@/data/taxData'
+import { datiAnno, anniDisponibili, type ScadenzeAnno } from '@/data/taxData'
 import { proiettaDatiAnno } from '@/data/proiezioneAnno'
 import { calcolaRateContributiFissi, applicaRiduzioneIVS } from '@/domain/contributi'
 import { formattaScadenza } from '@/domain/dates'
@@ -155,13 +155,21 @@ export function calcolaScadenze({
   const globali: Scadenza[] = []
   const annoSucc = anno + 1
   const annoPrec = anno - 1
-  const {
-    saldoImposte,
-    primoAccontoImposte,
-    secondoAccontoImposte,
-    primoAccontoContributi,
-    secondoAccontoContributi,
-  } = datiAnno(anno).scadenze
+
+  /**
+   * Date di scadenza dell'anno indicato. Ogni scadenza usa le date del PROPRIO
+   * anno di competenza (non dell'anno selezionato). Se l'anno non è nel database
+   * si proietta; in ultima istanza si ricade sulle date dell'anno corrente.
+   */
+  const dateAnno = (a: number): ScadenzeAnno =>
+    annoEsisteNelDatabase(a)
+      ? datiAnno(a).scadenze
+      : proiettaDatiAnno(a)?.scadenze ?? datiAnno(anno).scadenze
+
+  // Date dei due anni in gioco: ogni scadenza usa quelle del suo anno.
+  const dCorr = dateAnno(anno)
+  const dSucc = dateAnno(annoSucc)
+
   const fissiCorrenti = regimiConFissi(regimiCorrente)
 
   // Riferimento al versamento per la rata fissi, in base al trimestre.
@@ -204,7 +212,7 @@ export function calcolaScadenze({
   // ─── Saldo contributi G.S. anno precedente (versato a giugno anno corrente) ──
   if (totaleContributiSeparataPrecedente > 0.005) {
     globali.push({
-      data: formattaScadenza(saldoImposte, anno),
+      data: formattaScadenza(dCorr.saldoImposte, anno),
       descrizione: `Saldo contributi G.S. ${annoPrec}`,
       importo: totaleContributiSeparataPrecedente,
       componenti: [{ tipo: `Saldo contributi G.S. ${annoPrec}`, importo: totaleContributiSeparataPrecedente }],
@@ -216,7 +224,7 @@ export function calcolaScadenze({
   // ─── Saldo contributi eccedenza Art/Comm anno precedente (giugno anno corr.) ──
   if (totaleContributiEccedenzaArtCommPrecedente > 0.005) {
     globali.push({
-      data: formattaScadenza(saldoImposte, anno),
+      data: formattaScadenza(dCorr.saldoImposte, anno),
       descrizione: `Saldo contributi ecc. Art/Comm ${annoPrec}`,
       importo: totaleContributiEccedenzaArtCommPrecedente,
       componenti: [{ tipo: `Saldo contributi ecc. Art/Comm ${annoPrec}`, importo: totaleContributiEccedenzaArtCommPrecedente }],
@@ -233,7 +241,7 @@ export function calcolaScadenze({
       : 0
   if (accontoGSCorr > 0.005) {
     globali.push({
-      data: formattaScadenza(primoAccontoContributi, anno),
+      data: formattaScadenza(dCorr.primoAccontoContributi, anno),
       descrizione: `1° acconto contributi G.S. ${anno}`,
       importo: accontoGSCorr,
       componenti: [{ tipo: `1° acconto contributi G.S. ${anno}`, importo: accontoGSCorr }],
@@ -241,7 +249,7 @@ export function calcolaScadenze({
       riferimenti: ['gs-acconto-1'],
     })
     globali.push({
-      data: formattaScadenza(secondoAccontoContributi, anno),
+      data: formattaScadenza(dCorr.secondoAccontoContributi, anno),
       descrizione: `2° acconto contributi G.S. ${anno}`,
       importo: accontoGSCorr,
       componenti: [{ tipo: `2° acconto contributi G.S. ${anno}`, importo: accontoGSCorr }],
@@ -257,7 +265,7 @@ export function calcolaScadenze({
       : 0
   if (accontoEccCorr > 0.005) {
     globali.push({
-      data: formattaScadenza(primoAccontoContributi, anno),
+      data: formattaScadenza(dCorr.primoAccontoContributi, anno),
       descrizione: `1° acconto contributi ecc. Art/Comm ${anno}`,
       importo: accontoEccCorr,
       componenti: [{ tipo: `1° acconto contributi ecc. Art/Comm ${anno}`, importo: accontoEccCorr }],
@@ -265,7 +273,7 @@ export function calcolaScadenze({
       riferimenti: ['ecc-acconto-1'],
     })
     globali.push({
-      data: formattaScadenza(secondoAccontoContributi, anno),
+      data: formattaScadenza(dCorr.secondoAccontoContributi, anno),
       descrizione: `2° acconto contributi ecc. Art/Comm ${anno}`,
       importo: accontoEccCorr,
       componenti: [{ tipo: `2° acconto contributi ecc. Art/Comm ${anno}`, importo: accontoEccCorr }],
@@ -285,7 +293,7 @@ export function calcolaScadenze({
   // Saldo e 1° acconto cadono lo stesso giorno ma sono due versamenti distinti
   if (saldoImpostePrecedente > 0) {
     globali.push({
-      data: formattaScadenza(saldoImposte, anno),
+      data: formattaScadenza(dCorr.saldoImposte, anno),
       descrizione: `Saldo imposte ${anno - 1}`,
       importo: saldoImpostePrecedente,
       componenti: [{ tipo: `Saldo imposte ${anno - 1}`, importo: saldoImpostePrecedente }],
@@ -295,7 +303,7 @@ export function calcolaScadenze({
   }
   if (accontoImposteAnnoCorrente > 0) {
     globali.push({
-      data: formattaScadenza(primoAccontoImposte, anno),
+      data: formattaScadenza(dCorr.primoAccontoImposte, anno),
       descrizione: `1° acconto imposte ${anno}`,
       importo: accontoImposteAnnoCorrente,
       componenti: [{ tipo: `1° acconto imposte ${anno} (su tax netta ${anno - 1})`, importo: accontoImposteAnnoCorrente }],
@@ -305,7 +313,7 @@ export function calcolaScadenze({
   }
   if (accontoImposteAnnoCorrente > 0) {
     globali.push({
-      data: formattaScadenza(secondoAccontoImposte, anno),
+      data: formattaScadenza(dCorr.secondoAccontoImposte, anno),
       descrizione: `2° acconto imposte ${anno}`,
       importo: accontoImposteAnnoCorrente,
       componenti: [{ tipo: `2° acconto imposte ${anno} (su tax netta ${anno - 1})`, importo: accontoImposteAnnoCorrente }],
@@ -336,7 +344,7 @@ export function calcolaScadenze({
   // Saldo e 1° acconto: righe separate (le date possono divergere)
   if (saldoImposteDaVersare > 0) {
     globali.push({
-      data: formattaScadenza(saldoImposte, annoSucc),
+      data: formattaScadenza(dSucc.saldoImposte, annoSucc),
       descrizione: `Saldo imposte ${anno}`,
       importo: saldoImposteDaVersare,
       componenti: [{ tipo: `Saldo imposte ${anno}`, importo: saldoImposteDaVersare }],
@@ -345,7 +353,7 @@ export function calcolaScadenze({
   }
   if (accontoImposteAnnoSucc > 0) {
     globali.push({
-      data: formattaScadenza(primoAccontoImposte, annoSucc),
+      data: formattaScadenza(dSucc.primoAccontoImposte, annoSucc),
       descrizione: `1° acconto imposte ${annoSucc}`,
       importo: accontoImposteAnnoSucc,
       componenti: [{ tipo: `1° acconto imposte ${annoSucc} (su tax ${anno})`, importo: accontoImposteAnnoSucc }],
@@ -354,7 +362,7 @@ export function calcolaScadenze({
   }
   if (accontoImposteAnnoSucc > 0) {
     globali.push({
-      data: formattaScadenza(secondoAccontoImposte, annoSucc),
+      data: formattaScadenza(dSucc.secondoAccontoImposte, annoSucc),
       descrizione: `2° acconto imposte ${annoSucc}`,
       importo: accontoImposteAnnoSucc,
       componenti: [{ tipo: `2° acconto imposte ${annoSucc} (su tax ${anno})`, importo: accontoImposteAnnoSucc }],
@@ -370,7 +378,7 @@ export function calcolaScadenze({
 
   if (saldoContributiGS > 0) {
     globali.push({
-      data: formattaScadenza(saldoImposte, annoSucc),
+      data: formattaScadenza(dSucc.saldoImposte, annoSucc),
       descrizione: `Saldo contributi G.S. ${anno}`,
       importo: saldoContributiGS,
       componenti: [{ tipo: `Saldo contributi G.S. ${anno}`, importo: saldoContributiGS }],
@@ -379,7 +387,7 @@ export function calcolaScadenze({
   }
   if (accontoGSAnnoSucc > 0) {
     globali.push({
-      data: formattaScadenza(primoAccontoContributi, annoSucc),
+      data: formattaScadenza(dSucc.primoAccontoContributi, annoSucc),
       descrizione: `1° acconto contributi G.S. ${annoSucc}`,
       importo: accontoGSAnnoSucc,
       componenti: [{ tipo: `1° acconto contributi G.S. ${annoSucc} (su contr. G.S. ${anno})`, importo: accontoGSAnnoSucc }],
@@ -388,7 +396,7 @@ export function calcolaScadenze({
   }
   if (accontoGSAnnoSucc > 0) {
     globali.push({
-      data: formattaScadenza(secondoAccontoContributi, annoSucc),
+      data: formattaScadenza(dSucc.secondoAccontoContributi, annoSucc),
       descrizione: `2° acconto contributi G.S. ${annoSucc}`,
       importo: accontoGSAnnoSucc,
       componenti: [{ tipo: `2° acconto contributi G.S. ${annoSucc} (su contr. G.S. ${anno})`, importo: accontoGSAnnoSucc }],
@@ -404,7 +412,7 @@ export function calcolaScadenze({
 
   if (saldoContributiEccArtComm > 0) {
     globali.push({
-      data: formattaScadenza(saldoImposte, annoSucc),
+      data: formattaScadenza(dSucc.saldoImposte, annoSucc),
       descrizione: `Saldo contributi ecc. Art/Comm ${anno}`,
       importo: saldoContributiEccArtComm,
       componenti: [{ tipo: `Saldo contributi ecc. Art/Comm ${anno}`, importo: saldoContributiEccArtComm }],
@@ -413,7 +421,7 @@ export function calcolaScadenze({
   }
   if (accontoEccAnnoSucc > 0) {
     globali.push({
-      data: formattaScadenza(primoAccontoContributi, annoSucc),
+      data: formattaScadenza(dSucc.primoAccontoContributi, annoSucc),
       descrizione: `1° acconto contributi ecc. Art/Comm ${annoSucc}`,
       importo: accontoEccAnnoSucc,
       componenti: [{ tipo: `1° acconto contributi ecc. Art/Comm ${annoSucc} (su ecc. ${anno})`, importo: accontoEccAnnoSucc }],
@@ -422,7 +430,7 @@ export function calcolaScadenze({
   }
   if (accontoEccAnnoSucc > 0) {
     globali.push({
-      data: formattaScadenza(secondoAccontoContributi, annoSucc),
+      data: formattaScadenza(dSucc.secondoAccontoContributi, annoSucc),
       descrizione: `2° acconto contributi ecc. Art/Comm ${annoSucc}`,
       importo: accontoEccAnnoSucc,
       componenti: [{ tipo: `2° acconto contributi ecc. Art/Comm ${annoSucc} (su ecc. ${anno})`, importo: accontoEccAnnoSucc }],
