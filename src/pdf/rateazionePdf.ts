@@ -1,12 +1,14 @@
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
-import type { PianoRateazione } from '@/domain/rateazione'
+import type { PianoRateazione, RataPiano } from '@/domain/rateazione'
+import type { AnagraficaContribuente } from '@/data/anagraficaStorage'
 import { formattaScadenza } from '@/domain/dates'
 
 /**
- * PDF del piano di rateazione di un versamento d'imposta sostitutiva, con la
- * guida alla compilazione del modello F24 (sezione erario): codici tributo,
- * campo rateazione "NNRR", anno di riferimento e importi, come prodotti dal
+ * PDF del piano di rateazione di un versamento d'imposta sostitutiva: pagina
+ * di riepilogo con la guida alla compilazione (codici tributo, campo
+ * rateazione "NNRR", anno di riferimento) e una delega F24 in FACSIMILE per
+ * ogni rata, con i dati del contribuente. Importi e codici replicano il
  * software ufficiale "Redditi PF" dell'Agenzia delle Entrate.
  */
 
@@ -22,6 +24,8 @@ export interface DatiPdfRateazione {
   /** Anno solare in cui cadono le rate. */
   annoScadenza: number
   piano: PianoRateazione
+  /** Dati del contribuente per le deleghe; i campi vuoti restano da compilare. */
+  anagrafica: AnagraficaContribuente
 }
 
 // Codici tributo dell'imposta sostitutiva del regime forfettario.
@@ -49,6 +53,7 @@ export function generaPdfRateazione({
   annoCompetenza,
   annoScadenza,
   piano,
+  anagrafica,
 }: DatiPdfRateazione): void {
   const doc = new jsPDF({ unit: 'mm', format: 'a4' })
   const margine = 16
@@ -151,6 +156,121 @@ export function generaPdfRateazione({
   ]
   note.forEach((r, i) => doc.text(r, margine, y + i * 4))
 
+  // ── Una delega F24 in facsimile per ogni rata ─────────────────────────────
+  for (const rata of piano.rate) {
+    doc.addPage()
+    disegnaDelegaFacsimile(doc, margine, { rata, n, tributo, annoCompetenza, annoScadenza, anagrafica })
+  }
+
   const tipoFile = tipoVersamento === 'saldo' ? 'saldo' : 'primo-acconto'
   doc.save(`rateazione-imposta-${tipoFile}-${annoCompetenza}.pdf`)
+}
+
+// ---------------------------------------------------------------------------
+// Delega F24 in facsimile (una pagina per rata)
+// ---------------------------------------------------------------------------
+
+interface ParamsDelega {
+  rata: RataPiano
+  n: number
+  tributo: { codice: string; descrizione: string }
+  annoCompetenza: number
+  annoScadenza: number
+  anagrafica: AnagraficaContribuente
+}
+
+const finalY = (doc: jsPDF): number =>
+  (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY
+
+function disegnaDelegaFacsimile(
+  doc: jsPDF,
+  margine: number,
+  { rata, n, tributo, annoCompetenza, annoScadenza, anagrafica }: ParamsDelega,
+): void {
+  const scadenza = formattaScadenza(rata.dataMMGG, annoScadenza)
+
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(13)
+  doc.setTextColor(...BLU)
+  doc.text('Modello F24 — facsimile', margine, 20)
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(10)
+  doc.setTextColor(...GRIGIO_TESTO)
+  doc.text(
+    `${n === 1 ? 'Versamento unico' : `Rata ${rata.numero} di ${n}`} · da versare entro il ${scadenza}`,
+    margine,
+    26,
+  )
+
+  // Sezione contribuente: caselle con etichetta in testa, vuote se non fornite.
+  const stiliContribuente = {
+    theme: 'grid' as const,
+    styles: { fontSize: 9.5, cellPadding: 2.5, textColor: [30, 41, 59] as [number, number, number], minCellHeight: 9 },
+    headStyles: { fillColor: [241, 245, 249] as [number, number, number], textColor: GRIGIO_TESTO, fontSize: 7.5 },
+    margin: { left: margine, right: margine },
+  }
+  autoTable(doc, {
+    ...stiliContribuente,
+    startY: 32,
+    head: [['Codice fiscale', 'Cognome', 'Nome']],
+    body: [[anagrafica.codiceFiscale, anagrafica.cognome, anagrafica.nome]],
+    columnStyles: { 0: { cellWidth: 55, font: 'courier', fontStyle: 'bold' } },
+  })
+  autoTable(doc, {
+    ...stiliContribuente,
+    startY: finalY(doc) + 2,
+    head: [['Data di nascita', 'Sesso', 'Comune (o Stato estero) di nascita', 'Prov.']],
+    body: [[anagrafica.dataNascita, anagrafica.sesso, anagrafica.comuneNascita, anagrafica.provinciaNascita]],
+    columnStyles: { 0: { cellWidth: 35 }, 1: { cellWidth: 18, halign: 'center' }, 3: { cellWidth: 16, halign: 'center' } },
+  })
+
+  // Sezione erario.
+  let y = finalY(doc) + 8
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(10.5)
+  doc.setTextColor(...BLU)
+  doc.text('Sezione erario', margine, y)
+
+  const righe: string[][] = [
+    [tributo.codice, campoRateazione(rata.numero, n), String(annoCompetenza), euro(rata.quota), ''],
+  ]
+  if (rata.interessi > 0) {
+    righe.push([CODICE_INTERESSI, '', String(annoCompetenza), euro(rata.interessi), ''])
+  }
+  autoTable(doc, {
+    startY: y + 3,
+    margin: { left: margine, right: margine },
+    head: [['Codice tributo', 'Rateazione/regione/prov./mese rif.', 'Anno di riferimento', 'Importi a debito versati', 'Importi a credito compensati']],
+    body: righe,
+    foot: [
+      ['', '', 'Totale A', euro(rata.importo), 'B'],
+      ['', '', 'Saldo (A − B)', euro(rata.importo), ''],
+    ],
+    theme: 'grid',
+    styles: { fontSize: 9.5, cellPadding: 2.5, textColor: [30, 41, 59] },
+    headStyles: { fillColor: BLU, fontSize: 8 },
+    footStyles: { fillColor: [241, 245, 249], textColor: [30, 41, 59], fontStyle: 'bold' },
+    columnStyles: { 0: { halign: 'center' }, 1: { halign: 'center' }, 2: { halign: 'center' }, 3: { halign: 'right' }, 4: { halign: 'right' } },
+  })
+
+  // Saldo finale e legenda.
+  y = finalY(doc) + 8
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(11)
+  doc.setTextColor(30, 41, 59)
+  doc.text(`Saldo finale: ${euro(rata.importo)}`, margine, y)
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(8)
+  doc.setTextColor(...GRIGIO_TESTO)
+  doc.text(
+    `${tributo.codice}: ${tributo.descrizione}${rata.interessi > 0 ? ` · ${CODICE_INTERESSI}: interessi pagamento dilazionato imposte erariali` : ''}`,
+    margine,
+    y + 5,
+  )
+  doc.text(
+    'Facsimile di supporto alla compilazione: non utilizzabile per il versamento. Riportare i dati sul modello',
+    margine,
+    y + 10,
+  )
+  doc.text('F24 ufficiale (home banking, Entratel/Fisconline o sportello).', margine, y + 14)
 }

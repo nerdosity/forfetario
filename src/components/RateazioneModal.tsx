@@ -1,25 +1,13 @@
 import { useEffect, useState } from 'react'
-import { Download } from 'lucide-react'
-import { Badge, Button, Label, Radio, Table, TableBody, TableCell, TableHead, TableHeadCell, TableRow } from 'flowbite-react'
+import { ArrowLeft, Download } from 'lucide-react'
+import { Badge, Button, Label, Radio, Table, TableBody, TableCell, TableHead, TableHeadCell, TableRow, TextInput } from 'flowbite-react'
 import type { InizioRateazione, OpzioniRateazione, Scadenza } from '@/domain/types'
 import { calcolaPianoRateazione, numeroRateMax, rateazioneNeutra } from '@/domain/rateazione'
 import { formattaScadenza } from '@/domain/dates'
 import { formatEuro } from '@/domain/labels'
-import { Modal, Select, Tooltip } from '@/components/ui'
+import { caricaAnagrafica, salvaAnagrafica, type AnagraficaContribuente } from '@/data/anagraficaStorage'
+import { Field, Modal, Select, Tooltip } from '@/components/ui'
 import { theme } from '@/theme'
-
-/** Voce della scadenza senza l'eventuale suffisso di rata (per titoli e PDF). */
-const voceBase = (s: Scadenza): string =>
-  (s.voce ?? '').replace(/ · rata \d+ di \d+$/, '').replace(/ · differito al 30 luglio$/, '')
-
-/**
- * Ricava tipo di versamento e anno di competenza dalla chiave di rateazione
- * (es. "saldo-2025", "acconto1-2026"). Null se la chiave non è riconosciuta.
- */
-function parseChiave(chiave?: string): { tipo: 'saldo' | 'acconto1'; annoCompetenza: number } | null {
-  const m = chiave?.match(/^(saldo|acconto1)-(\d{4})$/)
-  return m ? { tipo: m[1] as 'saldo' | 'acconto1', annoCompetenza: Number(m[2]) } : null
-}
 
 interface Props {
   /** Scadenza da rateizzare (anche una riga-rata: si risale all'importo originario). */
@@ -34,19 +22,41 @@ interface Props {
 const aliquotaTesto = (aliquota: number) =>
   `${(aliquota * 100).toFixed(2).replace('.', ',')}%`
 
+/** Voce della scadenza senza l'eventuale suffisso di rata (per titoli e PDF). */
+const voceBase = (s: Scadenza): string =>
+  (s.voce ?? '').replace(/ · rata \d+ di \d+$/, '').replace(/ · differito al 30 luglio$/, '')
+
 /**
- * Popup di rateazione di un versamento d'imposta: scelta della prima scadenza
- * (giugno ordinaria o luglio con maggiorazione 0,4%) e del numero di rate,
- * con anteprima del piano calcolato secondo le regole del modello Redditi.
+ * Ricava tipo di versamento e anno di competenza dalla chiave di rateazione
+ * (es. "saldo-2025", "acconto1-2026"). Null se la chiave non è riconosciuta.
+ */
+function parseChiave(chiave?: string): { tipo: 'saldo' | 'acconto1'; annoCompetenza: number } | null {
+  const m = chiave?.match(/^(saldo|acconto1)-(\d{4})$/)
+  return m ? { tipo: m[1] as 'saldo' | 'acconto1', annoCompetenza: Number(m[2]) } : null
+}
+
+/**
+ * Popup di rateazione di un versamento d'imposta in due passi: scelta della
+ * prima scadenza (giugno ordinaria o luglio con maggiorazione 0,4%) e del
+ * numero di rate con anteprima del piano; poi, per scaricare il PDF con le
+ * deleghe F24 in facsimile, i dati anagrafici del contribuente (facoltativi,
+ * ricordati per le volte successive).
  */
 export function RateazioneModal({ scadenza, opzioniAttuali, onClose, onSave }: Props) {
   const [inizio, setInizio] = useState<InizioRateazione>(opzioniAttuali?.inizio ?? 'giugno')
   const [numeroRate, setNumeroRate] = useState(opzioniAttuali?.numeroRate ?? 1)
+  const [passo, setPasso] = useState<'opzioni' | 'anagrafica'>('opzioni')
+  const [anagrafica, setAnagrafica] = useState<AnagraficaContribuente>(caricaAnagrafica)
 
   // Passando a luglio il massimo scende a 6: riallinea la scelta se eccede.
   useEffect(() => {
     setNumeroRate((n) => Math.min(n, numeroRateMax(inizio)))
   }, [inizio])
+
+  // Persiste l'anagrafica a ogni modifica: non va reinserita la prossima volta.
+  useEffect(() => {
+    salvaAnagrafica(anagrafica)
+  }, [anagrafica])
 
   const anno = scadenza.annoScadenza
   const importoBase = scadenza.importoRateazioneBase ?? scadenza.importo
@@ -55,8 +65,15 @@ export function RateazioneModal({ scadenza, opzioniAttuali, onClose, onSave }: P
   const neutra = rateazioneNeutra(opzioni)
   const datiChiave = parseChiave(scadenza.chiaveRateazione)
 
+  const aggiorna = (campo: keyof AnagraficaContribuente) => (valore: string) =>
+    setAnagrafica((a) => ({ ...a, [campo]: valore }))
+
+  // CF facoltativo, ma se inserito deve avere 16 caratteri alfanumerici.
+  const cfNonValido =
+    anagrafica.codiceFiscale !== '' && !/^[A-Z0-9]{16}$/.test(anagrafica.codiceFiscale)
+
   // jsPDF è caricato solo alla prima richiesta (chunk separato).
-  const scaricaPdf = async () => {
+  const generaPdf = async () => {
     if (!datiChiave) return
     const { generaPdfRateazione } = await import('@/pdf/rateazionePdf')
     generaPdfRateazione({
@@ -65,144 +82,251 @@ export function RateazioneModal({ scadenza, opzioniAttuali, onClose, onSave }: P
       annoCompetenza: datiChiave.annoCompetenza,
       annoScadenza: anno,
       piano,
+      anagrafica,
     })
+    setPasso('opzioni')
   }
 
-  const opzioniRate = Array.from({ length: numeroRateMax(inizio) }, (_, i) => ({
-    value: i + 1,
-    label: i === 0 ? 'Versamento unico' : `${i + 1} rate`,
-  }))
+  const footerOpzioni = (
+    <>
+      <span className="mr-auto flex items-center gap-2">
+        {datiChiave && (
+          <Button color="light" onClick={() => setPasso('anagrafica')}>
+            <Download size={16} className="mr-2" aria-hidden />
+            Scarica PDF
+          </Button>
+        )}
+        {opzioniAttuali && (
+          <Button color="light" onClick={() => onSave(null)}>
+            Rimuovi rateazione
+          </Button>
+        )}
+      </span>
+      <Button color="light" onClick={onClose}>
+        Annulla
+      </Button>
+      <Button onClick={() => onSave(neutra ? null : { inizio, numeroRate })}>
+        Applica
+      </Button>
+    </>
+  )
+
+  const footerAnagrafica = (
+    <>
+      <Button color="light" onClick={() => setPasso('opzioni')} className="mr-auto">
+        <ArrowLeft size={16} className="mr-2" aria-hidden />
+        Indietro
+      </Button>
+      <Button onClick={generaPdf} disabled={cfNonValido}>
+        <Download size={16} className="mr-2" aria-hidden />
+        Genera PDF
+      </Button>
+    </>
+  )
 
   return (
     <Modal
       open
       onClose={onClose}
       size="4xl"
-      title="Rateazione del versamento"
+      title={passo === 'opzioni' ? 'Rateazione del versamento' : 'Dati del contribuente'}
       subtitle={`${scadenza.categoria ?? scadenza.descrizione} · ${voceBase(scadenza)} · ${formatEuro(importoBase)}`}
-      footer={
-        <>
-          <span className="mr-auto flex items-center gap-2">
-            {datiChiave && (
-              <Button color="light" onClick={scaricaPdf}>
-                <Download size={16} className="mr-2" aria-hidden />
-                Scarica PDF
-              </Button>
-            )}
-            {opzioniAttuali && (
-              <Button color="light" onClick={() => onSave(null)}>
-                Rimuovi rateazione
-              </Button>
-            )}
-          </span>
-          <Button color="light" onClick={onClose}>
-            Annulla
-          </Button>
-          <Button onClick={() => onSave(neutra ? null : { inizio, numeroRate })}>
-            Applica
-          </Button>
-        </>
-      }
+      footer={passo === 'opzioni' ? footerOpzioni : footerAnagrafica}
     >
-      <div className="grid gap-4 sm:grid-cols-2">
-        <fieldset className="space-y-2">
-          <legend className={`${theme.labelSmall} mb-2 flex items-center gap-1.5`}>
-            Prima scadenza
-            <Tooltip
-              content="Il versamento può essere differito di 30 giorni rispetto alla scadenza ordinaria applicando la maggiorazione dello 0,4% sull'intero importo."
-              label="Informazioni sulla prima scadenza"
-              posizione="sotto"
-              allinea="sinistra"
-            />
-          </legend>
-          <div className="flex items-center gap-2">
-            <Radio
-              id="rateazione-giugno"
-              name="rateazione-inizio"
-              checked={inizio === 'giugno'}
-              onChange={() => setInizio('giugno')}
-            />
-            <Label htmlFor="rateazione-giugno" className="font-normal">
-              {formattaScadenza('06-30', anno)} — ordinaria, fino a 7 rate
-            </Label>
-          </div>
-          <div className="flex items-center gap-2">
-            <Radio
-              id="rateazione-luglio"
-              name="rateazione-inizio"
-              checked={inizio === 'luglio'}
-              onChange={() => setInizio('luglio')}
-            />
-            <Label htmlFor="rateazione-luglio" className="font-normal">
-              {formattaScadenza('07-30', anno)} — maggiorazione 0,4%, fino a 6 rate
-            </Label>
-          </div>
-        </fieldset>
+      {passo === 'opzioni' ? (
+        <>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <fieldset className="space-y-2">
+              <legend className={`${theme.labelSmall} mb-2 flex items-center gap-1.5`}>
+                Prima scadenza
+                <Tooltip
+                  content="Il versamento può essere differito di 30 giorni rispetto alla scadenza ordinaria applicando la maggiorazione dello 0,4% sull'intero importo."
+                  label="Informazioni sulla prima scadenza"
+                  posizione="sotto"
+                  allinea="sinistra"
+                />
+              </legend>
+              <div className="flex items-center gap-2">
+                <Radio
+                  id="rateazione-giugno"
+                  name="rateazione-inizio"
+                  checked={inizio === 'giugno'}
+                  onChange={() => setInizio('giugno')}
+                />
+                <Label htmlFor="rateazione-giugno" className="font-normal">
+                  {formattaScadenza('06-30', anno)} — ordinaria, fino a 7 rate
+                </Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Radio
+                  id="rateazione-luglio"
+                  name="rateazione-inizio"
+                  checked={inizio === 'luglio'}
+                  onChange={() => setInizio('luglio')}
+                />
+                <Label htmlFor="rateazione-luglio" className="font-normal">
+                  {formattaScadenza('07-30', anno)} — maggiorazione 0,4%, fino a 6 rate
+                </Label>
+              </div>
+            </fieldset>
 
-        <div className="space-y-2">
-          <Label htmlFor="rateazione-numero" className={`${theme.labelSmall} flex items-center gap-1.5`}>
-            Numero di rate
-            <Tooltip
-              content="Le rate successive alla prima scadono il giorno 16 di ciascun mese (il 20 ad agosto) e maturano interessi di rateazione del 4% annuo (0,33% al mese), come nel software ufficiale dell'Agenzia delle Entrate. L'ultima rata cade entro il 16 dicembre."
-              label="Informazioni sul numero di rate"
-              posizione="sotto"
-              allinea="sinistra"
-            />
-          </Label>
-          <Select id="rateazione-numero" value={numeroRate} options={opzioniRate} onChange={setNumeroRate} />
-        </div>
-      </div>
+            <div className="space-y-2">
+              <Label htmlFor="rateazione-numero" className={`${theme.labelSmall} flex items-center gap-1.5`}>
+                Numero di rate
+                <Tooltip
+                  content="Le rate successive alla prima scadono il giorno 16 di ciascun mese (il 20 ad agosto) e maturano interessi di rateazione del 4% annuo (0,33% al mese), come nel software ufficiale dell'Agenzia delle Entrate. L'ultima rata cade entro il 16 dicembre."
+                  label="Informazioni sul numero di rate"
+                  posizione="sotto"
+                  allinea="sinistra"
+                />
+              </Label>
+              <Select
+                id="rateazione-numero"
+                value={numeroRate}
+                options={Array.from({ length: numeroRateMax(inizio) }, (_, i) => ({
+                  value: i + 1,
+                  label: i === 0 ? 'Versamento unico' : `${i + 1} rate`,
+                }))}
+                onChange={setNumeroRate}
+              />
+            </div>
+          </div>
 
-      <div>
-        <p className={`${theme.groupLabel} mb-2`}>Piano dei versamenti</p>
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableHeadCell>Rata</TableHeadCell>
-                <TableHeadCell>Scadenza</TableHeadCell>
-                <TableHeadCell className="text-right">Quota</TableHeadCell>
-                <TableHeadCell className="text-right">Interessi</TableHeadCell>
-                <TableHeadCell className="text-right">Importo</TableHeadCell>
-              </TableRow>
-            </TableHead>
-            <TableBody className="divide-y">
-              {piano.rate.map((rata) => (
-                <TableRow key={rata.numero} className="bg-white">
-                  <TableCell>{numeroRate === 1 ? 'Unica' : `${rata.numero} di ${numeroRate}`}</TableCell>
-                  <TableCell className="whitespace-nowrap tabular-nums">
-                    {formattaScadenza(rata.dataMMGG, anno)}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">{formatEuro(rata.quota)}</TableCell>
-                  <TableCell className="text-right tabular-nums text-slate-500">
-                    {rata.interessi > 0 ? `${formatEuro(rata.interessi)} (${aliquotaTesto(rata.aliquotaInteressi)})` : '—'}
-                  </TableCell>
-                  <TableCell className="text-right font-semibold tabular-nums">{formatEuro(rata.importo)}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-        <div className="mt-3 flex flex-wrap items-center justify-end gap-x-4 gap-y-1 text-sm">
-          {piano.maggiorazione > 0 && (
-            <span className="text-slate-500">
-              Maggiorazione 0,4%: <span className="font-medium tabular-nums">{formatEuro(piano.maggiorazione)}</span>
-            </span>
-          )}
-          {piano.totaleInteressi > 0 && (
-            <span className="text-slate-500">
-              Interessi: <span className="font-medium tabular-nums">{formatEuro(piano.totaleInteressi)}</span>
-            </span>
-          )}
-          <Badge color="info" className="w-fit text-sm">
-            Totale {formatEuro(piano.totale)}
-          </Badge>
-        </div>
-        <p className={`${theme.helpText} mt-2`}>
-          Date nominali: se festive slittano al primo giorno lavorativo utile. Con più di una rata
-          la voce non viene più confrontata con i versamenti inseriti.
-        </p>
-      </div>
+          <div>
+            <p className={`${theme.groupLabel} mb-2`}>Piano dei versamenti</p>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableHeadCell>Rata</TableHeadCell>
+                    <TableHeadCell>Scadenza</TableHeadCell>
+                    <TableHeadCell className="text-right">Quota</TableHeadCell>
+                    <TableHeadCell className="text-right">Interessi</TableHeadCell>
+                    <TableHeadCell className="text-right">Importo</TableHeadCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody className="divide-y">
+                  {piano.rate.map((rata) => (
+                    <TableRow key={rata.numero} className="bg-white">
+                      <TableCell>{numeroRate === 1 ? 'Unica' : `${rata.numero} di ${numeroRate}`}</TableCell>
+                      <TableCell className="whitespace-nowrap tabular-nums">
+                        {formattaScadenza(rata.dataMMGG, anno)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">{formatEuro(rata.quota)}</TableCell>
+                      <TableCell className="text-right tabular-nums text-slate-500">
+                        {rata.interessi > 0 ? `${formatEuro(rata.interessi)} (${aliquotaTesto(rata.aliquotaInteressi)})` : '—'}
+                      </TableCell>
+                      <TableCell className="text-right font-semibold tabular-nums">{formatEuro(rata.importo)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+            <div className="mt-3 flex flex-wrap items-center justify-end gap-x-4 gap-y-1 text-sm">
+              {piano.maggiorazione > 0 && (
+                <span className="text-slate-500">
+                  Maggiorazione 0,4%: <span className="font-medium tabular-nums">{formatEuro(piano.maggiorazione)}</span>
+                </span>
+              )}
+              {piano.totaleInteressi > 0 && (
+                <span className="text-slate-500">
+                  Interessi: <span className="font-medium tabular-nums">{formatEuro(piano.totaleInteressi)}</span>
+                </span>
+              )}
+              <Badge color="info" className="w-fit text-sm">
+                Totale {formatEuro(piano.totale)}
+              </Badge>
+            </div>
+            <p className={`${theme.helpText} mt-2`}>
+              Date nominali: se festive slittano al primo giorno lavorativo utile. Con più di una rata
+              la voce non viene più confrontata con i versamenti inseriti.
+            </p>
+          </div>
+        </>
+      ) : (
+        <>
+          <p className="text-sm text-slate-600">
+            Il PDF contiene il piano di rateazione e una delega F24 in facsimile per ogni rata
+            ({piano.opzioni.numeroRate === 1 ? 'versamento unico' : `${piano.opzioni.numeroRate} rate`}, prima scadenza{' '}
+            {formattaScadenza(piano.rate[0].dataMMGG, anno)}). I dati restano sul tuo dispositivo e
+            vengono ricordati per i prossimi PDF; i campi lasciati vuoti resteranno da compilare a mano.
+          </p>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Codice fiscale" htmlFor="anag-cf">
+              <TextInput
+                id="anag-cf"
+                value={anagrafica.codiceFiscale}
+                maxLength={16}
+                placeholder="RSSMRA80A01H501U"
+                color={cfNonValido ? 'failure' : undefined}
+                onChange={(e) => aggiorna('codiceFiscale')(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
+                className="font-mono"
+              />
+              {cfNonValido && (
+                <p className="mt-1 text-xs text-red-600">
+                  Il codice fiscale deve avere 16 caratteri alfanumerici.
+                </p>
+              )}
+            </Field>
+            <div className="grid grid-cols-2 gap-4">
+              <Field label="Cognome" htmlFor="anag-cognome">
+                <TextInput
+                  id="anag-cognome"
+                  value={anagrafica.cognome}
+                  onChange={(e) => aggiorna('cognome')(e.target.value)}
+                />
+              </Field>
+              <Field label="Nome" htmlFor="anag-nome">
+                <TextInput
+                  id="anag-nome"
+                  value={anagrafica.nome}
+                  onChange={(e) => aggiorna('nome')(e.target.value)}
+                />
+              </Field>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <Field label="Data di nascita" htmlFor="anag-nascita">
+                <TextInput
+                  id="anag-nascita"
+                  value={anagrafica.dataNascita}
+                  placeholder="GG/MM/AAAA"
+                  onChange={(e) => aggiorna('dataNascita')(e.target.value)}
+                />
+              </Field>
+              <Field label="Sesso" htmlFor="anag-sesso">
+                <Select
+                  id="anag-sesso"
+                  value={anagrafica.sesso}
+                  options={[
+                    { value: '', label: '—' },
+                    { value: 'M', label: 'M' },
+                    { value: 'F', label: 'F' },
+                  ]}
+                  onChange={(v) => setAnagrafica((a) => ({ ...a, sesso: v as AnagraficaContribuente['sesso'] }))}
+                />
+              </Field>
+            </div>
+            <div className="grid grid-cols-[1fr_5rem] gap-4">
+              <Field label="Comune (o Stato estero) di nascita" htmlFor="anag-comune">
+                <TextInput
+                  id="anag-comune"
+                  value={anagrafica.comuneNascita}
+                  onChange={(e) => aggiorna('comuneNascita')(e.target.value)}
+                />
+              </Field>
+              <Field label="Prov." htmlFor="anag-prov">
+                <TextInput
+                  id="anag-prov"
+                  value={anagrafica.provinciaNascita}
+                  maxLength={2}
+                  onChange={(e) => aggiorna('provinciaNascita')(e.target.value.toUpperCase().replace(/[^A-Z]/g, ''))}
+                />
+              </Field>
+            </div>
+          </div>
+        </>
+      )}
     </Modal>
   )
 }
