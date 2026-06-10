@@ -49,12 +49,13 @@ function inputIniziale(): CalcoloInput {
 type TabId = 'dati' | 'riepilogo' | 'regimi' | 'calendario' | 'saldi' | 'precedente'
 
 const NAV: { id: TabId; label: string; icon: typeof LayoutDashboard }[] = [
-  { id: 'dati', label: 'Dati', icon: SlidersHorizontal },
   { id: 'riepilogo', label: 'Riepilogo', icon: LayoutDashboard },
   { id: 'regimi', label: 'Dettaglio regimi', icon: BarChart3 },
   { id: 'calendario', label: 'Calendario', icon: Calendar },
   { id: 'saldi', label: 'Saldi e crediti', icon: FileText },
   { id: 'precedente', label: 'Anno precedente', icon: History },
+  // "Dati" resta in fondo: viene spinto all'estrema destra della navbar
+  { id: 'dati', label: 'Dati', icon: SlidersHorizontal },
 ]
 
 const TITOLO: Record<TabId, string> = {
@@ -69,7 +70,7 @@ const TITOLO: Record<TabId, string> = {
 export default function App() {
   const [input, setInput] = useInputState(inputIniziale)
   const [, forceUpdate] = useReducer((x: number) => x + 1, 0)
-  const [tab, setTab] = useState<TabId>('dati')
+  const [tab, setTab] = useState<TabId>('riepilogo')
 
   const calcoli = useMemo(() => calcola(input), [input])
 
@@ -151,8 +152,8 @@ export default function App() {
                 disabled={disabled}
                 title={disabled ? motivo : undefined}
                 className={`${theme.navItem} ${tab === id ? theme.navItemActive : ''} ${
-                  disabled ? 'cursor-not-allowed opacity-40 hover:text-slate-500' : ''
-                }`}
+                  id === 'dati' ? 'ml-auto' : ''
+                } ${disabled ? 'cursor-not-allowed opacity-40 hover:text-slate-500' : ''}`}
                 aria-current={tab === id ? 'page' : undefined}
               >
                 <Icon size={16} aria-hidden />

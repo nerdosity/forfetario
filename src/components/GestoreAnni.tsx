@@ -35,6 +35,8 @@ interface FormAnno {
   saldoImposte: string
   primoAccontoImposte: string
   secondoAccontoImposte: string
+  primoAccontoContributi: string
+  secondoAccontoContributi: string
 }
 
 function formToDatiAnno(f: FormAnno): DatiAnno {
@@ -53,6 +55,8 @@ function formToDatiAnno(f: FormAnno): DatiAnno {
       saldoImposte: f.saldoImposte,
       primoAccontoImposte: f.primoAccontoImposte,
       secondoAccontoImposte: f.secondoAccontoImposte,
+      primoAccontoContributi: f.primoAccontoContributi,
+      secondoAccontoContributi: f.secondoAccontoContributi,
     },
   }
 }
@@ -73,6 +77,8 @@ function datiAnnoToForm(anno: number, d: DatiAnno): FormAnno {
     saldoImposte: d.scadenze.saldoImposte,
     primoAccontoImposte: d.scadenze.primoAccontoImposte,
     secondoAccontoImposte: d.scadenze.secondoAccontoImposte,
+    primoAccontoContributi: d.scadenze.primoAccontoContributi,
+    secondoAccontoContributi: d.scadenze.secondoAccontoContributi,
   }
 }
 
@@ -293,6 +299,22 @@ export function GestoreAnni({ onAnniChanged }: Props) {
               <DateInput
                 value={form.secondoAccontoImposte}
                 onChange={(v) => setForm((prev) => ({ ...prev, secondoAccontoImposte: v }))}
+                anno={form.anno}
+              />
+            </Field>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="1° acconto contributi INPS" info="Data del primo acconto dei contributi INPS. Può differire da quella delle imposte.">
+              <DateInput
+                value={form.primoAccontoContributi}
+                onChange={(v) => setForm((prev) => ({ ...prev, primoAccontoContributi: v }))}
+                anno={form.anno}
+              />
+            </Field>
+            <Field label="2° acconto contributi INPS" info="Data del secondo acconto dei contributi INPS.">
+              <DateInput
+                value={form.secondoAccontoContributi}
+                onChange={(v) => setForm((prev) => ({ ...prev, secondoAccontoContributi: v }))}
                 anno={form.anno}
               />
             </Field>

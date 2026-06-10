@@ -11,12 +11,16 @@ export interface ContributoFisso {
 export interface ScadenzeAnno {
   /** 4 rate trimestrali dei contributi fissi (l'ultima cade l'anno successivo). */
   rateContributiFissi: [string, string, string, string]
-  /** Data del saldo imposte/contributi (di norma giugno). */
+  /** Data del saldo imposte e contributi (di norma giugno). */
   saldoImposte: string
-  /** Data del 1° acconto imposte/contributi (spesso coincide col saldo, ma non sempre). */
+  /** Data del 1° acconto imposte (spesso coincide col saldo, ma non sempre). */
   primoAccontoImposte: string
-  /** Secondo acconto imposte. */
+  /** Data del 2° acconto imposte (di norma novembre). */
   secondoAccontoImposte: string
+  /** Data del 1° acconto contributi INPS (può differire da quella delle imposte). */
+  primoAccontoContributi: string
+  /** Data del 2° acconto contributi INPS (può differire da quella delle imposte). */
+  secondoAccontoContributi: string
 }
 
 /** Costanti fiscali validate per un singolo anno. */
@@ -110,6 +114,15 @@ export function validaAnno(anno: string, v: unknown): DatiAnno {
         scad.primoAccontoImposte ?? scad.saldoAccontoImposte,
       ),
       secondoAccontoImposte: dataValida(anno, 'scadenze.secondoAccontoImposte', scad.secondoAccontoImposte),
+      // Acconti contributi: se non specificati, ereditano le date degli acconti imposte.
+      primoAccontoContributi: dataValida(
+        anno, 'scadenze.primoAccontoContributi',
+        scad.primoAccontoContributi ?? scad.primoAccontoImposte ?? scad.saldoAccontoImposte,
+      ),
+      secondoAccontoContributi: dataValida(
+        anno, 'scadenze.secondoAccontoContributi',
+        scad.secondoAccontoContributi ?? scad.secondoAccontoImposte,
+      ),
     },
   }
 }

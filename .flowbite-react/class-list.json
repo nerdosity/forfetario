@@ -336,7 +336,6 @@
   "hover:text-gray-900",
   "hover:text-primary-700",
   "hover:text-white",
-  "inline-block",
   "inline-flex",
   "inset-x-0",
   "inset-y-0",
@@ -473,6 +472,5 @@
   "w-fit",
   "w-full",
   "z-10",
-  "z-20",
   "z-50"
 ]
