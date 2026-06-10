@@ -46,7 +46,15 @@ export interface ComponenteScadenza {
 /** Una scadenza con data, importo e breakdown delle sue componenti. */
 export interface Scadenza {
   data: string
+  /** Testo completo dell'adempimento (usato come fallback e per accessibilità). */
   descrizione: string
+  /**
+   * Categoria dell'adempimento, evidenziata in grassetto nel calendario
+   * (es. "Contributi fissi artigiani", "Imposta sostitutiva").
+   */
+  categoria?: string
+  /** Dettaglio della voce, in testo normale (es. "1° acconto · anno 2026"). */
+  voce?: string
   importo: number
   componenti: ComponenteScadenza[]
   /** Anno solare in cui cade la scadenza. */

@@ -143,9 +143,18 @@ function TabellaScadenze({ titolo, sottotitolo, scadenze, input, mostraBilancio 
                   : diff > 0 ? `− ${formatEuro(diff)}` : `+ ${formatEuro(-diff)}`
                 return (
                   <TableRow key={i} className="bg-white">
-                    <TableCell className={`font-medium ${testo}`}>
-                      <span className="inline-flex items-center gap-1.5">
-                        {s.descrizione}
+                    <TableCell className={testo}>
+                      <span className="flex items-center gap-1.5">
+                        <span className="flex flex-col">
+                          {s.categoria ? (
+                            <>
+                              <span className="font-semibold leading-tight">{s.categoria}</span>
+                              {s.voce && <span className="text-xs font-normal text-slate-500 leading-tight">{s.voce}</span>}
+                            </>
+                          ) : (
+                            <span className="font-medium">{s.descrizione}</span>
+                          )}
+                        </span>
                         {s.stimata && (
                           <Tooltip
                             content={`Importo e data sono una proiezione basata sulle costanti dell'anno corrente: i valori ufficiali ${s.annoScadenza} non sono ancora disponibili.`}
