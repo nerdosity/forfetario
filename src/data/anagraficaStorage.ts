@@ -14,6 +14,10 @@ export interface AnagraficaContribuente {
   dataNascita: string
   comuneNascita: string
   provinciaNascita: string
+  /** Matricola INPS azienda (8 cifre), per la codeline dei contributi Art/Comm. */
+  matricolaInps: string
+  /** Codice soggetto INPS (10 = titolare; 11,12… collaboratori). */
+  codiceSoggettoInps: string
 }
 
 export function anagraficaVuota(): AnagraficaContribuente {
@@ -25,6 +29,8 @@ export function anagraficaVuota(): AnagraficaContribuente {
     dataNascita: '',
     comuneNascita: '',
     provinciaNascita: '',
+    matricolaInps: '',
+    codiceSoggettoInps: '10',
   }
 }
 
@@ -44,6 +50,8 @@ export function caricaAnagrafica(): AnagraficaContribuente {
       dataNascita: testo(o.dataNascita),
       comuneNascita: testo(o.comuneNascita),
       provinciaNascita: testo(o.provinciaNascita).toUpperCase(),
+      matricolaInps: testo(o.matricolaInps).replace(/\D/g, '').slice(0, 8),
+      codiceSoggettoInps: /^\d{2}$/.test(testo(o.codiceSoggettoInps)) ? testo(o.codiceSoggettoInps) : '10',
     }
   } catch {
     return anagraficaVuota()

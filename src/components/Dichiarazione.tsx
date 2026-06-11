@@ -1,8 +1,11 @@
-import { FileSpreadsheet, ExternalLink } from 'lucide-react'
-import { Badge, Button, Table, TableBody, TableCell, TableHead, TableHeadCell, TableRow } from 'flowbite-react'
+import { useEffect, useState } from 'react'
+import { FileSpreadsheet, ExternalLink, Copy } from 'lucide-react'
+import { Badge, Button, Table, TableBody, TableCell, TableHead, TableHeadCell, TableRow, TextInput } from 'flowbite-react'
 import type { RisultatoCalcolo } from '@/domain/types'
 import { generaRighiDichiarazione, type CampoDichiarazione } from '@/domain/dichiarazione'
-import { Card, Tooltip } from '@/components/ui'
+import { righeCodelineDaScadenze } from '@/domain/codelineInps'
+import { caricaAnagrafica, salvaAnagrafica } from '@/data/anagraficaStorage'
+import { Card, Field, Tooltip } from '@/components/ui'
 import { formatEuro } from '@/domain/labels'
 import { theme } from '@/theme'
 
@@ -62,6 +65,96 @@ function TabellaRighi({ titolo, righi }: { titolo: string; righi: CampoDichiaraz
  * (forfettario) e RS (contributi) da riportare nei Redditi PF. Apre il PDF
  * promemoria in una nuova scheda.
  */
+/** Sezione Codeline INPS: input matricola/soggetto + tabella codeline contributi. */
+function SezioneCodeline({ calcoli }: { calcoli: RisultatoCalcolo }) {
+  const [anag, setAnag] = useState(caricaAnagrafica)
+  useEffect(() => { salvaAnagrafica(anag) }, [anag])
+
+  const scadenzeContributi = [...calcoli.scadenzeAnnoCorrente, ...calcoli.scadenzeAnnoSuccessivo]
+    .filter((s) => /Contributi (fissi|eccedenza)/i.test(s.categoria ?? '') && s.importo > 0.005)
+
+  const righe = anag.matricolaInps.length === 8
+    ? righeCodelineDaScadenze(scadenzeContributi, anag.matricolaInps, anag.codiceSoggettoInps)
+    : []
+
+  return (
+    <div className="space-y-3">
+      <p className={`${theme.groupLabel}`}>Codeline INPS — sezione INPS del modello F24</p>
+      <div className="grid gap-4 sm:grid-cols-[12rem_8rem]">
+        <Field label="Matricola INPS azienda" htmlFor="cl-matr" info="8 cifre, dalla tua posizione contributiva artigiani/commercianti.">
+          <TextInput
+            id="cl-matr"
+            value={anag.matricolaInps}
+            maxLength={8}
+            placeholder="10130045"
+            onChange={(e) => setAnag((a) => ({ ...a, matricolaInps: e.target.value.replace(/\D/g, '').slice(0, 8) }))}
+            className="font-mono"
+          />
+        </Field>
+        <Field label="Codice soggetto" htmlFor="cl-sogg" info="10 = titolare; 11, 12… per i collaboratori familiari.">
+          <TextInput
+            id="cl-sogg"
+            value={anag.codiceSoggettoInps}
+            maxLength={2}
+            onChange={(e) => setAnag((a) => ({ ...a, codiceSoggettoInps: e.target.value.replace(/\D/g, '').slice(0, 2) }))}
+            className="font-mono"
+          />
+        </Field>
+      </div>
+
+      {anag.matricolaInps.length !== 8 ? (
+        <p className={theme.helpText}>Inserisci la matricola INPS (8 cifre) per generare le codeline dei contributi.</p>
+      ) : righe.length === 0 ? (
+        <p className={theme.helpText}>Nessuna scadenza di contributi artigiani/commercianti per cui generare la codeline.</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableHeadCell>Contributo</TableHeadCell>
+                <TableHeadCell>Causale</TableHeadCell>
+                <TableHeadCell className="text-right">Importo</TableHeadCell>
+                <TableHeadCell>Codeline (codice INPS)</TableHeadCell>
+              </TableRow>
+            </TableHead>
+            <TableBody className="divide-y">
+              {righe.map((r, i) => (
+                <TableRow key={i} className="bg-white">
+                  <TableCell className="text-slate-700">{r.descrizione}</TableCell>
+                  <TableCell className="font-mono text-slate-600">{r.causale}</TableCell>
+                  <TableCell className="text-right tabular-nums">{formatEuro(r.importo)}</TableCell>
+                  <TableCell>
+                    {r.codeline ? (
+                      <span className="flex items-center gap-2">
+                        <span className="font-mono font-semibold tracking-wide">{r.codeline}</span>
+                        <button
+                          type="button"
+                          onClick={() => navigator.clipboard?.writeText(r.codeline!)}
+                          title="Copia la codeline"
+                          aria-label="Copia la codeline"
+                          className={theme.btnIcon}
+                        >
+                          <Copy size={14} aria-hidden />
+                        </button>
+                      </span>
+                    ) : (
+                      <span className="text-amber-600 italic">calcola sul sito INPS</span>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+          <p className={`${theme.helpText} mt-2`}>
+            Codice INPS da riportare nel campo "matricola INPS/codice INPS" della sezione INPS del modello F24.
+            Calcolato con la formula ufficiale; per anni o rate fuori dal calcolato usa lo strumento del Cassetto INPS.
+          </p>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function Dichiarazione({ anno, calcoli }: Props) {
   const righi = generaRighiDichiarazione(calcoli, anno)
 
@@ -101,6 +194,8 @@ export function Dichiarazione({ anno, calcoli }: Props) {
 
         <TabellaRighi titolo="Quadro LM — liquidazione imposta" righi={righi.riepilogoLM} />
         <TabellaRighi titolo="Contributi previdenziali — deduzione" righi={righi.quadroRS} />
+
+        <SezioneCodeline calcoli={calcoli} />
 
         {righi.haCampiDaCompletare && (
           <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
