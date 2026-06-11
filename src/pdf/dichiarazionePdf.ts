@@ -88,7 +88,7 @@ export async function generaPdfDichiarazione(righi: RighiDichiarazione): Promise
     sezione(titolo, m.campi)
   })
   sezione('Quadro LM — liquidazione imposta', righi.riepilogoLM)
-  sezione('Quadro RS — contributi previdenziali', righi.quadroRS)
+  sezione('Contributi previdenziali — deduzione', righi.quadroRS)
 
   // Nota finale
   nuovaPaginaSeServe(40)

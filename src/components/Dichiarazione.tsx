@@ -100,7 +100,7 @@ export function Dichiarazione({ anno, calcoli }: Props) {
         ))}
 
         <TabellaRighi titolo="Quadro LM — liquidazione imposta" righi={righi.riepilogoLM} />
-        <TabellaRighi titolo="Quadro RS — contributi previdenziali" righi={righi.quadroRS} />
+        <TabellaRighi titolo="Contributi previdenziali — deduzione" righi={righi.quadroRS} />
 
         {righi.haCampiDaCompletare && (
           <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">

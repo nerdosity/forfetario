@@ -104,6 +104,33 @@ describe('diagnostica input reale utente', () => {
     expect(saldo.importo).toBeCloseTo(1351.55, 2)
   })
 
+  it('acconto eccedenza 2025 = 636,32 (metodo INPS: redditi 2024, costanti 2025)', () => {
+    const acconti = r.scadenzeAnnoCorrente.filter(
+      (s) => s.categoria === 'Contributi eccedenza artigiani/commercianti' && s.voce?.includes('acconto'),
+    )
+    // eslint-disable-next-line no-console
+    console.log('ACCONTI ECCEDENZA 2025:\n' + JSON.stringify(
+      acconti.map((s) => ({ voce: s.voce, importo: e2(s.importo) })), null, 2))
+    expect(acconti).toHaveLength(2)
+    for (const a of acconti) expect(a.importo).toBeCloseTo(636.32, 1)
+  })
+
+  it('credito gestione artigiani: scala il saldo successivo (consigliato)', () => {
+    const saldo = r.scadenzeAnnoSuccessivo.find(
+      (s) => s.categoria === 'Contributi eccedenza artigiani/commercianti' && s.voce?.startsWith('Saldo'),
+    )!
+    // eslint-disable-next-line no-console
+    console.log('CONGUAGLIO SALDO ECCEDENZA:\n' + JSON.stringify({
+      dovutoUfficiale: e2(saldo.importo),
+      consigliato: saldo.importoConsigliato != null ? e2(saldo.importoConsigliato) : null,
+      nota: saldo.notaConsigliato,
+    }, null, 2))
+    // gestione artigiani 2025: dovuto fissi+ecc vs versato → credito netto ~394
+    expect(saldo.importoConsigliato).not.toBeNull()
+    // il consigliato è il dovuto meno il credito di gestione
+    expect(saldo.importoConsigliato!).toBeLessThan(saldo.importo)
+  })
+
   it('confronto diretto: saldo ecc 2025 vs 1° acconto ecc 2026', () => {
     // Saldo ecc 2025 = eccedenza dovuta 2025 − acconti ecc versati nel 2025
     const eccedenzaDovuta2025 = e2(r.totaleContributiEccedenzaArtComm)

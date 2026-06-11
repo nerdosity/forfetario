@@ -97,6 +97,15 @@ export interface Scadenza {
    * versamento (prima di maggiorazione e interessi), per riconfigurare il piano.
    */
   importoRateazioneBase?: number
+  /**
+   * Importo "consigliato" da versare, diverso dal dovuto ufficiale: tiene conto
+   * di un credito della stessa gestione INPS maturato l'anno prima (versamenti
+   * netti in più del dovuto). Può essere negativo (credito > saldo). Presente
+   * solo sui saldi contributi quando c'è un conguaglio da considerare.
+   */
+  importoConsigliato?: number
+  /** Nota che spiega come si ottiene importoConsigliato. */
+  notaConsigliato?: string
 }
 
 /**

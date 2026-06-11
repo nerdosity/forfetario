@@ -204,6 +204,14 @@ function TabellaScadenze({ titolo, sottotitolo, scadenze, input, mostraBilancio,
                     </TableCell>
                     <TableCell className={`text-right tabular-nums ${tenue ? 'text-slate-400' : 'text-slate-700'}`}>
                       {s.stimata ? '≈ ' : ''}{formatEuro(s.importo)}
+                      {s.importoConsigliato != null && (
+                        <span className="mt-0.5 flex items-center justify-end gap-1 text-xs font-medium text-blue-600">
+                          Consigliato {s.importoConsigliato > 0 ? formatEuro(s.importoConsigliato) : '0,00 € (a credito)'}
+                          {s.notaConsigliato && (
+                            <Tooltip content={s.notaConsigliato} label="Perché consigliato" posizione="sotto" allinea="sinistra" />
+                          )}
+                        </span>
+                      )}
                     </TableCell>
                     <TableCell className="text-right tabular-nums text-slate-600">
                       {versato == null ? '—' : formatEuro(versato)}

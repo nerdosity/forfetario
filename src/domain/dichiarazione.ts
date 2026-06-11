@@ -41,7 +41,7 @@ export interface RighiDichiarazione {
   moduliLM: ModuloLM[]
   /** Righi LM di riepilogo (somma su tutti i moduli) e liquidazione imposta. */
   riepilogoLM: CampoDichiarazione[]
-  /** Quadro RS: contributi previdenziali e assistenziali dedotti. */
+  /** Riepilogo deduzione contributi: LM35 (dedotti) + eventuale RP26 cod. 76. */
   quadroRS: CampoDichiarazione[]
   /** Vero se manca qualche dato che l'utente deve completare a mano. */
   haCampiDaCompletare: boolean
@@ -183,27 +183,29 @@ export function generaRighiDichiarazione(calcoli: RisultatoCalcolo, anno: number
     },
   ]
 
-  // ── Quadro RS — contributi previdenziali ────────────────────────────────
-  const eccedenzaContributi = Math.max(0, contributiDedotti - redditoLordoTotale)
+  // ── Contributi previdenziali: riepilogo della deduzione ──────────────────
+  // La parte di contributi versati che supera il reddito del forfettario non
+  // entra in LM35 (deduzione limitata a LM34): non si perde, si può dedurre dal
+  // reddito complessivo nel quadro RP, rigo RP26, codice onere 76 — solo se si
+  // hanno altri redditi IRPEF. NB: questo NON è il caso dei contributi versati
+  // in più del dovuto (es. acconti sul minimale poi ridotti al 35%), che sono
+  // un credito INPS gestito nel cassetto previdenziale, fuori dalla dichiarazione.
+  const contributiSenzaCapienza = Math.max(0, contributiDedotti - redditoLordoTotale)
   const quadroRS: CampoDichiarazione[] = [
     {
-      rigo: 'RS',
-      descrizione: 'Contributi previdenziali versati nell\'anno',
-      valore: eu(contributiDedotti),
-      nota: 'Totale contributi INPS pagati, di cui dedotti in LM35.',
-    },
-    {
-      rigo: 'RS',
-      descrizione: 'Contributi dedotti dal reddito (LM35)',
+      rigo: 'LM35',
+      colonna: 1,
+      descrizione: 'Contributi previdenziali versati e dedotti',
       valore: eu(contributiDeducibiliEffettivi),
+      nota: 'Contributi INPS versati nell\'anno, dedotti dal reddito forfettario (max = reddito lordo).',
     },
     {
-      rigo: 'RS',
-      descrizione: 'Contributi eccedenti non dedotti',
-      valore: eu(eccedenzaContributi),
-      nota: eccedenzaContributi > 0
-        ? 'Parte dei contributi che supera il reddito: non deducibile qui.'
-        : 'Nessuna eccedenza: tutti i contributi sono stati dedotti.',
+      rigo: 'RP26',
+      descrizione: 'Contributi senza capienza nel forfettario (cod. 76)',
+      valore: eu(contributiSenzaCapienza),
+      nota: contributiSenzaCapienza > 0
+        ? 'La parte di contributi che supera il reddito forfettario va nel quadro RP rigo RP26 con codice onere 76, deducibile dal reddito complessivo se hai altri redditi IRPEF.'
+        : 'Nessun contributo eccede il reddito: tutto dedotto in LM35.',
     },
   ]
 

@@ -30,6 +30,79 @@ export function accontoVersatoDaLista(input: CalcoloInput, categoria: 'gs' | 'ec
     .reduce((s, r) => s + (r.importo ?? 0), 0)
 }
 
+/**
+ * Contributi IVS sull'eccedenza (oltre il minimale) per un regime
+ * artigiani/commercianti, usando le COSTANTI di un anno indicato (che può
+ * differire dall'anno del regime: serve per gli acconti, che applicano al
+ * reddito storico le aliquote/minimale dell'anno in corso, come fa l'INPS).
+ *
+ * Replica la logica del motore: minimale e soglia prima fascia proporzionati ai
+ * mesi, due fasce sopra la soglia (aliquota +1% sulla seconda), riduzione IVS.
+ * Restituisce 0 per la gestione separata o se il reddito non supera il minimale.
+ */
+export function eccedenzaIVSConCostanti(regime: Regime, annoCostanti: number): number {
+  if (regime.tipo === 'separata') return 0
+  const { minimaleReddito, sogliaPrimaFascia } = datiAnno(annoCostanti)
+  const aliquota = regime.tipo === 'artigiani'
+    ? datiAnno(annoCostanti).aliquotaArtigiani
+    : datiAnno(annoCostanti).aliquotaCommercianti
+  const mesi = getMesiInPeriodo(regime.meseInizio, regime.giornoInizio, regime.meseFine, regime.giornoFine)
+  const imponibile = (regime.fatturato * regime.coefficiente) / 100
+  const minimaleProporz = (minimaleReddito * mesi) / 12
+  if (imponibile <= minimaleProporz) return 0
+  const sogliaProporz = (sogliaPrimaFascia * mesi) / 12
+  let bruti: number
+  if (imponibile <= sogliaProporz) {
+    bruti = ((imponibile - minimaleProporz) * aliquota) / 100
+  } else {
+    const fascia1 = sogliaProporz - minimaleProporz
+    const fascia2 = imponibile - sogliaProporz
+    bruti = (fascia1 * aliquota) / 100 + (fascia2 * (aliquota + 1)) / 100
+  }
+  return applicaRiduzioneIVS(bruti, 0, regime.riduzioneContributi)
+}
+
+/**
+ * Contributi gestione separata per un regime, con le COSTANTI di un anno
+ * indicato (per gli acconti calcolati sul reddito storico ma aliquota corrente).
+ */
+export function contributiSeparataConCostanti(regime: Regime, annoCostanti: number): number {
+  if (regime.tipo !== 'separata') return 0
+  const imponibile = (regime.fatturato * regime.coefficiente) / 100
+  return (imponibile * datiAnno(annoCostanti).aliquotaSeparata) / 100
+}
+
+/**
+ * Credito contributivo maturato in una gestione INPS quando si è versato, in
+ * NETTO, più del dovuto per quella gestione. Si compensa sul saldo della stessa
+ * gestione l'anno seguente (non si mescolano gestioni diverse).
+ *
+ * - Gestione artigiani/commercianti: cassa unica fissi + eccedenza. I
+ *   versamenti `fissi-*` ed `ecc-*` confluiscono nella stessa gestione, quindi
+ *   il di-più sui fissi compensa il di-meno sull'eccedenza e viceversa.
+ * - Gestione separata: versamenti `gs-*`.
+ *
+ * `dovutoGestione` è il totale dovuto per quella gestione nell'anno (per
+ * art/comm: fissi annuali + eccedenza; per G.S.: contributi G.S.).
+ * Restituisce il credito (≥ 0): versato − dovuto, se positivo; 0 altrimenti.
+ */
+export function creditoContributivoGestione(
+  input: CalcoloInput,
+  gestione: 'artComm' | 'gs',
+  dovutoGestione: number,
+): number {
+  if (input.modalitaContributiVersati !== 'dettaglio') return 0
+  const tipiArtComm: TipoVersamento[] = [
+    'fissi-1', 'fissi-2', 'fissi-3', 'fissi-4-prec', 'ecc-saldo', 'ecc-acconto-1', 'ecc-acconto-2',
+  ]
+  const tipiGs: TipoVersamento[] = ['gs-saldo', 'gs-acconto-1', 'gs-acconto-2']
+  const tipi = gestione === 'gs' ? tipiGs : tipiArtComm
+  const versato = input.contributiVersatiDettaglio
+    .filter((r) => tipi.includes(r.tipo))
+    .reduce((s, r) => s + (r.importo ?? 0), 0)
+  return Math.max(0, versato - dovutoGestione)
+}
+
 // ---------------------------------------------------------------------------
 // Conteggio mesi (base per i contributi fissi Art/Comm)
 // ---------------------------------------------------------------------------

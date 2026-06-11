@@ -1,7 +1,7 @@
 import type { CalcoloInput, ComponenteScadenza, OpzioniRateazione, Regime, Scadenza, RiferimentoScadenza, TipoVersamento } from '@/domain/types'
 import { datiAnno, anniDisponibili, type ScadenzeAnno } from '@/data/taxData'
 import { proiettaDatiAnno } from '@/data/proiezioneAnno'
-import { calcolaRateContributiFissi, applicaRiduzioneIVS } from '@/domain/contributi'
+import { calcolaRateContributiFissi, applicaRiduzioneIVS, eccedenzaIVSConCostanti, contributiSeparataConCostanti } from '@/domain/contributi'
 import { espandiRateazione } from '@/domain/rateazione'
 import { formattaScadenza } from '@/domain/dates'
 import { labelTipo } from '@/domain/labels'
@@ -41,10 +41,15 @@ interface ParamsScadenze {
   accontiGSVersatiNelCorrente?: number
   totaleContributiEccArtCommDovutoCorrente?: number
   accontiEccVersatiNelCorrente?: number
-  // imposte/contributi anno corrente (base per gli acconti anno+1)
+  /**
+   * Credito della gestione INPS maturato l'anno corrente (versato netto > dovuto):
+   * si scala dal saldo della stessa gestione l'anno successivo. Per gestione,
+   * non mescolato.
+   */
+  creditoGestioneArtComm?: number
+  creditoGestioneGS?: number
+  // imposta anno corrente (base per l'acconto imposte anno+1)
   totaleImposteCorrente: number
-  totaleContributiSeparataCorrente: number
-  totaleContributiEccedenzaArtCommCorrente: number
   // imposte anno precedente (base per gli acconti anno corrente)
   totaleImpostePrecedente: number
   accontiImposteVersatiPerAnnoPrecedente: number
@@ -158,8 +163,6 @@ export function calcolaScadenze({
   saldoContributiGS,
   saldoContributiEccArtComm,
   totaleImposteCorrente,
-  totaleContributiSeparataCorrente,
-  totaleContributiEccedenzaArtCommCorrente,
   totaleImpostePrecedente,
   accontiImposteVersatiPerAnnoPrecedente,
   totaleContributiSeparataPrecedente,
@@ -168,6 +171,8 @@ export function calcolaScadenze({
   accontiGSVersatiNelCorrente,
   totaleContributiEccArtCommDovutoCorrente,
   accontiEccVersatiNelCorrente,
+  creditoGestioneArtComm,
+  creditoGestioneGS,
   rateazioniImposta,
 }: ParamsScadenze): RisultatoScadenze {
   const globali: Scadenza[] = []
@@ -193,6 +198,39 @@ export function calcolaScadenze({
       { tipo: 'Acconti già versati nell\'anno', importo: -acconti },
     ]
   }
+
+  /**
+   * Applica a una scadenza di saldo contributi l'eventuale credito della stessa
+   * gestione INPS maturato l'anno corrente. Imposta importoConsigliato (può
+   * essere negativo = credito residuo) e una nota; lascia invariato l'importo
+   * dovuto ufficiale. Restituisce la scadenza (eventualmente arricchita).
+   */
+  const conConguaglioGestione = (s: Scadenza, credito: number | undefined): Scadenza => {
+    if (!credito || credito <= 0.005) return s
+    const consigliato = s.importo - credito
+    return {
+      ...s,
+      importoConsigliato: consigliato,
+      notaConsigliato:
+        consigliato >= 0
+          ? `Hai versato ${credito.toFixed(2)} € in più del dovuto su questa gestione nel ${anno}: ` +
+            `puoi versare ${consigliato.toFixed(2)} € invece di ${s.importo.toFixed(2)} €.`
+          : `Hai versato ${credito.toFixed(2)} € in più del dovuto su questa gestione nel ${anno}: ` +
+            `coprono l'intero saldo e resta un credito di ${(-consigliato).toFixed(2)} € da compensare ` +
+            `sui versamenti successivi della stessa gestione.`,
+    }
+  }
+
+  /**
+   * Base degli acconti contributi, col metodo INPS: il contributo (eccedenza
+   * Art/Comm o gestione separata) si ricalcola sui REGIMI dell'anno storico
+   * indicato, ma usando le COSTANTI (minimale, soglia, aliquote) dell'anno in
+   * cui l'acconto si versa. Es. acconto 2025 = su redditi 2024, costanti 2025.
+   */
+  const baseAccontoEcc = (regimiStorici: Regime[], annoCostanti: number): number =>
+    regimiConFissi(regimiStorici).reduce((s, r) => s + eccedenzaIVSConCostanti(r, annoCostanti), 0)
+  const baseAccontoGS = (regimiStorici: Regime[], annoCostanti: number): number =>
+    regimiSeparata(regimiStorici).reduce((s, r) => s + contributiSeparataConCostanti(r, annoCostanti), 0)
 
   // Espande una scadenza d'imposta nelle sue rate, se l'utente ha scelto
   // una rateazione per la sua chiave; altrimenti la lascia invariata.
@@ -288,9 +326,11 @@ export function calcolaScadenze({
 
   // ─── Acconti contributi per l'anno corrente (1° giugno, 2° novembre) ──────
   // Basati sui contributi dovuti dell'anno precedente, solo se ancora attivi.
+  // Base INPS: contributi G.S. sui redditi dell'anno prima, costanti dell'anno corrente.
+  const baseGSCorr = baseAccontoGS(regimiPrecedente, anno)
   const accontoGSCorr =
-    attivoADicembre(regimiSeparata(regimiCorrente)) && totaleContributiSeparataPrecedente > 0
-      ? (totaleContributiSeparataPrecedente * QUOTA_ACCONTO_GS) / 2
+    attivoADicembre(regimiSeparata(regimiCorrente)) && baseGSCorr > 0
+      ? (baseGSCorr * QUOTA_ACCONTO_GS) / 2
       : 0
   if (accontoGSCorr > 0.005) {
     globali.push({
@@ -315,10 +355,12 @@ export function calcolaScadenze({
     })
   }
 
-  // Acconto eccedenza: 100% del dovuto in due rate da 50% → per rata = totale × 0,5
+  // Acconto eccedenza: 100% del dovuto in due rate da 50% → per rata = totale × 0,5.
+  // Base INPS: eccedenza sui redditi dell'anno prima, costanti dell'anno corrente.
+  const baseEccCorr = baseAccontoEcc(regimiPrecedente, anno)
   const accontoEccCorr =
-    attivoADicembre(regimiConFissi(regimiCorrente)) && totaleContributiEccedenzaArtCommPrecedente > 0
-      ? totaleContributiEccedenzaArtCommPrecedente * QUOTA_ACCONTO_ECC
+    attivoADicembre(regimiConFissi(regimiCorrente)) && baseEccCorr > 0
+      ? baseEccCorr * QUOTA_ACCONTO_ECC
       : 0
   if (accontoEccCorr > 0.005) {
     globali.push({
@@ -450,13 +492,15 @@ export function calcolaScadenze({
   }
 
   // ─── Saldo + acconti Gestione Separata ────────────────────────────────────
+  // Acconto anno+1 (proiezione): base sui redditi correnti, costanti dell'anno+1.
+  const baseGSSucc = baseAccontoGS(regimiCorrente, annoSucc)
   const accontoGSAnnoSucc =
-    attivoADicembre(regimiSeparata(regimiCorrente)) && totaleContributiSeparataCorrente > 0
-      ? (totaleContributiSeparataCorrente * QUOTA_ACCONTO_GS) / 2
+    attivoADicembre(regimiSeparata(regimiCorrente)) && baseGSSucc > 0
+      ? (baseGSSucc * QUOTA_ACCONTO_GS) / 2
       : 0
 
   if (saldoContributiGS > 0) {
-    globali.push({
+    globali.push(conConguaglioGestione({
       data: formattaScadenza(dSucc.saldoImposte, annoSucc),
       descrizione: `Saldo contributi Gestione separata ${anno}`,
       categoria: 'Contributi Gestione separata',
@@ -469,7 +513,7 @@ export function calcolaScadenze({
         accontiGSVersatiNelCorrente,
       ),
       annoScadenza: annoSucc,
-    })
+    }, creditoGestioneGS))
   }
   if (accontoGSAnnoSucc > 0) {
     globali.push({
@@ -495,13 +539,15 @@ export function calcolaScadenze({
   }
 
   // ─── Saldo + acconti eccedenza Art/Comm ───────────────────────────────────
+  // Acconto anno+1 (proiezione): base sui redditi correnti, costanti dell'anno+1.
+  const baseEccSucc = baseAccontoEcc(regimiCorrente, annoSucc)
   const accontoEccAnnoSucc =
-    attivoADicembre(regimiConFissi(regimiCorrente)) && totaleContributiEccedenzaArtCommCorrente > 0
-      ? totaleContributiEccedenzaArtCommCorrente * QUOTA_ACCONTO_ECC
+    attivoADicembre(regimiConFissi(regimiCorrente)) && baseEccSucc > 0
+      ? baseEccSucc * QUOTA_ACCONTO_ECC
       : 0
 
   if (saldoContributiEccArtComm > 0) {
-    globali.push({
+    globali.push(conConguaglioGestione({
       data: formattaScadenza(dSucc.saldoImposte, annoSucc),
       descrizione: `Saldo contributi eccedenza artigiani/commercianti ${anno}`,
       categoria: 'Contributi eccedenza artigiani/commercianti',
@@ -514,7 +560,7 @@ export function calcolaScadenze({
         accontiEccVersatiNelCorrente,
       ),
       annoScadenza: annoSucc,
-    })
+    }, creditoGestioneArtComm))
   }
   if (accontoEccAnnoSucc > 0) {
     globali.push({
