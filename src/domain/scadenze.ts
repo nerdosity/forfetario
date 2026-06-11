@@ -429,33 +429,35 @@ export function calcolaScadenze({
 
   // ─── Conguaglio per gestione: NETTO (versato − dovuto) sulle rate obbligatorie ─
   // Il saldo è il punto in cui si scontano le differenze (in più e in meno) pagate
-  // sulle altre rate della STESSA gestione, cumulando tutte le competenze già
-  // scadute. Es. +1200 su una rata e −200 su un'altra → credito netto 1000 da
-  // scontare sul saldo. Le tre gestioni (artigiani/commercianti = IVS art/comm,
-  // gestione separata) restano SEPARATE: il credito di una non tocca le altre.
-  //
-  // Il netto si calcola sulle scadenze obbligatorie già generate per l'anno
-  // corrente (rate fisse 1ª-3ª, 4ª rata competenza precedente, acconti, saldo
-  // competenza precedente): per ciascuna, versato (dalla mappa anni) − dovuto.
+  // sulle altre rate della STESSA gestione. Si considerano tutte le rate
+  // obbligatorie GIÀ VERSATE durante l'anno di riferimento e l'anno successivo
+  // (anni solari di pagamento), di qualsiasi competenza: es. +1200 su una rata e
+  // −200 su un'altra → credito netto 1000 da scontare sul saldo. Le tre gestioni
+  // (artigiani/commercianti = IVS art/comm, gestione separata) restano SEPARATE.
+  // Solo le rate effettivamente versate entrano (versato > 0): una rata non ancora
+  // pagata non genera un "−dovuto" fittizio. Questo esclude automaticamente il
+  // saldo a cui si applica il conguaglio (non ancora pagato), ma include un saldo
+  // di competenza precedente già versato nell'anno (è una rata obbligatoria pagata).
   const rifEcc: RiferimentoScadenza[] = ['fissi-1', 'fissi-2', 'fissi-3', 'fissi-4-prec', 'ecc-saldo', 'ecc-acconto-1', 'ecc-acconto-2']
   const rifGs: RiferimentoScadenza[] = ['gs-saldo', 'gs-acconto-1', 'gs-acconto-2']
   const isRif = (s: Scadenza, set: RiferimentoScadenza[]) =>
     (s.riferimenti ?? []).some((r) => set.includes(r))
 
-  // Netto di una gestione: Σ (versato − dovuto) sulle scadenze obbligatorie
-  // dell'anno corrente di quella gestione. Solo positivo (credito da scontare).
   const nettoGestione = (set: RiferimentoScadenza[]): number => {
     if (!input) return 0
     const tot = globali
-      .filter((s) => s.annoScadenza === anno && isRif(s, set))
+      .filter((s) => (s.annoScadenza === anno || s.annoScadenza === annoSucc) && isRif(s, set))
       .reduce((acc, s) => {
-        const versato = versatoPerScadenza(s, input) ?? 0
+        const versato = versatoPerScadenza(s, input)
+        // Conta solo le rate effettivamente versate (versato > 0).
+        if (versato == null || versato <= 0.005) return acc
         return acc + (versato - s.importo)
       }, 0)
     return Math.max(0, tot)
   }
-  const creditoGestioneArtComm = nettoGestione(rifEcc)
-  const creditoGestioneGS = nettoGestione(rifGs)
+  // NB: i crediti si calcolano più in basso, DOPO che tutte le rate obbligatorie
+  // dell'anno successivo (es. 4ª rata fissi competenza corrente, versata a febbraio
+  // dell'anno+1) sono state aggiunte a `globali`, così entrano nel netto.
 
   // ─── Saldo imposte anno precedente + 1° acconto imposte anno corrente ──────
   const saldoImpostePrecedente = Math.max(
@@ -564,6 +566,12 @@ export function calcolaScadenze({
       annoScadenza: annoSucc,
     })
   }
+
+  // Crediti di conguaglio per gestione: calcolati ORA, dopo che TUTTE le rate
+  // obbligatorie dell'anno corrente e successivo (incluse fissi 1ª-3ª annoSucc e
+  // la 4ª rata competenza corrente versata a febbraio annoSucc) sono in `globali`.
+  const creditoGestioneArtComm = nettoGestione(rifEcc)
+  const creditoGestioneGS = nettoGestione(rifGs)
 
   // ─── Saldo + acconti Gestione Separata ────────────────────────────────────
   // Acconto anno+1 (proiezione): base sui redditi correnti, costanti dell'anno+1.
