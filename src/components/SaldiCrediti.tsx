@@ -54,6 +54,24 @@ export function SaldiCrediti({ anno, calcoli }: Props) {
     calcoli.saldoContributiGSAnnoCorrente +
     calcoli.saldoContributiEccArtCommAnnoCorrente
 
+  // Conguagli per gestione: di-più versato sulle rate obbligatorie, scalabile sul
+  // saldo. Letti dalle scadenze dell'anno successivo (dove il saldo porta
+  // l'importoConsigliato). Solo quelli effettivamente presenti (credito > 0).
+  const conguagli = calcoli.scadenzeAnnoSuccessivo
+    .filter(
+      (s) =>
+        s.importoConsigliato != null &&
+        /Contributi (gestione separata|eccedenza)/i.test(s.categoria ?? '') &&
+        s.voce?.startsWith('Saldo'),
+    )
+    .map((s) => ({
+      gestione: /eccedenza/i.test(s.categoria ?? '') ? 'artigiani/commercianti' : 'gestione separata',
+      credito: s.importo - (s.importoConsigliato ?? s.importo),
+      dovuto: s.importo,
+      consigliato: s.importoConsigliato ?? s.importo,
+    }))
+    .filter((c) => c.credito > 0.005)
+
   return (
     <Card
       title={`Saldi e crediti ${anno}`}
@@ -106,6 +124,21 @@ export function SaldiCrediti({ anno, calcoli }: Props) {
       ) : (
         <p className={theme.helpText}>Nessun saldo da versare con i dati inseriti.</p>
       )}
+
+      {/* Conguaglio contributi: di-più versato sulle rate, scalabile sul saldo */}
+      {conguagli.map((c) => (
+        <div
+          key={c.gestione}
+          className="mt-4 flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3"
+        >
+          <p className="text-sm text-emerald-800">
+            Sui contributi {c.gestione} hai versato <strong>{formatEuro(c.credito)}</strong> in più del
+            dovuto sulle rate obbligatorie: puoi scontarli sul saldo e versare{' '}
+            <strong>{formatEuro(c.consigliato)}</strong> invece di {formatEuro(c.dovuto)}. La cifra
+            dovuta ufficiale resta {formatEuro(c.dovuto)}; il conguaglio è un suggerimento.
+          </p>
+        </div>
+      ))}
 
       {calcoli.totaleContributiFissiArtComm > 0.005 && (
         <p className={`${theme.helpText} mt-4`}>

@@ -28,35 +28,37 @@ function TabellaRighi({ titolo, righi }: { titolo: string; righi: CampoDichiaraz
   return (
     <div>
       <p className={`${theme.groupLabel} mb-2`}>{titolo}</p>
-      <div>
-        <Table theme={tableTheme}>
-          <TableHead>
-            <TableRow>
-              <TableHeadCell className="w-20">Rigo</TableHeadCell>
-              <TableHeadCell className="w-16">Col.</TableHeadCell>
-              <TableHeadCell>Descrizione</TableHeadCell>
-              <TableHeadCell className="text-right">Valore</TableHeadCell>
+      <Table theme={tableTheme}>
+        <TableHead>
+          <TableRow>
+            <TableHeadCell className="w-16 whitespace-nowrap">Rigo</TableHeadCell>
+            <TableHeadCell className="w-12 whitespace-nowrap">Col.</TableHeadCell>
+            <TableHeadCell>Descrizione</TableHeadCell>
+            <TableHeadCell className="w-28 text-right whitespace-nowrap">Valore</TableHeadCell>
+          </TableRow>
+        </TableHead>
+        <TableBody className="divide-y divide-slate-100">
+          {righi.map((c, i) => (
+            <TableRow key={i} className="bg-white">
+              <TableCell className="whitespace-nowrap py-2.5 font-semibold text-slate-700">{c.rigo}</TableCell>
+              <TableCell className="py-2.5 text-slate-500 tabular-nums">{c.colonna ?? '—'}</TableCell>
+              <TableCell className="py-2.5 pr-4 text-slate-700">
+                <span className="inline-flex items-start gap-1.5">
+                  <span>{c.descrizione}</span>
+                  {c.nota && (
+                    <span className="mt-0.5 shrink-0 leading-none">
+                      <Tooltip content={c.nota} label="Dettaglio del campo" posizione="sotto" allinea="sinistra" />
+                    </span>
+                  )}
+                </span>
+              </TableCell>
+              <TableCell className="whitespace-nowrap py-2.5 text-right tabular-nums">
+                <ValoreCampo valore={c.valore} />
+              </TableCell>
             </TableRow>
-          </TableHead>
-          <TableBody className="divide-y">
-            {righi.map((c, i) => (
-              <TableRow key={i} className="bg-white">
-                <TableCell className="font-semibold text-slate-700">{c.rigo}</TableCell>
-                <TableCell className="text-slate-500 tabular-nums">{c.colonna ?? '—'}</TableCell>
-                <TableCell className="text-slate-700">
-                  <span className="flex items-center gap-1.5">
-                    {c.descrizione}
-                    {c.nota && <Tooltip content={c.nota} label="Dettaglio del campo" posizione="sotto" allinea="sinistra" />}
-                  </span>
-                </TableCell>
-                <TableCell className="text-right">
-                  <ValoreCampo valore={c.valore} />
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+          ))}
+        </TableBody>
+      </Table>
     </div>
   )
 }
@@ -92,7 +94,7 @@ function SezioneCodeline({ calcoli }: { calcoli: RisultatoCalcolo }) {
   return (
     <div className="space-y-3">
       <p className={`${theme.groupLabel}`}>Codeline INPS — sezione INPS del modello F24</p>
-      <div className="grid gap-4 sm:grid-cols-[1fr_9rem_7rem]">
+      <div className="grid gap-4 sm:grid-cols-3">
         <Field label="Sede INPS" htmlFor="cl-sede" info="Digita il nome della sede (SAP) che gestisce la tua posizione artigiani/commercianti e selezionala dall'elenco.">
           <TextInput
             id="cl-sede"
@@ -153,13 +155,13 @@ function SezioneCodeline({ calcoli }: { calcoli: RisultatoCalcolo }) {
                 <TableHeadCell>Codeline (codice INPS)</TableHeadCell>
               </TableRow>
             </TableHead>
-            <TableBody className="divide-y">
+            <TableBody className="divide-y divide-slate-100">
               {righe.map((r, i) => (
                 <TableRow key={i} className="bg-white">
-                  <TableCell className="text-slate-700">{r.descrizione}</TableCell>
-                  <TableCell className="hidden font-mono text-slate-600 sm:table-cell">{r.causale}</TableCell>
-                  <TableCell className="text-right tabular-nums whitespace-nowrap">{formatEuro(r.importo)}</TableCell>
-                  <TableCell>
+                  <TableCell className="py-2.5 pr-4 text-slate-700">{r.descrizione}</TableCell>
+                  <TableCell className="hidden py-2.5 font-mono text-slate-600 sm:table-cell">{r.causale}</TableCell>
+                  <TableCell className="py-2.5 text-right tabular-nums whitespace-nowrap">{formatEuro(r.importo)}</TableCell>
+                  <TableCell className="py-2.5">
                     {r.codeline ? (
                       <span className="flex items-center gap-1.5">
                         <span className="font-mono text-[0.8rem] font-semibold tracking-tight break-all">{r.codeline}</span>
