@@ -31,6 +31,7 @@ const inputBase: CalcoloInput = {
   contributiVersatiDuranteAnno: null,
   modalitaContributiVersati: 'totale',
   contributiVersatiDettaglio: [],
+  versamentiAnnoSuccessivo: [],
   contributiVersatiDuranteAnnoPrecedente: null,
   impostaSaldoVersatoAnnoCorrente: null,
   impostaAcconto1VersatoAnnoCorrente: null,

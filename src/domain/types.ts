@@ -200,6 +200,15 @@ export interface CalcoloInput {
   contributiVersatiDettaglio: VersamentoContributo[]
 
   /**
+   * Pagamenti di contributi fatti NELL'ANNO SUCCESSIVO a quello di riferimento
+   * (es. se l'anno è 2025, i pagamenti effettuati nel 2026: saldo eccedenza 2025,
+   * acconti 2026, rate fisse). Servono a marcare come pagate le scadenze del
+   * calendario dell'anno successivo e a sapere quale rata sul reddito è ancora
+   * aperta per applicarci il conguaglio. Stessa struttura dei versamenti correnti.
+   */
+  versamentiAnnoSuccessivo: VersamentoContributo[]
+
+  /**
    * Contributi INPS versati DURANTE l'anno precedente (deducibili per il
    * calcolo dell'imposta sostitutiva dell'anno precedente, mostrata nel
    * riepilogo).

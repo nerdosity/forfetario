@@ -113,6 +113,7 @@ export function caricaInput(base: CalcoloInput): CalcoloInput | null {
       contributiVersatiDuranteAnno: numOrNull(o.contributiVersatiDuranteAnno),
       modalitaContributiVersati: o.modalitaContributiVersati === 'dettaglio' ? 'dettaglio' : 'totale',
       contributiVersatiDettaglio: normalizzaDettaglio(o.contributiVersatiDettaglio),
+      versamentiAnnoSuccessivo: normalizzaDettaglio(o.versamentiAnnoSuccessivo),
       contributiVersatiDuranteAnnoPrecedente: numOrNull(o.contributiVersatiDuranteAnnoPrecedente),
       impostaSaldoVersatoAnnoCorrente: numOrNull(o.impostaSaldoVersatoAnnoCorrente),
       impostaAcconto1VersatoAnnoCorrente: numOrNull(o.impostaAcconto1VersatoAnnoCorrente),

@@ -27,6 +27,7 @@ function inputDiEsempio(): CalcoloInput {
       { id: 'v1', tipo: 'fissi-1', descrizione: '', importo: 1000, deducibile: true },
       { id: 'v2', tipo: 'altro', descrizione: 'Ravvedimento', importo: 234.56, deducibile: true },
     ],
+    versamentiAnnoSuccessivo: [],
     contributiVersatiDuranteAnnoPrecedente: 1000,
     impostaSaldoVersatoAnnoCorrente: 100,
     impostaAcconto1VersatoAnnoCorrente: 200,

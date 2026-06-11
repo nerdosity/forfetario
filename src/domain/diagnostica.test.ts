@@ -35,6 +35,7 @@ const input: CalcoloInput = {
     { id: 'vers-13', tipo: 'altro', descrizione: '5a rata INPS non versati 2024', importo: 144.68 },
     { id: 'vers-14', tipo: 'fissi-4-prec', descrizione: '', importo: 1106.76 },
   ],
+  versamentiAnnoSuccessivo: [],
   contributiVersatiDuranteAnnoPrecedente: 7281,
   impostaSaldoVersatoAnnoCorrente: 163,
   impostaAcconto1VersatoAnnoCorrente: 1533.57,

@@ -21,6 +21,7 @@ function input(over: Partial<CalcoloInput>): CalcoloInput {
     contributiVersatiDuranteAnno: null,
     modalitaContributiVersati: 'dettaglio',
     contributiVersatiDettaglio: [],
+    versamentiAnnoSuccessivo: [],
     contributiVersatiDuranteAnnoPrecedente: null,
     impostaSaldoVersatoAnnoCorrente: null,
     impostaAcconto1VersatoAnnoCorrente: null,

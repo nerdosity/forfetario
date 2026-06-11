@@ -74,17 +74,25 @@ export function versatoPerScadenza(scadenza: Scadenza, input: CalcoloInput): num
   const rif = scadenza.riferimenti
   if (!rif || rif.length === 0) return null
 
+  // Le scadenze che cadono nell'anno SUCCESSIVO (saldo competenza anno + acconti
+  // anno+1) si pagano nell'anno successivo: i loro versamenti stanno nella lista
+  // dedicata. Le scadenze dell'anno di riferimento usano i versamenti correnti.
+  const isAnnoSuccessivo = scadenza.annoScadenza === input.anno + 1
+  const listaVersamenti = isAnnoSuccessivo ? input.versamentiAnnoSuccessivo : input.contributiVersatiDettaglio
+
   const importoVoce = (tipo: TipoVersamento): number =>
     input.modalitaContributiVersati === 'dettaglio'
-      ? input.contributiVersatiDettaglio
+      ? (listaVersamenti ?? [])
           .filter((r) => r.tipo === tipo)
           .reduce((s, r) => s + (r.importo ?? 0), 0)
       : 0
 
   return rif.reduce((tot, r) => {
-    if (r === 'imposta-saldo') return tot + (input.impostaSaldoVersatoAnnoCorrente ?? 0)
-    if (r === 'imposta-acconto1') return tot + (input.impostaAcconto1VersatoAnnoCorrente ?? 0)
-    if (r === 'imposta-acconto2') return tot + (input.impostaAcconto2VersatoAnnoCorrente ?? 0)
+    // I versamenti d'imposta correnti restano gli stessi campi solo per le
+    // scadenze dell'anno di riferimento (l'anno+1 non ha campi imposta dedicati).
+    if (r === 'imposta-saldo') return tot + (isAnnoSuccessivo ? 0 : input.impostaSaldoVersatoAnnoCorrente ?? 0)
+    if (r === 'imposta-acconto1') return tot + (isAnnoSuccessivo ? 0 : input.impostaAcconto1VersatoAnnoCorrente ?? 0)
+    if (r === 'imposta-acconto2') return tot + (isAnnoSuccessivo ? 0 : input.impostaAcconto2VersatoAnnoCorrente ?? 0)
     return tot + importoVoce(r)
   }, 0)
 }
@@ -230,6 +238,22 @@ export function calcolaScadenze({
             `coprono l'intero saldo e resta un credito di ${(-consigliato).toFixed(2)} € da compensare ` +
             `sui versamenti successivi della stessa gestione.`,
     }
+  }
+
+  /**
+   * Applica il credito di conguaglio alla PRIMA scadenza sul reddito non ancora
+   * pagata, in ordine: saldo → 1° acconto → 2° acconto. Le rate già pagate sono
+   * saltate (il loro conguaglio andrà sul saldo dell'anno dopo). Restituisce le
+   * scadenze, con il consigliato impostato su quella scelta. `input` può mancare
+   * (nessun dato pagamenti): in tal caso il credito va sul saldo (la prima).
+   */
+  const applicaCreditoPrimaNonPagata = (scadenzeOrdinate: Scadenza[], credito: number): Scadenza[] => {
+    if (credito <= 0.005) return scadenzeOrdinate
+    const idx = input
+      ? scadenzeOrdinate.findIndex((s) => !scadenzaPagata(s, input))
+      : 0
+    const target = idx < 0 ? -1 : idx
+    return scadenzeOrdinate.map((s, i) => (i === target ? conConguaglioGestione(s, credito) : s))
   }
 
   // Base acconti col metodo INPS: reddito di gestione annuo aggregato, minimale
@@ -539,8 +563,10 @@ export function calcolaScadenze({
       ? (baseGSSucc * QUOTA_ACCONTO_GS) / 2
       : 0
 
+  // Scadenze sul reddito (G.S.) dell'anno successivo, in ordine: saldo → acconti.
+  const scadenzeGSSucc: Scadenza[] = []
   if (saldoContributiGS > 0) {
-    globali.push(conConguaglioGestione({
+    scadenzeGSSucc.push({
       data: formattaScadenza(dSucc.saldoImposte, annoSucc),
       descrizione: `Saldo contributi Gestione separata ${anno}`,
       categoria: 'Contributi Gestione separata',
@@ -553,10 +579,11 @@ export function calcolaScadenze({
         accontiGSVersatiNelCorrente,
       ),
       annoScadenza: annoSucc,
-    }, creditoGestioneGS))
+      riferimenti: ['gs-saldo'],
+    })
   }
   if (accontoGSAnnoSucc > 0) {
-    globali.push({
+    scadenzeGSSucc.push({
       data: formattaScadenza(dSucc.primoAccontoContributi, annoSucc),
       descrizione: `1° acconto contributi Gestione separata ${annoSucc}`,
       categoria: 'Contributi Gestione separata',
@@ -564,10 +591,9 @@ export function calcolaScadenze({
       importo: accontoGSAnnoSucc,
       componenti: [{ tipo: `1° acconto contributi G.S. ${annoSucc} (su contr. G.S. ${anno})`, importo: accontoGSAnnoSucc }],
       annoScadenza: annoSucc,
+      riferimenti: ['gs-acconto-1'],
     })
-  }
-  if (accontoGSAnnoSucc > 0) {
-    globali.push({
+    scadenzeGSSucc.push({
       data: formattaScadenza(dSucc.secondoAccontoContributi, annoSucc),
       descrizione: `2° acconto contributi Gestione separata ${annoSucc}`,
       categoria: 'Contributi Gestione separata',
@@ -575,8 +601,10 @@ export function calcolaScadenze({
       importo: accontoGSAnnoSucc,
       componenti: [{ tipo: `2° acconto contributi G.S. ${annoSucc} (su contr. G.S. ${anno})`, importo: accontoGSAnnoSucc }],
       annoScadenza: annoSucc,
+      riferimenti: ['gs-acconto-2'],
     })
   }
+  globali.push(...applicaCreditoPrimaNonPagata(scadenzeGSSucc, creditoGestioneGS))
 
   // ─── Saldo + acconti eccedenza Art/Comm ───────────────────────────────────
   // Acconto anno+1 (proiezione): base sui redditi correnti, costanti dell'anno+1.
@@ -586,8 +614,12 @@ export function calcolaScadenze({
       ? baseEccSucc * QUOTA_ACCONTO_ECC
       : 0
 
+  // Scadenze sul reddito (eccedenza) dell'anno successivo, in ordine cronologico:
+  // saldo competenza anno → 1° acconto → 2° acconto. Il conguaglio si applica
+  // alla prima non ancora pagata.
+  const scadenzeEccSucc: Scadenza[] = []
   if (saldoContributiEccArtComm > 0) {
-    globali.push(conConguaglioGestione({
+    scadenzeEccSucc.push({
       data: formattaScadenza(dSucc.saldoImposte, annoSucc),
       descrizione: `Saldo contributi eccedenza artigiani/commercianti ${anno}`,
       categoria: 'Contributi eccedenza artigiani/commercianti',
@@ -600,10 +632,11 @@ export function calcolaScadenze({
         accontiEccVersatiNelCorrente,
       ),
       annoScadenza: annoSucc,
-    }, creditoGestioneArtComm))
+      riferimenti: ['ecc-saldo'],
+    })
   }
   if (accontoEccAnnoSucc > 0) {
-    globali.push({
+    scadenzeEccSucc.push({
       data: formattaScadenza(dSucc.primoAccontoContributi, annoSucc),
       descrizione: `1° acconto contributi eccedenza artigiani/commercianti ${annoSucc}`,
       categoria: 'Contributi eccedenza artigiani/commercianti',
@@ -611,10 +644,9 @@ export function calcolaScadenze({
       importo: accontoEccAnnoSucc,
       componenti: [{ tipo: `1° acconto contributi ecc. Art/Comm ${annoSucc} (su ecc. ${anno})`, importo: accontoEccAnnoSucc }],
       annoScadenza: annoSucc,
+      riferimenti: ['ecc-acconto-1'],
     })
-  }
-  if (accontoEccAnnoSucc > 0) {
-    globali.push({
+    scadenzeEccSucc.push({
       data: formattaScadenza(dSucc.secondoAccontoContributi, annoSucc),
       descrizione: `2° acconto contributi eccedenza artigiani/commercianti ${annoSucc}`,
       categoria: 'Contributi eccedenza artigiani/commercianti',
@@ -622,8 +654,10 @@ export function calcolaScadenze({
       importo: accontoEccAnnoSucc,
       componenti: [{ tipo: `2° acconto contributi ecc. Art/Comm ${annoSucc} (su ecc. ${anno})`, importo: accontoEccAnnoSucc }],
       annoScadenza: annoSucc,
+      riferimenti: ['ecc-acconto-2'],
     })
   }
+  globali.push(...applicaCreditoPrimaNonPagata(scadenzeEccSucc, creditoGestioneArtComm))
 
   // ─── Prime 3 rate contributi fissi dell'anno successivo ───────────────────
   // Se l'anno successivo non è nel database, le costanti si STIMANO per

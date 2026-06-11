@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { Trash2, TriangleAlert, CalendarRange, Landmark, History, Wallet } from 'lucide-react'
+import { Trash2, TriangleAlert, CalendarRange, Landmark, History, Wallet, CalendarClock } from 'lucide-react'
 import { Button, Modal as FbModal, ModalHeader, ModalBody, ModalFooter } from 'flowbite-react'
 import { RegimeEditor } from '@/components/RegimeEditor'
 import { GestoreAnni } from '@/components/GestoreAnni'
 import { ContributiVersati } from '@/components/ContributiVersati'
+import { PagamentiAnnoSuccessivo } from '@/components/PagamentiAnnoSuccessivo'
 import { Card, Field, MoneyInput, Select } from '@/components/ui'
 import { anniDisponibili } from '@/data/taxData'
 import type { CalcoloInput, RisultatoCalcolo } from '@/domain/types'
@@ -81,6 +82,15 @@ export function InputPanel({ input, calcoli, onChange, onAnniChanged, onAzzeraAn
             onChangeModalita={(m) => onChange({ modalitaContributiVersati: m })}
             onChangeTotale={(v) => onChange({ contributiVersatiDuranteAnno: v })}
             onChangeDettaglio={(righe) => onChange({ contributiVersatiDettaglio: righe })}
+          />
+        </Card>
+
+        {/* Pagamenti effettuati nell'anno successivo (saldo anno rif. + acconti anno succ.) */}
+        <Card title={`Pagamenti fatti nel ${input.anno + 1}`} icon={CalendarClock} iconIntent="info">
+          <PagamentiAnnoSuccessivo
+            anno={input.anno}
+            dettaglio={input.versamentiAnnoSuccessivo}
+            onChange={(righe) => onChange({ versamentiAnnoSuccessivo: righe })}
           />
         </Card>
 
