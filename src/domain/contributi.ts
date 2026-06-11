@@ -53,7 +53,9 @@ export function baseEccedenzaAcconto(regimi: Regime[], annoCostanti: number): nu
   const calcola = (tipo: 'artigiani' | 'commercianti'): number => {
     const periodi = regimi.filter((r) => r.tipo === tipo)
     if (periodi.length === 0) return 0
-    const reddito = periodi.reduce((s, r) => s + imponibileRegime(r), 0)
+    // INPS calcola i contributi sul reddito imponibile arrotondato all'euro
+    // (il calcolatore richiede il reddito senza decimali).
+    const reddito = Math.round(periodi.reduce((s, r) => s + imponibileRegime(r), 0))
     if (reddito <= dati.minimaleReddito) return 0
     const aliquota = tipo === 'artigiani' ? dati.aliquotaArtigiani : dati.aliquotaCommercianti
     let bruti: number
@@ -75,7 +77,8 @@ export function baseEccedenzaAcconto(regimi: Regime[], annoCostanti: number): nu
  * G.S. annuo aggregato, con l'aliquota dell'anno in cui l'acconto si versa.
  */
 export function baseSeparataAcconto(regimi: Regime[], annoCostanti: number): number {
-  const reddito = regimi.filter((r) => r.tipo === 'separata').reduce((s, r) => s + imponibileRegime(r), 0)
+  // Reddito imponibile arrotondato all'euro, come il calcolatore INPS.
+  const reddito = Math.round(regimi.filter((r) => r.tipo === 'separata').reduce((s, r) => s + imponibileRegime(r), 0))
   return (reddito * datiAnno(annoCostanti).aliquotaSeparata) / 100
 }
 

@@ -96,13 +96,14 @@ describe('diagnostica input reale utente', () => {
       (s) => s.categoria === 'Contributi eccedenza artigiani/commercianti' && s.voce?.startsWith('Saldo'),
     )!
     // Il calcolatore ufficiale INPS calcola: saldo = eccedenza dovuta − acconti
-    // DOVUTI (non quelli versati). Verificato: saldo 1223,35.
+    // DOVUTI (non quelli versati). Eccedenza 2025 = 2496,00 (reddito imponibile
+    // arrotondato all'euro come INPS), acconti dovuti 1272,64 → saldo 1223,36.
     expect(saldo.componenti).toHaveLength(2)
-    expect(saldo.componenti[0].importo).toBeCloseTo(2495.93, 1) // dovuto 2025
-    expect(saldo.componenti[1].importo).toBeCloseTo(-1272.63, 1) // acconti DOVUTI (636,32 × 2)
+    expect(saldo.componenti[0].importo).toBeCloseTo(2496.0, 0) // dovuto 2025
+    expect(saldo.componenti[1].importo).toBeCloseTo(-1272.64, 0) // acconti DOVUTI (636,32 × 2)
     const somma = saldo.componenti.reduce((a, c) => a + c.importo, 0)
     expect(somma).toBeCloseTo(saldo.importo, 2)
-    expect(saldo.importo).toBeCloseTo(1223.35, 1) // = valore calcolatore INPS
+    expect(saldo.importo).toBeCloseTo(1223.36, 0) // ≈ valore calcolatore INPS (1223,35)
   })
 
   it('acconto eccedenza 2025 = 636,32 (metodo INPS: redditi 2024, costanti 2025)', () => {

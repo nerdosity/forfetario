@@ -74,20 +74,23 @@ function calcolaDatiAnno(
           ? ` (rid. ${regime.riduzioneContributi}%)`
           : '')
 
-      // Contributi sull'eccedenza (proporzionati ai mesi)
+      // Contributi sull'eccedenza (proporzionati ai mesi). INPS calcola sul
+      // reddito imponibile arrotondato all'euro (il calcolatore non usa decimali);
+      // l'imposta sostitutiva invece resta sul reddito con i decimali.
+      const imponibileContributi = Math.round(imponibileLordoRegime)
       const minimaleProporz = (minimaleReddito * mesiRegime) / 12
-      if (imponibileLordoRegime > minimaleProporz) {
-        const eccedenza = imponibileLordoRegime - minimaleProporz
+      if (imponibileContributi > minimaleProporz) {
+        const eccedenza = imponibileContributi - minimaleProporz
         const sogliaProporz = (sogliaPrimaFascia * mesiRegime) / 12
         let eccedenzaIVSBruti: number
 
-        if (imponibileLordoRegime <= sogliaProporz) {
+        if (imponibileContributi <= sogliaProporz) {
           eccedenzaIVSBruti = (eccedenza * aliquota) / 100
           dettaglioCalcoloContributi +=
-            `\nEccedenza IVS: (${imponibileLordoRegime.toFixed(2)} - ${minimaleProporz.toFixed(2)}) € × ${aliquota}% = ${eccedenzaIVSBruti.toFixed(2)} €`
+            `\nEccedenza IVS: (${imponibileContributi.toFixed(2)} - ${minimaleProporz.toFixed(2)}) € × ${aliquota}% = ${eccedenzaIVSBruti.toFixed(2)} €`
         } else {
           const primaFascia = sogliaProporz - minimaleProporz
-          const secondaFascia = imponibileLordoRegime - sogliaProporz
+          const secondaFascia = imponibileContributi - sogliaProporz
           const su1 = (primaFascia * aliquota) / 100
           const su2 = (secondaFascia * (aliquota + 1)) / 100
           eccedenzaIVSBruti = su1 + su2
