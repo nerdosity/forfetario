@@ -7,7 +7,7 @@ import { formattaScadenza } from '@/domain/dates'
 import { formatEuro } from '@/domain/labels'
 import { caricaAnagrafica, salvaAnagrafica, type AnagraficaContribuente } from '@/data/anagraficaStorage'
 import { Field, Modal, Select, Tooltip } from '@/components/ui'
-import { theme } from '@/theme'
+import { theme, tableTheme } from '@/theme'
 
 interface Props {
   /** Scadenza da rateizzare (anche una riga-rata: si risale all'importo originario). */
@@ -199,8 +199,8 @@ export function RateazioneModal({ scadenza, opzioniAttuali, onClose, onSave }: P
 
           <div>
             <p className={`${theme.groupLabel} mb-2`}>Piano dei versamenti</p>
-            <div className="overflow-x-auto">
-              <Table>
+            <div>
+              <Table theme={tableTheme}>
                 <TableHead>
                   <TableRow>
                     <TableHeadCell>Rata</TableHeadCell>

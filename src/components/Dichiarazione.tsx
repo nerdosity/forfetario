@@ -8,7 +8,7 @@ import { SEDI_INPS } from '@/data/sediInps'
 import { caricaAnagrafica, salvaAnagrafica } from '@/data/anagraficaStorage'
 import { Card, Field, Tooltip } from '@/components/ui'
 import { formatEuro } from '@/domain/labels'
-import { theme } from '@/theme'
+import { theme, tableTheme } from '@/theme'
 
 interface Props {
   anno: number
@@ -28,8 +28,8 @@ function TabellaRighi({ titolo, righi }: { titolo: string; righi: CampoDichiaraz
   return (
     <div>
       <p className={`${theme.groupLabel} mb-2`}>{titolo}</p>
-      <div className="overflow-x-auto">
-        <Table>
+      <div>
+        <Table theme={tableTheme}>
           <TableHead>
             <TableRow>
               <TableHeadCell className="w-20">Rigo</TableHeadCell>
@@ -92,7 +92,7 @@ function SezioneCodeline({ calcoli }: { calcoli: RisultatoCalcolo }) {
   return (
     <div className="space-y-3">
       <p className={`${theme.groupLabel}`}>Codeline INPS — sezione INPS del modello F24</p>
-      <div className="grid gap-4 sm:grid-cols-[14rem_8rem]">
+      <div className="grid gap-4 sm:grid-cols-[1fr_9rem_7rem]">
         <Field label="Sede INPS" htmlFor="cl-sede" info="Digita il nome della sede (SAP) che gestisce la tua posizione artigiani/commercianti e selezionala dall'elenco.">
           <TextInput
             id="cl-sede"
@@ -113,18 +113,6 @@ function SezioneCodeline({ calcoli }: { calcoli: RisultatoCalcolo }) {
             ))}
           </datalist>
         </Field>
-        <Field label="Codice soggetto" htmlFor="cl-sogg" info="10 = titolare; 11, 12… per i collaboratori familiari.">
-          <TextInput
-            id="cl-sogg"
-            value={anag.codiceSoggettoInps}
-            maxLength={2}
-            color={soggettoValido ? undefined : 'failure'}
-            onChange={(e) => setAnag((a) => ({ ...a, codiceSoggettoInps: e.target.value.replace(/\D/g, '').slice(0, 2) }))}
-            className="font-mono"
-          />
-        </Field>
-      </div>
-      <div className="grid gap-4 sm:grid-cols-[14rem_8rem]">
         <Field label="Matricola INPS azienda" htmlFor="cl-matr" info="8 cifre, dalla tua posizione contributiva artigiani/commercianti.">
           <TextInput
             id="cl-matr"
@@ -133,6 +121,16 @@ function SezioneCodeline({ calcoli }: { calcoli: RisultatoCalcolo }) {
             placeholder="10130045"
             color={!anag.matricolaInps || matricolaValida ? undefined : 'failure'}
             onChange={(e) => setAnag((a) => ({ ...a, matricolaInps: e.target.value.replace(/\D/g, '').slice(0, 8) }))}
+            className="font-mono"
+          />
+        </Field>
+        <Field label="Codice soggetto" htmlFor="cl-sogg" info="10 = titolare; 11, 12… per i collaboratori familiari.">
+          <TextInput
+            id="cl-sogg"
+            value={anag.codiceSoggettoInps}
+            maxLength={2}
+            color={soggettoValido ? undefined : 'failure'}
+            onChange={(e) => setAnag((a) => ({ ...a, codiceSoggettoInps: e.target.value.replace(/\D/g, '').slice(0, 2) }))}
             className="font-mono"
           />
         </Field>
@@ -145,12 +143,12 @@ function SezioneCodeline({ calcoli }: { calcoli: RisultatoCalcolo }) {
       ) : righe.length === 0 ? (
         <p className={theme.helpText}>Nessuna scadenza di contributi artigiani/commercianti per cui generare la codeline.</p>
       ) : (
-        <div className="overflow-x-auto">
-          <Table>
+        <div>
+          <Table theme={tableTheme}>
             <TableHead>
               <TableRow>
                 <TableHeadCell>Contributo</TableHeadCell>
-                <TableHeadCell>Causale</TableHeadCell>
+                <TableHeadCell className="hidden sm:table-cell">Causale</TableHeadCell>
                 <TableHeadCell className="text-right">Importo</TableHeadCell>
                 <TableHeadCell>Codeline (codice INPS)</TableHeadCell>
               </TableRow>
@@ -159,12 +157,12 @@ function SezioneCodeline({ calcoli }: { calcoli: RisultatoCalcolo }) {
               {righe.map((r, i) => (
                 <TableRow key={i} className="bg-white">
                   <TableCell className="text-slate-700">{r.descrizione}</TableCell>
-                  <TableCell className="font-mono text-slate-600">{r.causale}</TableCell>
-                  <TableCell className="text-right tabular-nums">{formatEuro(r.importo)}</TableCell>
+                  <TableCell className="hidden font-mono text-slate-600 sm:table-cell">{r.causale}</TableCell>
+                  <TableCell className="text-right tabular-nums whitespace-nowrap">{formatEuro(r.importo)}</TableCell>
                   <TableCell>
                     {r.codeline ? (
-                      <span className="flex items-center gap-2">
-                        <span className="font-mono font-semibold tracking-wide">{r.codeline}</span>
+                      <span className="flex items-center gap-1.5">
+                        <span className="font-mono text-[0.8rem] font-semibold tracking-tight break-all">{r.codeline}</span>
                         <button
                           type="button"
                           onClick={() => navigator.clipboard?.writeText(r.codeline!)}
@@ -176,10 +174,10 @@ function SezioneCodeline({ calcoli }: { calcoli: RisultatoCalcolo }) {
                         </button>
                         {!r.affidabile && (
                           <Tooltip
-                            content="Questa codeline è una stima: per questa matricola l'algoritmo non è ancora garantito esatto. Verificala sullo strumento ufficiale del Cassetto INPS prima di usarla per il pagamento."
+                            content="Questa codeline usa un codice soggetto o una sede non coperti dalla validazione. L'algoritmo è quello ufficiale, ma per sicurezza verificala sullo strumento del Cassetto INPS prima del pagamento."
                             label="Codeline da verificare"
                             posizione="sotto"
-                            allinea="sinistra"
+                            allinea="destra"
                           />
                         )}
                       </span>

@@ -11,8 +11,12 @@ interface TooltipProps {
    * (es. dentro un modal), dove la bolla verso l'alto verrebbe tagliata.
    */
   posizione?: 'sopra' | 'sotto'
-  /** Allineamento orizzontale della bolla rispetto all'icona. Default 'centro'. */
-  allinea?: 'centro' | 'sinistra'
+  /**
+   * Allineamento orizzontale della bolla rispetto all'icona. Default 'centro'.
+   * Usare 'destra' quando il trigger sta vicino al bordo destro (es. ultima
+   * colonna di una tabella): la bolla si apre verso sinistra, dentro lo schermo.
+   */
+  allinea?: 'centro' | 'sinistra' | 'destra'
 }
 
 /**
@@ -22,10 +26,12 @@ interface TooltipProps {
  */
 export function Tooltip({ content, label, posizione = 'sopra', allinea = 'centro' }: TooltipProps) {
   const vert = posizione === 'sopra' ? 'bottom-full mb-2' : 'top-full mt-2'
-  const oriz = allinea === 'centro' ? 'left-1/2 -translate-x-1/2' : 'left-0'
+  const oriz =
+    allinea === 'centro' ? 'left-1/2 -translate-x-1/2' : allinea === 'destra' ? 'right-0' : 'left-0'
   const frecciaVert =
     posizione === 'sopra' ? 'top-full border-t-slate-900' : 'bottom-full border-b-slate-900'
-  const frecciaOriz = allinea === 'centro' ? 'left-1/2 -translate-x-1/2' : 'left-2'
+  const frecciaOriz =
+    allinea === 'centro' ? 'left-1/2 -translate-x-1/2' : allinea === 'destra' ? 'right-2' : 'left-2'
 
   return (
     <span className="group/tip relative inline-flex">

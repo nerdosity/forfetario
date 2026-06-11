@@ -14,7 +14,7 @@ import { scadenzaPagata, versatoPerScadenza, bilancioPagamenti, type BilancioCat
 import { Card, Tooltip } from '@/components/ui'
 import { RateazioneModal } from '@/components/RateazioneModal'
 import { formatEuro } from '@/domain/labels'
-import { theme } from '@/theme'
+import { theme, tableTheme } from '@/theme'
 
 interface Props {
   anno: number
@@ -116,8 +116,8 @@ function TabellaScadenze({ titolo, sottotitolo, scadenze, input, mostraBilancio,
       </div>
 
       {scadenze.length > 0 ? (
-        <div className="overflow-x-auto">
-          <Table hoverable>
+        <div>
+          <Table hoverable theme={tableTheme}>
             <TableHead>
               <TableRow>
                 <TableHeadCell>Adempimento</TableHeadCell>

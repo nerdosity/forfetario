@@ -10,7 +10,7 @@ import {
 import type { RisultatoCalcolo } from '@/domain/types'
 import { Card } from '@/components/ui'
 import { formatEuro } from '@/domain/labels'
-import { theme } from '@/theme'
+import { theme, tableTheme } from '@/theme'
 
 interface Props {
   anno: number
@@ -71,8 +71,8 @@ export function SaldiCrediti({ anno, calcoli }: Props) {
       </div>
 
       {righe.length > 0 ? (
-        <div className="overflow-x-auto">
-          <Table hoverable>
+        <div>
+          <Table hoverable theme={tableTheme}>
             <TableHead>
               <TableRow>
                 <TableHeadCell>Voce</TableHeadCell>

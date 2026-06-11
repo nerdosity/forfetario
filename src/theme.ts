@@ -80,6 +80,18 @@ export const theme = {
 } as const
 
 /**
+ * Override del tema Flowbite per `<Table>`. Neutralizza lo "shadow" assoluto a
+ * piena dimensione (che, dentro colonne strette, genera barre di scorrimento
+ * spurie) e riduce il padding delle celle da px-6 a px-3 così la tabella sta
+ * nello spazio disponibile senza scroll. Passare con `theme={tableTheme}`.
+ */
+export const tableTheme = {
+  root: { shadow: 'hidden', wrapper: 'relative' },
+  body: { cell: { base: 'px-3 py-2.5 align-top' } },
+  head: { cell: { base: 'bg-slate-50 px-3 py-2' } },
+} as const
+
+/**
  * Accenti di colore semantici, riutilizzati per icone, importi e bordi.
  * Mappa un "intent" alle relative classi così i componenti non hardcodano colori.
  */
