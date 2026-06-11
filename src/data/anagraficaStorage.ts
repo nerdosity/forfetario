@@ -18,6 +18,8 @@ export interface AnagraficaContribuente {
   matricolaInps: string
   /** Codice soggetto INPS (10 = titolare; 11,12… collaboratori). */
   codiceSoggettoInps: string
+  /** Codice sede INPS / SAP (4 cifre), per la codeline. */
+  sedeInps: string
 }
 
 export function anagraficaVuota(): AnagraficaContribuente {
@@ -31,6 +33,7 @@ export function anagraficaVuota(): AnagraficaContribuente {
     provinciaNascita: '',
     matricolaInps: '',
     codiceSoggettoInps: '10',
+    sedeInps: '',
   }
 }
 
@@ -52,6 +55,7 @@ export function caricaAnagrafica(): AnagraficaContribuente {
       provinciaNascita: testo(o.provinciaNascita).toUpperCase(),
       matricolaInps: testo(o.matricolaInps).replace(/\D/g, '').slice(0, 8),
       codiceSoggettoInps: /^\d{2}$/.test(testo(o.codiceSoggettoInps)) ? testo(o.codiceSoggettoInps) : '10',
+      sedeInps: testo(o.sedeInps).replace(/\D/g, '').slice(0, 4),
     }
   } catch {
     return anagraficaVuota()

@@ -4,6 +4,7 @@ import { Badge, Button, Table, TableBody, TableCell, TableHead, TableHeadCell, T
 import type { RisultatoCalcolo } from '@/domain/types'
 import { generaRighiDichiarazione, type CampoDichiarazione } from '@/domain/dichiarazione'
 import { righeCodelineDaScadenze } from '@/domain/codelineInps'
+import { SEDI_INPS } from '@/data/sediInps'
 import { caricaAnagrafica, salvaAnagrafica } from '@/data/anagraficaStorage'
 import { Card, Field, Tooltip } from '@/components/ui'
 import { formatEuro } from '@/domain/labels'
@@ -65,45 +66,82 @@ function TabellaRighi({ titolo, righi }: { titolo: string; righi: CampoDichiaraz
  * (forfettario) e RS (contributi) da riportare nei Redditi PF. Apre il PDF
  * promemoria in una nuova scheda.
  */
-/** Sezione Codeline INPS: input matricola/soggetto + tabella codeline contributi. */
+/** Sezione Codeline INPS: input sede/matricola/soggetto + tabella codeline contributi. */
 function SezioneCodeline({ calcoli }: { calcoli: RisultatoCalcolo }) {
   const [anag, setAnag] = useState(caricaAnagrafica)
   useEffect(() => { salvaAnagrafica(anag) }, [anag])
 
+  // testo mostrato nel campo sede (nome + SAP), inizializzato dal SAP salvato
+  const [sedeTesto, setSedeTesto] = useState(() => {
+    const s = SEDI_INPS.find((x) => x.sap === anag.sedeInps)
+    return s ? `${s.nome} (${s.sap})` : ''
+  })
+
   const scadenzeContributi = [...calcoli.scadenzeAnnoCorrente, ...calcoli.scadenzeAnnoSuccessivo]
     .filter((s) => /Contributi (fissi|eccedenza)/i.test(s.categoria ?? '') && s.importo > 0.005)
 
-  const righe = anag.matricolaInps.length === 8
-    ? righeCodelineDaScadenze(scadenzeContributi, anag.matricolaInps, anag.codiceSoggettoInps)
+  const matricolaValida = /^\d{8}$/.test(anag.matricolaInps)
+  const soggettoValido = /^\d{2}$/.test(anag.codiceSoggettoInps)
+  const sedeValida = /^\d{4}$/.test(anag.sedeInps)
+  const datiCompleti = matricolaValida && soggettoValido && sedeValida
+
+  const righe = datiCompleti
+    ? righeCodelineDaScadenze(scadenzeContributi, anag.matricolaInps, anag.codiceSoggettoInps, anag.sedeInps)
     : []
 
   return (
     <div className="space-y-3">
       <p className={`${theme.groupLabel}`}>Codeline INPS — sezione INPS del modello F24</p>
-      <div className="grid gap-4 sm:grid-cols-[12rem_8rem]">
-        <Field label="Matricola INPS azienda" htmlFor="cl-matr" info="8 cifre, dalla tua posizione contributiva artigiani/commercianti.">
+      <div className="grid gap-4 sm:grid-cols-[14rem_8rem]">
+        <Field label="Sede INPS" htmlFor="cl-sede" info="Digita il nome della sede (SAP) che gestisce la tua posizione artigiani/commercianti e selezionala dall'elenco.">
           <TextInput
-            id="cl-matr"
-            value={anag.matricolaInps}
-            maxLength={8}
-            placeholder="10130045"
-            onChange={(e) => setAnag((a) => ({ ...a, matricolaInps: e.target.value.replace(/\D/g, '').slice(0, 8) }))}
-            className="font-mono"
+            id="cl-sede"
+            list="sedi-inps"
+            value={sedeTesto}
+            placeholder="es. Milano, Roma Eur…"
+            color={!sedeTesto || sedeValida ? undefined : 'failure'}
+            onChange={(e) => {
+              const testo = e.target.value
+              setSedeTesto(testo)
+              const sede = SEDI_INPS.find((s) => `${s.nome} (${s.sap})` === testo)
+              setAnag((a) => ({ ...a, sedeInps: sede ? sede.sap : '' }))
+            }}
           />
+          <datalist id="sedi-inps">
+            {SEDI_INPS.map((s) => (
+              <option key={s.sap} value={`${s.nome} (${s.sap})`} />
+            ))}
+          </datalist>
         </Field>
         <Field label="Codice soggetto" htmlFor="cl-sogg" info="10 = titolare; 11, 12… per i collaboratori familiari.">
           <TextInput
             id="cl-sogg"
             value={anag.codiceSoggettoInps}
             maxLength={2}
+            color={soggettoValido ? undefined : 'failure'}
             onChange={(e) => setAnag((a) => ({ ...a, codiceSoggettoInps: e.target.value.replace(/\D/g, '').slice(0, 2) }))}
             className="font-mono"
           />
         </Field>
       </div>
+      <div className="grid gap-4 sm:grid-cols-[14rem_8rem]">
+        <Field label="Matricola INPS azienda" htmlFor="cl-matr" info="8 cifre, dalla tua posizione contributiva artigiani/commercianti.">
+          <TextInput
+            id="cl-matr"
+            value={anag.matricolaInps}
+            maxLength={8}
+            placeholder="10130045"
+            color={!anag.matricolaInps || matricolaValida ? undefined : 'failure'}
+            onChange={(e) => setAnag((a) => ({ ...a, matricolaInps: e.target.value.replace(/\D/g, '').slice(0, 8) }))}
+            className="font-mono"
+          />
+        </Field>
+      </div>
 
-      {anag.matricolaInps.length !== 8 ? (
-        <p className={theme.helpText}>Inserisci la matricola INPS (8 cifre) per generare le codeline dei contributi.</p>
+      {!datiCompleti ? (
+        <p className={theme.helpText}>
+          Seleziona la sede e inserisci matricola (8 cifre) e codice soggetto per generare le codeline dei contributi.
+        </p>
       ) : righe.length === 0 ? (
         <p className={theme.helpText}>Nessuna scadenza di contributi artigiani/commercianti per cui generare la codeline.</p>
       ) : (
@@ -157,16 +195,28 @@ function SezioneCodeline({ calcoli }: { calcoli: RisultatoCalcolo }) {
             <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
               <Badge color="warning" className="mt-0.5 w-fit shrink-0">Da verificare</Badge>
               <p className="text-sm text-amber-800">
-                Alcune codeline sono <strong>stime</strong> (icona di avviso): per questa matricola
-                l'algoritmo non è ancora garantito esatto su tutti i casi. Verificale sullo strumento
-                ufficiale del Cassetto previdenziale INPS prima di usarle per il pagamento F24.
+                Alcune righe usano un codice soggetto o una sede non coperti dalla validazione
+                (icona di avviso). L'algoritmo è quello ufficiale, ma per sicurezza verifica queste
+                codeline sullo strumento del Cassetto previdenziale INPS prima del pagamento.
               </p>
             </div>
           )}
           <p className={`${theme.helpText} mt-2`}>
             Codice INPS da riportare nel campo "matricola INPS/codice INPS" della sezione INPS del modello F24.
-            Calcolato con l'algoritmo ricostruito dallo strumento ufficiale; per anni, rate o matricole fuori
-            dal dominio coperto usa lo strumento del Cassetto INPS.
+            Calcolato con l'algoritmo ufficiale INPS (controcodice modulo 99 a blocchi e check digit finale
+            modulo 11) descritto nella{' '}
+            <a
+              href="https://servizi2.inps.it/servizi/Bussola/VisualizzaDoc.aspx?sVirtualURL=/Circolari/Circolare%20numero%20123%20del%209-6-1998.htm&Accessibile=yes"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 underline hover:text-blue-700"
+            >
+              Circolare INPS n. 123 del 9/6/1998
+            </a>.
+          </p>
+          <p className={`${theme.helpText} mt-1 italic`}>
+            Strumento di supporto non ufficiale: verifica il codice sul Cassetto previdenziale INPS
+            prima del versamento. Nessuna responsabilità per errori o pagamenti respinti.
           </p>
         </div>
       )}
