@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Trash2, TriangleAlert, CalendarRange } from 'lucide-react'
+import { useRef, useState } from 'react'
+import { Trash2, TriangleAlert, CalendarRange, Download, Upload } from 'lucide-react'
 import { Button, Modal as FbModal, ModalHeader, ModalBody, ModalFooter } from 'flowbite-react'
 import { RegimeEditor } from '@/components/RegimeEditor'
 import { GestoreAnni } from '@/components/GestoreAnni'
@@ -9,6 +9,7 @@ import { anniDisponibili } from '@/data/taxData'
 import type { CalcoloInput, DatiAnno, RisultatoCalcolo } from '@/domain/types'
 import { datiDellAnno } from '@/domain/types'
 import { regimeVuoto } from '@/domain/regimeFactory'
+import { esportaInput, importaInput } from '@/data/inputStorage'
 import { theme } from '@/theme'
 
 interface InputPanelProps {
@@ -116,11 +117,39 @@ function SezioneAnno({
 /** Tab "Dati": le 3 sezioni per anno (anno-1, riferimento, anno+1). */
 export function InputPanel({ input, calcoli, onChange, onAnniChanged, onAzzeraAnnoCorrente }: InputPanelProps) {
   const [confermaAzzera, setConfermaAzzera] = useState(false)
+  const [esitoImport, setEsitoImport] = useState<{ ok: boolean; msg: string } | null>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
   const anno = input.anno
 
   const azzera = () => {
     onAzzeraAnnoCorrente()
     setConfermaAzzera(false)
+  }
+
+  // Esporta i dati come file JSON scaricabile.
+  const esporta = () => {
+    const blob = new Blob([esportaInput(input)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `forfettario-dati-${anno}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  // Importa i dati da un file JSON: sostituisce tutto lo stato.
+  const importa = (file: File) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      try {
+        const nuovo = importaInput(String(reader.result), input)
+        onChange(nuovo)
+        setEsitoImport({ ok: true, msg: 'Dati importati correttamente.' })
+      } catch {
+        setEsitoImport({ ok: false, msg: 'File non valido: deve essere un JSON esportato da questa app.' })
+      }
+    }
+    reader.readAsText(file)
   }
 
   // Aggiorna i dati di un anno specifico nella mappa.
@@ -157,11 +186,38 @@ export function InputPanel({ input, calcoli, onChange, onAnniChanged, onAzzeraAn
           </div>
         </div>
 
-        <Button color="red" outline size="sm" onClick={() => setConfermaAzzera(true)}>
-          <Trash2 size={15} className="mr-2" aria-hidden />
-          Azzera dati {anno}
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button color="light" size="sm" onClick={esporta} title="Scarica tutti i dati come file JSON">
+            <Download size={15} className="mr-2" aria-hidden />
+            Esporta
+          </Button>
+          <Button color="light" size="sm" onClick={() => fileRef.current?.click()} title="Carica i dati da un file JSON">
+            <Upload size={15} className="mr-2" aria-hidden />
+            Importa
+          </Button>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="application/json,.json"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0]
+              if (f) importa(f)
+              e.target.value = '' // permette di re-importare lo stesso file
+            }}
+          />
+          <Button color="red" outline size="sm" onClick={() => setConfermaAzzera(true)}>
+            <Trash2 size={15} className="mr-2" aria-hidden />
+            Azzera dati {anno}
+          </Button>
+        </div>
       </div>
+
+      {esitoImport && (
+        <p className={`text-sm ${esitoImport.ok ? 'text-emerald-700' : 'text-red-700'}`}>
+          {esitoImport.msg}
+        </p>
+      )}
 
       {/* Tre sezioni: anno-1, riferimento, anno+1 */}
       <div className="grid gap-4 sm:gap-6 xl:grid-cols-3">

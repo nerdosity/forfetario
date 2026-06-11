@@ -163,6 +163,18 @@ function migraDalVecchio(o: Record<string, unknown>, anno: number): Record<numbe
 }
 
 /**
+ * Ricostruisce un CalcoloInput valido da un oggetto grezzo (già parsato). Accetta
+ * sia il formato nuovo (mappa `anni`) sia il vecchio mono-anno (migrato). `base`
+ * fornisce l'anno di default se quello salvato non è più disponibile.
+ */
+export function normalizzaInput(o: Record<string, unknown>, base: CalcoloInput): CalcoloInput {
+  const anniOk = anniDisponibili()
+  const anno = typeof o.anno === 'number' && anniOk.includes(o.anno) ? o.anno : base.anno
+  const anni = o.anni !== undefined ? normalizzaAnni(o.anni) : migraDalVecchio(o, anno)
+  return { anno, anni, rateazioniImposta: normalizzaRateazioni(o.rateazioniImposta) }
+}
+
+/**
  * Carica l'input salvato. Restituisce `null` se non c'è nulla di valido.
  * Riconosce sia il nuovo formato (con `anni`) sia il vecchio mono-anno, che
  * viene migrato automaticamente.
@@ -171,20 +183,7 @@ export function caricaInput(base: CalcoloInput): CalcoloInput | null {
   try {
     const raw = localStorage.getItem(LS_KEY)
     if (!raw) return null
-    const o = JSON.parse(raw) as Record<string, unknown>
-
-    // L'anno salvato deve essere ancora disponibile, altrimenti usa il default
-    const anniOk = anniDisponibili()
-    const anno = typeof o.anno === 'number' && anniOk.includes(o.anno) ? o.anno : base.anno
-
-    // Formato nuovo (ha la mappa `anni`) oppure migrazione dal vecchio mono-anno
-    const anni = o.anni !== undefined ? normalizzaAnni(o.anni) : migraDalVecchio(o, anno)
-
-    return {
-      anno,
-      anni,
-      rateazioniImposta: normalizzaRateazioni(o.rateazioniImposta),
-    }
+    return normalizzaInput(JSON.parse(raw) as Record<string, unknown>, base)
   } catch {
     return null
   }
@@ -197,6 +196,21 @@ export function salvaInput(input: CalcoloInput): void {
   } catch {
     // storage non disponibile o quota superata — ignora
   }
+}
+
+/** Serializza l'input come stringa JSON indentata, per l'esportazione su file. */
+export function esportaInput(input: CalcoloInput): string {
+  return JSON.stringify(input, null, 2)
+}
+
+/**
+ * Importa l'input da una stringa JSON (file caricato). Restituisce l'input
+ * normalizzato, o lancia se il JSON è malformato. `base` dà l'anno di default.
+ */
+export function importaInput(json: string, base: CalcoloInput): CalcoloInput {
+  const o = JSON.parse(json) as Record<string, unknown>
+  if (typeof o !== 'object' || o === null) throw new Error('Formato non valido')
+  return normalizzaInput(o, base)
 }
 
 /** Rimuove l'input salvato (reset). */
