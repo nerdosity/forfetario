@@ -1,4 +1,4 @@
-import type { CalcoloInput, OpzioniRateazione, Regime, Scadenza, RiferimentoScadenza, TipoVersamento } from '@/domain/types'
+import type { CalcoloInput, ComponenteScadenza, OpzioniRateazione, Regime, Scadenza, RiferimentoScadenza, TipoVersamento } from '@/domain/types'
 import { datiAnno, anniDisponibili, type ScadenzeAnno } from '@/data/taxData'
 import { proiettaDatiAnno } from '@/data/proiezioneAnno'
 import { calcolaRateContributiFissi, applicaRiduzioneIVS } from '@/domain/contributi'
@@ -36,6 +36,11 @@ interface ParamsScadenze {
   saldoImposteDaVersare: number
   saldoContributiGS: number
   saldoContributiEccArtComm: number
+  // dettaglio per documentare il saldo (dovuto − acconti già versati nell'anno)
+  totaleContributiSeparataDovutoCorrente?: number
+  accontiGSVersatiNelCorrente?: number
+  totaleContributiEccArtCommDovutoCorrente?: number
+  accontiEccVersatiNelCorrente?: number
   // imposte/contributi anno corrente (base per gli acconti anno+1)
   totaleImposteCorrente: number
   totaleContributiSeparataCorrente: number
@@ -159,11 +164,35 @@ export function calcolaScadenze({
   accontiImposteVersatiPerAnnoPrecedente,
   totaleContributiSeparataPrecedente,
   totaleContributiEccedenzaArtCommPrecedente,
+  totaleContributiSeparataDovutoCorrente,
+  accontiGSVersatiNelCorrente,
+  totaleContributiEccArtCommDovutoCorrente,
+  accontiEccVersatiNelCorrente,
   rateazioniImposta,
 }: ParamsScadenze): RisultatoScadenze {
   const globali: Scadenza[] = []
   const annoSucc = anno + 1
   const annoPrec = anno - 1
+
+  /**
+   * Componenti che documentano un saldo a conguaglio: dovuto totale dell'anno
+   * meno gli acconti già versati durante l'anno. Se i dati di dettaglio non ci
+   * sono (o gli acconti sono nulli) si ricade su una voce singola.
+   */
+  const componentiSaldo = (
+    etichetta: string,
+    saldo: number,
+    dovuto: number | undefined,
+    acconti: number | undefined,
+  ): ComponenteScadenza[] => {
+    if (dovuto == null || acconti == null || acconti <= 0.005) {
+      return [{ tipo: etichetta, importo: saldo }]
+    }
+    return [
+      { tipo: `Totale dovuto ${anno}`, importo: dovuto },
+      { tipo: 'Acconti già versati nell\'anno', importo: -acconti },
+    ]
+  }
 
   // Espande una scadenza d'imposta nelle sue rate, se l'utente ha scelto
   // una rateazione per la sua chiave; altrimenti la lascia invariata.
@@ -433,7 +462,12 @@ export function calcolaScadenze({
       categoria: 'Contributi Gestione separata',
       voce: `Saldo · competenza ${anno}`,
       importo: saldoContributiGS,
-      componenti: [{ tipo: `Saldo contributi G.S. ${anno}`, importo: saldoContributiGS }],
+      componenti: componentiSaldo(
+        `Saldo contributi G.S. ${anno}`,
+        saldoContributiGS,
+        totaleContributiSeparataDovutoCorrente,
+        accontiGSVersatiNelCorrente,
+      ),
       annoScadenza: annoSucc,
     })
   }
@@ -473,7 +507,12 @@ export function calcolaScadenze({
       categoria: 'Contributi eccedenza artigiani/commercianti',
       voce: `Saldo · competenza ${anno}`,
       importo: saldoContributiEccArtComm,
-      componenti: [{ tipo: `Saldo contributi ecc. Art/Comm ${anno}`, importo: saldoContributiEccArtComm }],
+      componenti: componentiSaldo(
+        `Saldo contributi ecc. Art/Comm ${anno}`,
+        saldoContributiEccArtComm,
+        totaleContributiEccArtCommDovutoCorrente,
+        accontiEccVersatiNelCorrente,
+      ),
       annoScadenza: annoSucc,
     })
   }

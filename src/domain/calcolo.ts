@@ -233,6 +233,11 @@ export function calcola(input: CalcoloInput): RisultatoCalcolo {
     accontiImposteVersatiPerAnnoPrecedente: accontiImposteVersatiPerAnnoPrecedente ?? 0,
     totaleContributiSeparataPrecedente: datiPrecedente.totaleContributiSeparata,
     totaleContributiEccedenzaArtCommPrecedente: datiPrecedente.totaleContributiEccedenzaArtComm,
+    // Dettaglio per documentare i saldi a conguaglio (dovuto − acconti versati)
+    totaleContributiSeparataDovutoCorrente: datiCorrente.totaleContributiSeparata,
+    accontiGSVersatiNelCorrente: accontiGSEff,
+    totaleContributiEccArtCommDovutoCorrente: datiCorrente.totaleContributiEccedenzaArtComm,
+    accontiEccVersatiNelCorrente: accontiEccEff,
     rateazioniImposta: input.rateazioniImposta,
   })
 

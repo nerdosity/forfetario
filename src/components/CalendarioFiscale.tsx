@@ -175,7 +175,8 @@ function TabellaScadenze({ titolo, sottotitolo, scadenze, input, mostraBilancio,
                     </TableCell>
                     {hasRateazione && (
                       <TableCell className="text-center">
-                        {s.chiaveRateazione && onRateizza && (
+                        {/* Niente rateazione su voci già pagate: il versamento è chiuso. */}
+                        {s.chiaveRateazione && onRateizza && !pagata && (
                           <button
                             type="button"
                             onClick={() => onRateizza(s)}

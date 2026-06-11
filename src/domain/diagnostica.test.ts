@@ -91,6 +91,20 @@ describe('diagnostica input reale utente', () => {
     expect(righe.length).toBeGreaterThan(0)
   })
 
+  it('il saldo eccedenza è documentato in dovuto − acconti versati', () => {
+    const saldo = r.scadenzeAnnoSuccessivo.find(
+      (s) => s.categoria === 'Contributi eccedenza artigiani/commercianti' && s.voce?.startsWith('Saldo'),
+    )!
+    // due componenti: dovuto totale e acconti già versati (negativo)
+    expect(saldo.componenti).toHaveLength(2)
+    expect(saldo.componenti[0].importo).toBeCloseTo(2495.93, 2) // dovuto 2025
+    expect(saldo.componenti[1].importo).toBeCloseTo(-1144.38, 2) // acconti versati
+    // i componenti sommano all'importo della scadenza
+    const somma = saldo.componenti.reduce((a, c) => a + c.importo, 0)
+    expect(somma).toBeCloseTo(saldo.importo, 2)
+    expect(saldo.importo).toBeCloseTo(1351.55, 2)
+  })
+
   it('confronto diretto: saldo ecc 2025 vs 1° acconto ecc 2026', () => {
     // Saldo ecc 2025 = eccedenza dovuta 2025 − acconti ecc versati nel 2025
     const eccedenzaDovuta2025 = e2(r.totaleContributiEccedenzaArtComm)
