@@ -136,6 +136,14 @@ function SezioneCodeline({ calcoli }: { calcoli: RisultatoCalcolo }) {
                         >
                           <Copy size={14} aria-hidden />
                         </button>
+                        {!r.affidabile && (
+                          <Tooltip
+                            content="Questa codeline è una stima: per questa matricola l'algoritmo non è ancora garantito esatto. Verificala sullo strumento ufficiale del Cassetto INPS prima di usarla per il pagamento."
+                            label="Codeline da verificare"
+                            posizione="sotto"
+                            allinea="sinistra"
+                          />
+                        )}
                       </span>
                     ) : (
                       <span className="text-amber-600 italic">calcola sul sito INPS</span>
@@ -145,9 +153,20 @@ function SezioneCodeline({ calcoli }: { calcoli: RisultatoCalcolo }) {
               ))}
             </TableBody>
           </Table>
+          {righe.some((r) => r.codeline && !r.affidabile) && (
+            <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+              <Badge color="warning" className="mt-0.5 w-fit shrink-0">Da verificare</Badge>
+              <p className="text-sm text-amber-800">
+                Alcune codeline sono <strong>stime</strong> (icona di avviso): per questa matricola
+                l'algoritmo non è ancora garantito esatto su tutti i casi. Verificale sullo strumento
+                ufficiale del Cassetto previdenziale INPS prima di usarle per il pagamento F24.
+              </p>
+            </div>
+          )}
           <p className={`${theme.helpText} mt-2`}>
             Codice INPS da riportare nel campo "matricola INPS/codice INPS" della sezione INPS del modello F24.
-            Calcolato con la formula ufficiale; per anni o rate fuori dal calcolato usa lo strumento del Cassetto INPS.
+            Calcolato con l'algoritmo ricostruito dallo strumento ufficiale; per anni, rate o matricole fuori
+            dal dominio coperto usa lo strumento del Cassetto INPS.
           </p>
         </div>
       )}
