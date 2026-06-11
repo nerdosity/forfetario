@@ -241,9 +241,10 @@ export function calcolaScadenze({
       importoConsigliato: consigliato,
       notaConsigliato:
         consigliato >= 0
-          ? `Hai versato ${credito.toFixed(2)} € in più del dovuto su questa gestione nel ${anno}: ` +
-            `puoi versare ${consigliato.toFixed(2)} € invece di ${s.importo.toFixed(2)} €.`
-          : `Hai versato ${credito.toFixed(2)} € in più del dovuto su questa gestione nel ${anno}: ` +
+          ? `Su questa gestione hai versato in totale ${credito.toFixed(2)} € in più del dovuto ` +
+            `(differenza netta tra rate pagate in più e in meno): puoi versare ${consigliato.toFixed(2)} € ` +
+            `invece di ${s.importo.toFixed(2)} €.`
+          : `Su questa gestione hai versato in totale ${credito.toFixed(2)} € in più del dovuto: ` +
             `coprono l'intero saldo e resta un credito di ${(-consigliato).toFixed(2)} € da compensare ` +
             `sui versamenti successivi della stessa gestione.`,
     }
@@ -403,7 +404,6 @@ export function calcolaScadenze({
       ? baseEccCorr * (QUOTA_ACCONTO_ECC * 2)
       : 0
   const [eccR1, eccR2] = rateAcconto(accontoEccCorrTot)
-  const [gsR1, gsR2] = rateAcconto(accontoGSCorrTot)
   if (accontoEccCorrTot > 0.005) {
     globali.push({
       data: formattaScadenza(dCorr.primoAccontoContributi, anno),
@@ -427,42 +427,35 @@ export function calcolaScadenze({
     })
   }
 
-  // ─── Conguaglio per gestione: somma dei soli di-PIÙ sulle rate obbligatorie ─
-  // Il saldo eccedenza è il punto in cui si scontano gli EXTRA pagati sulle altre
-  // rate della stessa gestione (minimali fisse e acconti). Vale solo per i di-PIÙ:
-  // una rata pagata in MENO non riduce il credito — va regolarizzata a parte (con
-  // mora), non si compensa col saldo. Si confrontano solo le rate di competenza
-  // dell'anno (fisse 1ª-3ª + acconti); saldo e 4ª rata sono competenza precedente.
-  // Versamenti dell'anno di riferimento (competenza corrente), dalla mappa anni.
-  const datiRif = input ? datiDellAnno(input, anno) : undefined
-  const importoVersato = (tipo: TipoVersamento): number =>
-    datiRif?.modalitaContributi === 'dettaglio'
-      ? datiRif.contributiVersati
-          .filter((r) => r.tipo === tipo)
-          .reduce((s, r) => s + (r.importo ?? 0), 0)
-      : 0
-  /** Somma dei soli eccessi (versato − dovuto, se positivo) voce per voce. */
-  const sommaDiPiu = (voci: { tipo: TipoVersamento; dovuto: number }[]): number =>
-    voci.reduce((s, v) => s + Math.max(0, importoVersato(v.tipo) - v.dovuto), 0)
+  // ─── Conguaglio per gestione: NETTO (versato − dovuto) sulle rate obbligatorie ─
+  // Il saldo è il punto in cui si scontano le differenze (in più e in meno) pagate
+  // sulle altre rate della STESSA gestione, cumulando tutte le competenze già
+  // scadute. Es. +1200 su una rata e −200 su un'altra → credito netto 1000 da
+  // scontare sul saldo. Le tre gestioni (artigiani/commercianti = IVS art/comm,
+  // gestione separata) restano SEPARATE: il credito di una non tocca le altre.
+  //
+  // Il netto si calcola sulle scadenze obbligatorie già generate per l'anno
+  // corrente (rate fisse 1ª-3ª, 4ª rata competenza precedente, acconti, saldo
+  // competenza precedente): per ciascuna, versato (dalla mappa anni) − dovuto.
+  const rifEcc: RiferimentoScadenza[] = ['fissi-1', 'fissi-2', 'fissi-3', 'fissi-4-prec', 'ecc-saldo', 'ecc-acconto-1', 'ecc-acconto-2']
+  const rifGs: RiferimentoScadenza[] = ['gs-saldo', 'gs-acconto-1', 'gs-acconto-2']
+  const isRif = (s: Scadenza, set: RiferimentoScadenza[]) =>
+    (s.riferimenti ?? []).some((r) => set.includes(r))
 
-  // Rate fisse 1ª-3ª correnti dovute (la 4ª si versa l'anno dopo).
-  const rateFissiCorrenti = regimiConFissi(regimiCorrente).flatMap((regime) =>
-    calcolaRateContributiFissi(regime, anno).rate.filter((r) => r.anno === anno && r.rataIdx <= 2),
-  )
-  const dovutoRata = (idx: number) =>
-    rateFissiCorrenti.filter((r) => r.rataIdx === idx).reduce((s, r) => s + r.importo, 0)
-
-  const creditoGestioneArtComm = sommaDiPiu([
-    { tipo: 'fissi-1', dovuto: dovutoRata(0) },
-    { tipo: 'fissi-2', dovuto: dovutoRata(1) },
-    { tipo: 'fissi-3', dovuto: dovutoRata(2) },
-    { tipo: 'ecc-acconto-1', dovuto: eccR1 },
-    { tipo: 'ecc-acconto-2', dovuto: eccR2 },
-  ])
-  const creditoGestioneGS = sommaDiPiu([
-    { tipo: 'gs-acconto-1', dovuto: gsR1 },
-    { tipo: 'gs-acconto-2', dovuto: gsR2 },
-  ])
+  // Netto di una gestione: Σ (versato − dovuto) sulle scadenze obbligatorie
+  // dell'anno corrente di quella gestione. Solo positivo (credito da scontare).
+  const nettoGestione = (set: RiferimentoScadenza[]): number => {
+    if (!input) return 0
+    const tot = globali
+      .filter((s) => s.annoScadenza === anno && isRif(s, set))
+      .reduce((acc, s) => {
+        const versato = versatoPerScadenza(s, input) ?? 0
+        return acc + (versato - s.importo)
+      }, 0)
+    return Math.max(0, tot)
+  }
+  const creditoGestioneArtComm = nettoGestione(rifEcc)
+  const creditoGestioneGS = nettoGestione(rifGs)
 
   // ─── Saldo imposte anno precedente + 1° acconto imposte anno corrente ──────
   const saldoImpostePrecedente = Math.max(

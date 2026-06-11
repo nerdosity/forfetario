@@ -137,15 +137,16 @@ describe('diagnostica input reale utente', () => {
       nota: saldo.notaConsigliato,
     }, null, 2))
     // Dovuto ufficiale (come INPS): 1223,35 (eccedenza − acconti dovuti).
-    // Conguaglio = somma dei soli di-PIÙ sulle rate obbligatorie di competenza 2025:
-    //   fissi-1: 1115,16 − 725,50 = +389,66
-    //   ecc-acconto-2: 767,11 − 636,32 = +130,79
-    //   (ecc-acconto-1 pagato in meno NON riduce il credito)
-    // credito = 520,45 → consigliato = 1223,35 − 520,45 = 702,90
+    // Conguaglio = NETTO (versato − dovuto) su TUTTE le rate obbligatorie artComm
+    // collegate, tutte le competenze, in più e in meno:
+    //   fissi-1: +389,66 · fissi-4-prec: +386,71 · ecc-saldo: +6,12
+    //   ecc-acconto-1: −259,05 · ecc-acconto-2: +130,79
+    //   netto = 654,23 → consigliato = 1223,35 − 654,23 = 569,12
+    // (coincide col "Bilancio pagamenti" della stessa gestione)
     expect(saldo.importoConsigliato).not.toBeNull()
     expect(saldo.importo).toBeCloseTo(1223.35, 1)
-    expect(saldo.importo - saldo.importoConsigliato!).toBeCloseTo(520.45, 1)
-    expect(saldo.importoConsigliato!).toBeCloseTo(702.90, 1)
+    expect(saldo.importo - saldo.importoConsigliato!).toBeCloseTo(654.23, 1)
+    expect(saldo.importoConsigliato!).toBeCloseTo(569.12, 1)
   })
 
   it('confronto diretto: saldo ecc 2025 vs 1° acconto ecc 2026', () => {
