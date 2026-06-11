@@ -125,10 +125,15 @@ describe('diagnostica input reale utente', () => {
       consigliato: saldo.importoConsigliato != null ? e2(saldo.importoConsigliato) : null,
       nota: saldo.notaConsigliato,
     }, null, 2))
-    // gestione artigiani 2025: dovuto fissi+ecc vs versato → credito netto ~394
+    // Conguaglio = somma dei soli di-PIÙ sulle rate obbligatorie di competenza 2025:
+    //   fissi-1: 1115,16 − 725,50 = +389,66
+    //   ecc-acconto-2: 767,11 − 636,32 = +130,79
+    //   (ecc-acconto-1 pagato in meno NON riduce il credito)
+    // credito = 520,45 → consigliato = 1351,55 − 520,45 = 831,11
     expect(saldo.importoConsigliato).not.toBeNull()
-    // il consigliato è il dovuto meno il credito di gestione
-    expect(saldo.importoConsigliato!).toBeLessThan(saldo.importo)
+    expect(saldo.importo).toBeCloseTo(1351.55, 1)
+    expect(saldo.importo - saldo.importoConsigliato!).toBeCloseTo(520.45, 1)
+    expect(saldo.importoConsigliato!).toBeCloseTo(831.11, 1)
   })
 
   it('confronto diretto: saldo ecc 2025 vs 1° acconto ecc 2026', () => {

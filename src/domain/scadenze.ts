@@ -42,12 +42,10 @@ interface ParamsScadenze {
   totaleContributiEccArtCommDovutoCorrente?: number
   accontiEccVersatiNelCorrente?: number
   /**
-   * Credito della gestione INPS maturato l'anno corrente (versato netto > dovuto):
-   * si scala dal saldo della stessa gestione l'anno successivo. Per gestione,
-   * non mescolato.
+   * Input utente: serve a calcolare il conguaglio (versato vs dovuto di cassa
+   * della competenza, per gestione) e a marcare le scadenze già pagate.
    */
-  creditoGestioneArtComm?: number
-  creditoGestioneGS?: number
+  input?: CalcoloInput
   // imposta anno corrente (base per l'acconto imposte anno+1)
   totaleImposteCorrente: number
   // imposte anno precedente (base per gli acconti anno corrente)
@@ -185,8 +183,7 @@ export function calcolaScadenze({
   accontiGSVersatiNelCorrente,
   totaleContributiEccArtCommDovutoCorrente,
   accontiEccVersatiNelCorrente,
-  creditoGestioneArtComm,
-  creditoGestioneGS,
+  input,
   rateazioniImposta,
 }: ParamsScadenze): RisultatoScadenze {
   const globali: Scadenza[] = []
@@ -392,6 +389,41 @@ export function calcolaScadenze({
       riferimenti: ['ecc-acconto-2'],
     })
   }
+
+  // ─── Conguaglio per gestione: somma dei soli di-PIÙ sulle rate obbligatorie ─
+  // Il saldo eccedenza è il punto in cui si scontano gli EXTRA pagati sulle altre
+  // rate della stessa gestione (minimali fisse e acconti). Vale solo per i di-PIÙ:
+  // una rata pagata in MENO non riduce il credito — va regolarizzata a parte (con
+  // mora), non si compensa col saldo. Si confrontano solo le rate di competenza
+  // dell'anno (fisse 1ª-3ª + acconti); saldo e 4ª rata sono competenza precedente.
+  const importoVersato = (tipo: TipoVersamento): number =>
+    input?.modalitaContributiVersati === 'dettaglio'
+      ? input.contributiVersatiDettaglio
+          .filter((r) => r.tipo === tipo)
+          .reduce((s, r) => s + (r.importo ?? 0), 0)
+      : 0
+  /** Somma dei soli eccessi (versato − dovuto, se positivo) voce per voce. */
+  const sommaDiPiu = (voci: { tipo: TipoVersamento; dovuto: number }[]): number =>
+    voci.reduce((s, v) => s + Math.max(0, importoVersato(v.tipo) - v.dovuto), 0)
+
+  // Rate fisse 1ª-3ª correnti dovute (la 4ª si versa l'anno dopo).
+  const rateFissiCorrenti = regimiConFissi(regimiCorrente).flatMap((regime) =>
+    calcolaRateContributiFissi(regime, anno).rate.filter((r) => r.anno === anno && r.rataIdx <= 2),
+  )
+  const dovutoRata = (idx: number) =>
+    rateFissiCorrenti.filter((r) => r.rataIdx === idx).reduce((s, r) => s + r.importo, 0)
+
+  const creditoGestioneArtComm = sommaDiPiu([
+    { tipo: 'fissi-1', dovuto: dovutoRata(0) },
+    { tipo: 'fissi-2', dovuto: dovutoRata(1) },
+    { tipo: 'fissi-3', dovuto: dovutoRata(2) },
+    { tipo: 'ecc-acconto-1', dovuto: accontoEccCorr },
+    { tipo: 'ecc-acconto-2', dovuto: accontoEccCorr },
+  ])
+  const creditoGestioneGS = sommaDiPiu([
+    { tipo: 'gs-acconto-1', dovuto: accontoGSCorr },
+    { tipo: 'gs-acconto-2', dovuto: accontoGSCorr },
+  ])
 
   // ─── Saldo imposte anno precedente + 1° acconto imposte anno corrente ──────
   const saldoImpostePrecedente = Math.max(

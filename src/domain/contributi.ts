@@ -80,18 +80,20 @@ export function baseSeparataAcconto(regimi: Regime[], annoCostanti: number): num
 }
 
 /**
- * Credito contributivo maturato in una gestione INPS quando si è versato, in
- * NETTO, più del dovuto per quella gestione. Si compensa sul saldo della stessa
- * gestione l'anno seguente (non si mescolano gestioni diverse).
+ * Conguaglio contributivo di una gestione INPS: differenza, in NETTO, tra quanto
+ * versato e quanto dovuto per quella gestione nella COMPETENZA dell'anno di
+ * riferimento. Positivo = versato in più (credito); negativo = versato in meno.
+ * Si compensa sulla prima rata calcolata sul reddito non ancora pagata (saldo →
+ * acconti) della stessa gestione; non si mescolano gestioni diverse.
  *
- * - Gestione artigiani/commercianti: cassa unica fissi + eccedenza. I
- *   versamenti `fissi-*` ed `ecc-*` confluiscono nella stessa gestione, quindi
- *   il di-più sui fissi compensa il di-meno sull'eccedenza e viceversa.
- * - Gestione separata: versamenti `gs-*`.
+ * IMPORTANTE: si considerano solo i versamenti di COMPETENZA dell'anno corrente
+ * (rate fisse 1ª-3ª che si versano nell'anno + acconti eccedenza). Si ESCLUDONO
+ * `ecc-saldo` e `fissi-4-prec`, che sono versamenti per la competenza dell'anno
+ * PRECEDENTE (il loro conguaglio appartiene a quell'anno). Restano comunque
+ * deducibili in dichiarazione: l'esclusione vale solo per questo conguaglio.
  *
- * `dovutoGestione` è il totale dovuto per quella gestione nell'anno (per
+ * `dovutoGestione` è il totale dovuto per quella gestione nella competenza (per
  * art/comm: fissi annuali + eccedenza; per G.S.: contributi G.S.).
- * Restituisce il credito (≥ 0): versato − dovuto, se positivo; 0 altrimenti.
  */
 export function creditoContributivoGestione(
   input: CalcoloInput,
@@ -99,10 +101,9 @@ export function creditoContributivoGestione(
   dovutoGestione: number,
 ): number {
   if (input.modalitaContributiVersati !== 'dettaglio') return 0
-  const tipiArtComm: TipoVersamento[] = [
-    'fissi-1', 'fissi-2', 'fissi-3', 'fissi-4-prec', 'ecc-saldo', 'ecc-acconto-1', 'ecc-acconto-2',
-  ]
-  const tipiGs: TipoVersamento[] = ['gs-saldo', 'gs-acconto-1', 'gs-acconto-2']
+  // Solo versamenti di competenza dell'anno corrente (no saldo/4ª-rata dell'anno prima)
+  const tipiArtComm: TipoVersamento[] = ['fissi-1', 'fissi-2', 'fissi-3', 'ecc-acconto-1', 'ecc-acconto-2']
+  const tipiGs: TipoVersamento[] = ['gs-acconto-1', 'gs-acconto-2']
   const tipi = gestione === 'gs' ? tipiGs : tipiArtComm
   const versato = input.contributiVersatiDettaglio
     .filter((r) => tipi.includes(r.tipo))

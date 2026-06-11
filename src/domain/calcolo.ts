@@ -7,7 +7,7 @@ import type {
 } from '@/domain/types'
 import { aliquotaContributi, datiAnno } from '@/data/taxData'
 import { giorniPermanenza } from '@/domain/dates'
-import { getMesiInPeriodo, applicaRiduzioneIVS, contributiVersatiEffettivi, rateFissePerTrimestre, accontoVersatoDaLista, creditoContributivoGestione } from '@/domain/contributi'
+import { getMesiInPeriodo, applicaRiduzioneIVS, contributiVersatiEffettivi, rateFissePerTrimestre, accontoVersatoDaLista } from '@/domain/contributi'
 import { calcolaScadenze } from '@/domain/scadenze'
 import { contributoFissoAnno } from '@/data/taxData'
 
@@ -236,13 +236,9 @@ export function calcola(input: CalcoloInput): RisultatoCalcolo {
     accontiGSVersatiNelCorrente: accontiGSEff,
     totaleContributiEccArtCommDovutoCorrente: datiCorrente.totaleContributiEccedenzaArtComm,
     accontiEccVersatiNelCorrente: accontiEccEff,
-    // Crediti per gestione INPS: versato netto > dovuto nell'anno corrente,
-    // da scalare sul saldo della stessa gestione l'anno successivo.
-    creditoGestioneArtComm: creditoContributivoGestione(
-      input, 'artComm',
-      datiCorrente.totaleContributiFissiArtComm + datiCorrente.totaleContributiEccedenzaArtComm,
-    ),
-    creditoGestioneGS: creditoContributivoGestione(input, 'gs', datiCorrente.totaleContributiSeparata),
+    // Il conguaglio per gestione (di-più sulle rate obbligatorie da scontare sul
+    // saldo) è calcolato dentro calcolaScadenze, che dispone dei dovuti di cassa.
+    input,
     rateazioniImposta: input.rateazioniImposta,
   })
 
