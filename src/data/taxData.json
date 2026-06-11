@@ -84,8 +84,8 @@
       "aliquotaArtigiani": 24,
       "aliquotaCommercianti": 24.48,
       "contributoFisso": {
-        "artigiani": { "ivsAnnuale": 4521.36, "maternitaMensile": 0.62 },
-        "commercianti": { "ivsAnnuale": 4611.64, "maternitaMensile": 0.62 }
+        "artigiani": { "ivsAnnuale": 4513.92, "maternitaMensile": 0.62 },
+        "commercianti": { "ivsAnnuale": 4604.20, "maternitaMensile": 0.62 }
       },
       "scadenze": {
         "rateContributiFissi": ["05-16", "08-20", "11-16", "02-16"],

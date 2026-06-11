@@ -205,7 +205,9 @@ export function calcolaRateContributiFissi(regime: Regime, anno: number): Risult
     ).length
 
     if (mesiAttivi > 0) {
-      const importo = mensileEffettivo * mesiAttivi
+      // Ogni rata trimestrale è arrotondata a 2 decimali, come fa l'INPS sul
+      // modello F24 (le rate si versano al centesimo, non con frazioni).
+      const importo = Math.round(mensileEffettivo * mesiAttivi * 100) / 100
       const annoVers = anno + trim.annoOffset
       rate.push({
         data: formattaScadenza(rateContributiFissi[trim.rataIdx], annoVers),

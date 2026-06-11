@@ -16,6 +16,17 @@ const QUOTA_ACCONTO_ECC = 0.5
 const regimiConFissi = (regimi: Regime[]) =>
   regimi.filter((r) => r.tipo === 'artigiani' || r.tipo === 'commercianti')
 
+/**
+ * Spezza un acconto totale in due rate al centesimo come il calcolatore INPS:
+ * 1ª rata arrotondata per difetto (floor a 2 decimali), 2ª rata = totale − 1ª
+ * (così la somma è esatta). Es. 2456,53 → [1228,26, 1228,27].
+ */
+const rateAcconto = (totale: number): [number, number] => {
+  const r1 = Math.floor((totale / 2) * 100) / 100
+  const r2 = Math.round((totale - r1) * 100) / 100
+  return [r1, r2]
+}
+
 // Etichette estese e leggibili per le scadenze (niente abbreviazioni stipate).
 const ORDINALE = ['', '1°', '2°', '3°', '4°']
 const ORDINALE_RATA = ['', '1ª', '2ª', '3ª', '4ª']
@@ -357,18 +368,19 @@ export function calcolaScadenze({
   // Basati sui contributi dovuti dell'anno precedente, solo se ancora attivi.
   // Base INPS: contributi G.S. sui redditi dell'anno prima, costanti dell'anno corrente.
   const baseGSCorr = baseAccontoGS(regimiPrecedente, anno)
-  const accontoGSCorr =
+  const accontoGSCorrTot =
     attivoADicembre(regimiSeparata(regimiCorrente)) && baseGSCorr > 0
-      ? (baseGSCorr * QUOTA_ACCONTO_GS) / 2
+      ? baseGSCorr * QUOTA_ACCONTO_GS
       : 0
-  if (accontoGSCorr > 0.005) {
+  if (accontoGSCorrTot > 0.005) {
+    const [r1, r2] = rateAcconto(accontoGSCorrTot)
     globali.push({
       data: formattaScadenza(dCorr.primoAccontoContributi, anno),
       descrizione: `1° acconto contributi Gestione separata ${anno}`,
       categoria: 'Contributi Gestione separata',
       voce: `${accontoLabel(1)} · competenza ${anno}`,
-      importo: accontoGSCorr,
-      componenti: [{ tipo: `1° acconto contributi G.S. ${anno}`, importo: accontoGSCorr }],
+      importo: r1,
+      componenti: [{ tipo: `1° acconto contributi G.S. ${anno}`, importo: r1 }],
       annoScadenza: anno,
       riferimenti: ['gs-acconto-1'],
     })
@@ -377,28 +389,31 @@ export function calcolaScadenze({
       descrizione: `2° acconto contributi Gestione separata ${anno}`,
       categoria: 'Contributi Gestione separata',
       voce: `${accontoLabel(2)} · competenza ${anno}`,
-      importo: accontoGSCorr,
-      componenti: [{ tipo: `2° acconto contributi G.S. ${anno}`, importo: accontoGSCorr }],
+      importo: r2,
+      componenti: [{ tipo: `2° acconto contributi G.S. ${anno}`, importo: r2 }],
       annoScadenza: anno,
       riferimenti: ['gs-acconto-2'],
     })
   }
 
-  // Acconto eccedenza: 100% del dovuto in due rate da 50% → per rata = totale × 0,5.
-  // Base INPS: eccedenza sui redditi dell'anno prima, costanti dell'anno corrente.
+  // Acconto eccedenza: 100% del dovuto, spezzato in due rate al centesimo (1ª per
+  // difetto, 2ª = resto) come fa il calcolatore INPS. Base: eccedenza sui redditi
+  // dell'anno prima, costanti dell'anno corrente.
   const baseEccCorr = baseAccontoEcc(regimiPrecedente, anno)
-  const accontoEccCorr =
+  const accontoEccCorrTot =
     attivoADicembre(regimiConFissi(regimiCorrente)) && baseEccCorr > 0
-      ? baseEccCorr * QUOTA_ACCONTO_ECC
+      ? baseEccCorr * (QUOTA_ACCONTO_ECC * 2)
       : 0
-  if (accontoEccCorr > 0.005) {
+  const [eccR1, eccR2] = rateAcconto(accontoEccCorrTot)
+  const [gsR1, gsR2] = rateAcconto(accontoGSCorrTot)
+  if (accontoEccCorrTot > 0.005) {
     globali.push({
       data: formattaScadenza(dCorr.primoAccontoContributi, anno),
       descrizione: `1° acconto contributi eccedenza artigiani/commercianti ${anno}`,
       categoria: 'Contributi eccedenza artigiani/commercianti',
       voce: `${accontoLabel(1)} · competenza ${anno}`,
-      importo: accontoEccCorr,
-      componenti: [{ tipo: `1° acconto contributi ecc. Art/Comm ${anno}`, importo: accontoEccCorr }],
+      importo: eccR1,
+      componenti: [{ tipo: `1° acconto contributi ecc. Art/Comm ${anno}`, importo: eccR1 }],
       annoScadenza: anno,
       riferimenti: ['ecc-acconto-1'],
     })
@@ -407,8 +422,8 @@ export function calcolaScadenze({
       descrizione: `2° acconto contributi eccedenza artigiani/commercianti ${anno}`,
       categoria: 'Contributi eccedenza artigiani/commercianti',
       voce: `${accontoLabel(2)} · competenza ${anno}`,
-      importo: accontoEccCorr,
-      componenti: [{ tipo: `2° acconto contributi ecc. Art/Comm ${anno}`, importo: accontoEccCorr }],
+      importo: eccR2,
+      componenti: [{ tipo: `2° acconto contributi ecc. Art/Comm ${anno}`, importo: eccR2 }],
       annoScadenza: anno,
       riferimenti: ['ecc-acconto-2'],
     })
@@ -441,12 +456,12 @@ export function calcolaScadenze({
     { tipo: 'fissi-1', dovuto: dovutoRata(0) },
     { tipo: 'fissi-2', dovuto: dovutoRata(1) },
     { tipo: 'fissi-3', dovuto: dovutoRata(2) },
-    { tipo: 'ecc-acconto-1', dovuto: accontoEccCorr },
-    { tipo: 'ecc-acconto-2', dovuto: accontoEccCorr },
+    { tipo: 'ecc-acconto-1', dovuto: eccR1 },
+    { tipo: 'ecc-acconto-2', dovuto: eccR2 },
   ])
   const creditoGestioneGS = sommaDiPiu([
-    { tipo: 'gs-acconto-1', dovuto: accontoGSCorr },
-    { tipo: 'gs-acconto-2', dovuto: accontoGSCorr },
+    { tipo: 'gs-acconto-1', dovuto: gsR1 },
+    { tipo: 'gs-acconto-2', dovuto: gsR2 },
   ])
 
   // ─── Saldo imposte anno precedente + 1° acconto imposte anno corrente ──────
@@ -558,10 +573,11 @@ export function calcolaScadenze({
   // ─── Saldo + acconti Gestione Separata ────────────────────────────────────
   // Acconto anno+1 (proiezione): base sui redditi correnti, costanti dell'anno+1.
   const baseGSSucc = baseAccontoGS(regimiCorrente, annoSucc)
-  const accontoGSAnnoSucc =
+  const accontoGSAnnoSuccTot =
     attivoADicembre(regimiSeparata(regimiCorrente)) && baseGSSucc > 0
-      ? (baseGSSucc * QUOTA_ACCONTO_GS) / 2
+      ? baseGSSucc * QUOTA_ACCONTO_GS
       : 0
+  const [gsSuccR1, gsSuccR2] = rateAcconto(accontoGSAnnoSuccTot)
 
   // Scadenze sul reddito (G.S.) dell'anno successivo, in ordine: saldo → acconti.
   const scadenzeGSSucc: Scadenza[] = []
@@ -582,14 +598,14 @@ export function calcolaScadenze({
       riferimenti: ['gs-saldo'],
     })
   }
-  if (accontoGSAnnoSucc > 0) {
+  if (accontoGSAnnoSuccTot > 0) {
     scadenzeGSSucc.push({
       data: formattaScadenza(dSucc.primoAccontoContributi, annoSucc),
       descrizione: `1° acconto contributi Gestione separata ${annoSucc}`,
       categoria: 'Contributi Gestione separata',
       voce: `${accontoLabel(1)} · competenza ${annoSucc}`,
-      importo: accontoGSAnnoSucc,
-      componenti: [{ tipo: `1° acconto contributi G.S. ${annoSucc} (su contr. G.S. ${anno})`, importo: accontoGSAnnoSucc }],
+      importo: gsSuccR1,
+      componenti: [{ tipo: `1° acconto contributi G.S. ${annoSucc} (su contr. G.S. ${anno})`, importo: gsSuccR1 }],
       annoScadenza: annoSucc,
       riferimenti: ['gs-acconto-1'],
     })
@@ -598,8 +614,8 @@ export function calcolaScadenze({
       descrizione: `2° acconto contributi Gestione separata ${annoSucc}`,
       categoria: 'Contributi Gestione separata',
       voce: `${accontoLabel(2)} · competenza ${annoSucc}`,
-      importo: accontoGSAnnoSucc,
-      componenti: [{ tipo: `2° acconto contributi G.S. ${annoSucc} (su contr. G.S. ${anno})`, importo: accontoGSAnnoSucc }],
+      importo: gsSuccR2,
+      componenti: [{ tipo: `2° acconto contributi G.S. ${annoSucc} (su contr. G.S. ${anno})`, importo: gsSuccR2 }],
       annoScadenza: annoSucc,
       riferimenti: ['gs-acconto-2'],
     })
@@ -609,10 +625,11 @@ export function calcolaScadenze({
   // ─── Saldo + acconti eccedenza Art/Comm ───────────────────────────────────
   // Acconto anno+1 (proiezione): base sui redditi correnti, costanti dell'anno+1.
   const baseEccSucc = baseAccontoEcc(regimiCorrente, annoSucc)
-  const accontoEccAnnoSucc =
+  const accontoEccAnnoSuccTot =
     attivoADicembre(regimiConFissi(regimiCorrente)) && baseEccSucc > 0
-      ? baseEccSucc * QUOTA_ACCONTO_ECC
+      ? baseEccSucc * (QUOTA_ACCONTO_ECC * 2)
       : 0
+  const [eccSuccR1, eccSuccR2] = rateAcconto(accontoEccAnnoSuccTot)
 
   // Scadenze sul reddito (eccedenza) dell'anno successivo, in ordine cronologico:
   // saldo competenza anno → 1° acconto → 2° acconto. Il conguaglio si applica
@@ -635,14 +652,14 @@ export function calcolaScadenze({
       riferimenti: ['ecc-saldo'],
     })
   }
-  if (accontoEccAnnoSucc > 0) {
+  if (accontoEccAnnoSuccTot > 0) {
     scadenzeEccSucc.push({
       data: formattaScadenza(dSucc.primoAccontoContributi, annoSucc),
       descrizione: `1° acconto contributi eccedenza artigiani/commercianti ${annoSucc}`,
       categoria: 'Contributi eccedenza artigiani/commercianti',
       voce: `${accontoLabel(1)} · competenza ${annoSucc}`,
-      importo: accontoEccAnnoSucc,
-      componenti: [{ tipo: `1° acconto contributi ecc. Art/Comm ${annoSucc} (su ecc. ${anno})`, importo: accontoEccAnnoSucc }],
+      importo: eccSuccR1,
+      componenti: [{ tipo: `1° acconto contributi ecc. Art/Comm ${annoSucc} (su ecc. ${anno})`, importo: eccSuccR1 }],
       annoScadenza: annoSucc,
       riferimenti: ['ecc-acconto-1'],
     })
@@ -651,8 +668,8 @@ export function calcolaScadenze({
       descrizione: `2° acconto contributi eccedenza artigiani/commercianti ${annoSucc}`,
       categoria: 'Contributi eccedenza artigiani/commercianti',
       voce: `${accontoLabel(2)} · competenza ${annoSucc}`,
-      importo: accontoEccAnnoSucc,
-      componenti: [{ tipo: `2° acconto contributi ecc. Art/Comm ${annoSucc} (su ecc. ${anno})`, importo: accontoEccAnnoSucc }],
+      importo: eccSuccR2,
+      componenti: [{ tipo: `2° acconto contributi ecc. Art/Comm ${annoSucc} (su ecc. ${anno})`, importo: eccSuccR2 }],
       annoScadenza: annoSucc,
       riferimenti: ['ecc-acconto-2'],
     })

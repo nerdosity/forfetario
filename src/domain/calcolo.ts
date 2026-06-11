@@ -7,7 +7,7 @@ import type {
 } from '@/domain/types'
 import { aliquotaContributi, datiAnno } from '@/data/taxData'
 import { giorniPermanenza } from '@/domain/dates'
-import { getMesiInPeriodo, applicaRiduzioneIVS, contributiVersatiEffettivi, rateFissePerTrimestre, accontoVersatoDaLista } from '@/domain/contributi'
+import { getMesiInPeriodo, applicaRiduzioneIVS, contributiVersatiEffettivi, rateFissePerTrimestre, baseEccedenzaAcconto, baseSeparataAcconto } from '@/domain/contributi'
 import { calcolaScadenze } from '@/domain/scadenze'
 import { contributoFissoAnno } from '@/data/taxData'
 
@@ -209,14 +209,21 @@ export function calcola(input: CalcoloInput): RisultatoCalcolo {
   // Gli acconti imposta restano un campo dedicato (l'imposta non è un contributo);
   // gli acconti contributi si ricavano dalle righe della lista versamenti.
   const accontiImposteEff = accontiImposteVersatiPerAnnoCorrente
-  const accontiGSEff = accontoVersatoDaLista(input, 'gs')
-  const accontiEccEff = accontoVersatoDaLista(input, 'ecc')
 
   const saldoImposteDaVersare = Math.max(0, datiCorrente.totaleImposte - accontiImposteEff)
   const creditoImposte = Math.max(0, accontiImposteEff - datiCorrente.totaleImposte)
 
-  const saldoContributiGS = Math.max(0, datiCorrente.totaleContributiSeparata - accontiGSEff)
-  const saldoContributiEccArtComm = Math.max(0, datiCorrente.totaleContributiEccedenzaArtComm - accontiEccEff)
+  // Il saldo contributi UFFICIALE (come il calcolatore INPS) = eccedenza/G.S.
+  // dovuta dell'anno − acconti DOVUTI (non quelli effettivamente versati). Gli
+  // acconti dovuti = base acconto sui redditi dell'anno precedente con le costanti
+  // dell'anno corrente (lo stesso valore mostrato come acconti dell'anno). Quanto
+  // versato in più/meno rispetto al dovuto è gestito a parte come conguaglio
+  // (mostrato e suggerito), non incide sul saldo ufficiale.
+  const accontiGSDovuti = baseSeparataAcconto(regimiPrecedente, anno)
+  const accontiEccDovuti = baseEccedenzaAcconto(regimiPrecedente, anno)
+
+  const saldoContributiGS = Math.max(0, datiCorrente.totaleContributiSeparata - accontiGSDovuti)
+  const saldoContributiEccArtComm = Math.max(0, datiCorrente.totaleContributiEccedenzaArtComm - accontiEccDovuti)
 
   // ─── Scadenze ─────────────────────────────────────────────────────────────
   const { scadenzeAnnoCorrente, scadenzeAnnoSuccessivo } = calcolaScadenze({
@@ -231,11 +238,11 @@ export function calcola(input: CalcoloInput): RisultatoCalcolo {
     accontiImposteVersatiPerAnnoPrecedente: accontiImposteVersatiPerAnnoPrecedente ?? 0,
     totaleContributiSeparataPrecedente: datiPrecedente.totaleContributiSeparata,
     totaleContributiEccedenzaArtCommPrecedente: datiPrecedente.totaleContributiEccedenzaArtComm,
-    // Dettaglio per documentare i saldi a conguaglio (dovuto − acconti versati)
+    // Dettaglio per documentare i saldi (dovuto − acconti DOVUTI, come INPS).
     totaleContributiSeparataDovutoCorrente: datiCorrente.totaleContributiSeparata,
-    accontiGSVersatiNelCorrente: accontiGSEff,
+    accontiGSVersatiNelCorrente: accontiGSDovuti,
     totaleContributiEccArtCommDovutoCorrente: datiCorrente.totaleContributiEccedenzaArtComm,
-    accontiEccVersatiNelCorrente: accontiEccEff,
+    accontiEccVersatiNelCorrente: accontiEccDovuti,
     // Il conguaglio per gestione (di-più sulle rate obbligatorie da scontare sul
     // saldo) è calcolato dentro calcolaScadenze, che dispone dei dovuti di cassa.
     input,
@@ -249,9 +256,10 @@ export function calcola(input: CalcoloInput): RisultatoCalcolo {
     accontiImposteEffettivamenteVersatiPerAnnoCorrente: accontiImposteEff,
     saldoImposteDaVersareAnnoCorrente: saldoImposteDaVersare,
     creditoImposteAnnoCorrente: creditoImposte,
-    accontiGSVersatiPerAnnoRif: accontiGSEff,
+    // Acconti DOVUTI (come INPS): coerenti col saldo ufficiale (dovuto − dovuti).
+    accontiGSVersatiPerAnnoRif: accontiGSDovuti,
     saldoContributiGSAnnoCorrente: saldoContributiGS,
-    accontiEccArtCommVersatiPerAnnoRif: accontiEccEff,
+    accontiEccArtCommVersatiPerAnnoRif: accontiEccDovuti,
     saldoContributiEccArtCommAnnoCorrente: saldoContributiEccArtComm,
     scadenzeAnnoCorrente,
     scadenzeAnnoSuccessivo,

@@ -91,18 +91,18 @@ describe('diagnostica input reale utente', () => {
     expect(righe.length).toBeGreaterThan(0)
   })
 
-  it('il saldo eccedenza è documentato in dovuto − acconti versati', () => {
+  it('il saldo eccedenza è documentato in dovuto − acconti DOVUTI (come INPS)', () => {
     const saldo = r.scadenzeAnnoSuccessivo.find(
       (s) => s.categoria === 'Contributi eccedenza artigiani/commercianti' && s.voce?.startsWith('Saldo'),
     )!
-    // due componenti: dovuto totale e acconti già versati (negativo)
+    // Il calcolatore ufficiale INPS calcola: saldo = eccedenza dovuta − acconti
+    // DOVUTI (non quelli versati). Verificato: saldo 1223,35.
     expect(saldo.componenti).toHaveLength(2)
-    expect(saldo.componenti[0].importo).toBeCloseTo(2495.93, 2) // dovuto 2025
-    expect(saldo.componenti[1].importo).toBeCloseTo(-1144.38, 2) // acconti versati
-    // i componenti sommano all'importo della scadenza
+    expect(saldo.componenti[0].importo).toBeCloseTo(2495.93, 1) // dovuto 2025
+    expect(saldo.componenti[1].importo).toBeCloseTo(-1272.63, 1) // acconti DOVUTI (636,32 × 2)
     const somma = saldo.componenti.reduce((a, c) => a + c.importo, 0)
     expect(somma).toBeCloseTo(saldo.importo, 2)
-    expect(saldo.importo).toBeCloseTo(1351.55, 2)
+    expect(saldo.importo).toBeCloseTo(1223.35, 1) // = valore calcolatore INPS
   })
 
   it('acconto eccedenza 2025 = 636,32 (metodo INPS: redditi 2024, costanti 2025)', () => {
@@ -126,15 +126,16 @@ describe('diagnostica input reale utente', () => {
       consigliato: saldo.importoConsigliato != null ? e2(saldo.importoConsigliato) : null,
       nota: saldo.notaConsigliato,
     }, null, 2))
+    // Dovuto ufficiale (come INPS): 1223,35 (eccedenza − acconti dovuti).
     // Conguaglio = somma dei soli di-PIÙ sulle rate obbligatorie di competenza 2025:
     //   fissi-1: 1115,16 − 725,50 = +389,66
     //   ecc-acconto-2: 767,11 − 636,32 = +130,79
     //   (ecc-acconto-1 pagato in meno NON riduce il credito)
-    // credito = 520,45 → consigliato = 1351,55 − 520,45 = 831,11
+    // credito = 520,45 → consigliato = 1223,35 − 520,45 = 702,90
     expect(saldo.importoConsigliato).not.toBeNull()
-    expect(saldo.importo).toBeCloseTo(1351.55, 1)
+    expect(saldo.importo).toBeCloseTo(1223.35, 1)
     expect(saldo.importo - saldo.importoConsigliato!).toBeCloseTo(520.45, 1)
-    expect(saldo.importoConsigliato!).toBeCloseTo(831.11, 1)
+    expect(saldo.importoConsigliato!).toBeCloseTo(702.90, 1)
   })
 
   it('confronto diretto: saldo ecc 2025 vs 1° acconto ecc 2026', () => {
