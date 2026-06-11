@@ -6,6 +6,7 @@ import {
   BarChart3,
   Calendar,
   FileText,
+  FileSpreadsheet,
   History,
   ChevronRight,
 } from 'lucide-react'
@@ -15,7 +16,9 @@ import { RiepilogoPrecedente } from '@/components/RiepilogoPrecedente'
 import { DettaglioRegimi } from '@/components/DettaglioRegimi'
 import { CalendarioFiscale } from '@/components/CalendarioFiscale'
 import { SaldiCrediti } from '@/components/SaldiCrediti'
+import { Dichiarazione } from '@/components/Dichiarazione'
 import { calcola } from '@/domain/calcolo'
+import { haDatiPerDichiarazione } from '@/domain/dichiarazione'
 import { regimeVuoto } from '@/domain/regimeFactory'
 import type { CalcoloInput } from '@/domain/types'
 import { anniDisponibili } from '@/data/taxData'
@@ -47,13 +50,14 @@ function inputIniziale(): CalcoloInput {
   return caricaInput(def) ?? def
 }
 
-type TabId = 'dati' | 'riepilogo' | 'regimi' | 'calendario' | 'saldi' | 'precedente'
+type TabId = 'dati' | 'riepilogo' | 'regimi' | 'calendario' | 'saldi' | 'dichiarazione' | 'precedente'
 
 const NAV: { id: TabId; label: string; icon: typeof LayoutDashboard }[] = [
   { id: 'riepilogo', label: 'Riepilogo', icon: LayoutDashboard },
   { id: 'regimi', label: 'Dettaglio regimi', icon: BarChart3 },
   { id: 'calendario', label: 'Calendario', icon: Calendar },
   { id: 'saldi', label: 'Saldi e crediti', icon: FileText },
+  { id: 'dichiarazione', label: 'Dichiarazione', icon: FileSpreadsheet },
   { id: 'precedente', label: 'Anno precedente', icon: History },
   // "Dati" resta in fondo: viene spinto all'estrema destra della navbar
   { id: 'dati', label: 'Dati', icon: SlidersHorizontal },
@@ -65,6 +69,7 @@ const TITOLO: Record<TabId, string> = {
   regimi: 'Dettaglio regimi',
   calendario: 'Calendario fiscale',
   saldi: 'Saldi e crediti',
+  dichiarazione: 'Righi dichiarazione',
   precedente: 'Riepilogo anno precedente',
 }
 
@@ -106,15 +111,19 @@ export default function App() {
   const hasDatiPrecedente = prev.totaleFatturato > 0 || prev.totaleImponibileLordo > 0
   // Con un solo periodo, "Dettaglio regimi" coincide con "Riepilogo": è ridondante.
   const hasPiuRegimi = input.regimiCorrente.length > 1
+  // "Dichiarazione" ha senso solo con almeno un regime con fatturato inserito.
+  const hasDatiDichiarazione = haDatiPerDichiarazione(calcoli)
 
   const tabDisabilitato = (id: TabId): boolean =>
-    (id === 'precedente' && !hasDatiPrecedente) || (id === 'regimi' && !hasPiuRegimi)
+    (id === 'precedente' && !hasDatiPrecedente) ||
+    (id === 'regimi' && !hasPiuRegimi) ||
+    (id === 'dichiarazione' && !hasDatiDichiarazione)
 
   // Se il tab attivo viene disabilitato (dati rimossi o periodo eliminato), torna al riepilogo
   useEffect(() => {
     if (tabDisabilitato(tab)) setTab('riepilogo')
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, hasDatiPrecedente, hasPiuRegimi])
+  }, [tab, hasDatiPrecedente, hasPiuRegimi, hasDatiDichiarazione])
 
   return (
     <div className={theme.appBg}>
@@ -144,7 +153,9 @@ export default function App() {
             const motivo =
               id === 'precedente'
                 ? `Inserisci i dati del ${input.anno - 1} per abilitare questa sezione`
-                : 'Disponibile con più di un periodo nello stesso anno'
+                : id === 'dichiarazione'
+                  ? 'Inserisci almeno un regime con fatturato per abilitare questa sezione'
+                  : 'Disponibile con più di un periodo nello stesso anno'
             return (
               <button
                 key={id}
@@ -207,6 +218,9 @@ export default function App() {
           />
         )}
         {tab === 'saldi' && <SaldiCrediti anno={input.anno} calcoli={calcoli} />}
+        {tab === 'dichiarazione' && hasDatiDichiarazione && (
+          <Dichiarazione anno={input.anno} calcoli={calcoli} />
+        )}
         {tab === 'precedente' && hasDatiPrecedente && (
           <RiepilogoPrecedente anno={input.anno} calcoli={calcoli} />
         )}

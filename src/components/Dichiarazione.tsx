@@ -1,0 +1,118 @@
+import { FileSpreadsheet, ExternalLink } from 'lucide-react'
+import { Badge, Button, Table, TableBody, TableCell, TableHead, TableHeadCell, TableRow } from 'flowbite-react'
+import type { RisultatoCalcolo } from '@/domain/types'
+import { generaRighiDichiarazione, type CampoDichiarazione } from '@/domain/dichiarazione'
+import { Card, Tooltip } from '@/components/ui'
+import { formatEuro } from '@/domain/labels'
+import { theme } from '@/theme'
+
+interface Props {
+  anno: number
+  calcoli: RisultatoCalcolo
+}
+
+/** Mostra un valore di campo: euro se numero, testo (es. "da inserire") altrimenti. */
+function ValoreCampo({ valore }: { valore: number | string }) {
+  if (typeof valore === 'number') {
+    return <span className="font-semibold tabular-nums">{formatEuro(valore)}</span>
+  }
+  return <span className="text-amber-600 italic">{valore}</span>
+}
+
+/** Tabella di righi (rigo · colonna · descrizione · valore) con tooltip nota. */
+function TabellaRighi({ titolo, righi }: { titolo: string; righi: CampoDichiarazione[] }) {
+  return (
+    <div>
+      <p className={`${theme.groupLabel} mb-2`}>{titolo}</p>
+      <div className="overflow-x-auto">
+        <Table>
+          <TableHead>
+            <TableRow>
+              <TableHeadCell className="w-20">Rigo</TableHeadCell>
+              <TableHeadCell className="w-16">Col.</TableHeadCell>
+              <TableHeadCell>Descrizione</TableHeadCell>
+              <TableHeadCell className="text-right">Valore</TableHeadCell>
+            </TableRow>
+          </TableHead>
+          <TableBody className="divide-y">
+            {righi.map((c, i) => (
+              <TableRow key={i} className="bg-white">
+                <TableCell className="font-semibold text-slate-700">{c.rigo}</TableCell>
+                <TableCell className="text-slate-500 tabular-nums">{c.colonna ?? '—'}</TableCell>
+                <TableCell className="text-slate-700">
+                  <span className="flex items-center gap-1.5">
+                    {c.descrizione}
+                    {c.nota && <Tooltip content={c.nota} label="Dettaglio del campo" posizione="sotto" allinea="sinistra" />}
+                  </span>
+                </TableCell>
+                <TableCell className="text-right">
+                  <ValoreCampo valore={c.valore} />
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Pannello "Righi dichiarazione": traduce i calcoli nei campi del quadro LM
+ * (forfettario) e RS (contributi) da riportare nei Redditi PF. Apre il PDF
+ * promemoria in una nuova scheda.
+ */
+export function Dichiarazione({ anno, calcoli }: Props) {
+  const righi = generaRighiDichiarazione(calcoli, anno)
+
+  const apriPdf = async () => {
+    const scheda = window.open('', '_blank')
+    const { generaPdfDichiarazione } = await import('@/pdf/dichiarazionePdf')
+    const url = await generaPdfDichiarazione(righi)
+    if (scheda) scheda.location.replace(url)
+    else window.open(url, '_blank', 'noopener')
+  }
+
+  return (
+    <Card
+      title="Righi dichiarazione"
+      icon={FileSpreadsheet}
+      iconIntent="info"
+      info="Traduzione dei calcoli nei campi del quadro LM (regime forfettario) e del quadro RS (contributi) da riportare nei Redditi PF. Promemoria di compilazione: non sostituisce la dichiarazione."
+    >
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <p className={theme.helpText}>
+            Quadro LM sezione II e quadro RS per l'anno d'imposta {anno}.
+          </p>
+          <Button size="sm" onClick={apriPdf}>
+            <ExternalLink size={15} className="mr-2" aria-hidden />
+            Apri PDF
+          </Button>
+        </div>
+
+        {righi.moduliLM.map((m) => (
+          <TabellaRighi
+            key={m.modulo}
+            titolo={righi.moduliLM.length > 1 ? `Quadro LM — attività ${m.modulo}` : 'Quadro LM — attività'}
+            righi={m.campi}
+          />
+        ))}
+
+        <TabellaRighi titolo="Quadro LM — liquidazione imposta" righi={righi.riepilogoLM} />
+        <TabellaRighi titolo="Quadro RS — contributi previdenziali" righi={righi.quadroRS} />
+
+        {righi.haCampiDaCompletare && (
+          <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+            <Badge color="warning" className="mt-0.5 w-fit shrink-0">Da completare</Badge>
+            <p className="text-sm text-amber-800">
+              I campi in arancione (es. il codice ATECO) non sono ricavabili dai dati inseriti:
+              riportarli a mano. Il documento è un promemoria di compilazione, non sostituisce la
+              dichiarazione né i controlli del software ufficiale.
+            </p>
+          </div>
+        )}
+      </div>
+    </Card>
+  )
+}

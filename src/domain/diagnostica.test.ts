@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest'
 import { calcola } from './calcolo'
-import { calcolaScadenze } from './scadenze'
 import type { CalcoloInput } from './types'
 
 /**
