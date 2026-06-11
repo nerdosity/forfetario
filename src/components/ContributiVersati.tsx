@@ -2,7 +2,7 @@ import { Plus, Trash2 } from 'lucide-react'
 import { Button, Dropdown, DropdownItem } from 'flowbite-react'
 import type { RisultatoCalcolo, TipoVersamento, VersamentoContributo } from '@/domain/types'
 import { versamentoVuoto } from '@/domain/regimeFactory'
-import { Field, MoneyInput, Select } from '@/components/ui'
+import { Field, MoneyInput, Select, Tooltip } from '@/components/ui'
 import { formatEuro } from '@/domain/labels'
 import { theme } from '@/theme'
 
@@ -211,6 +211,21 @@ export function ContributiVersati({
                     className="col-span-2 rounded-md border border-slate-300 px-2 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
                   />
                 )}
+                <label className="col-span-2 inline-flex items-center gap-1.5 text-xs text-slate-600">
+                  <input
+                    type="checkbox"
+                    checked={r.deducibile !== false}
+                    onChange={(e) => aggiorna(r.id, { deducibile: e.target.checked })}
+                    className="h-3.5 w-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500/30"
+                  />
+                  Deducibile in dichiarazione
+                  <Tooltip
+                    content="Lascia spuntato per i contributi previdenziali obbligatori (anche rate pregresse o ravvedimenti pagati quest'anno: deducibili per cassa). Togli la spunta per i contributi volontari extra IVS, che vanno solo annotati e non sono deducibili."
+                    label="Quando è deducibile"
+                    posizione="sotto"
+                    allinea="sinistra"
+                  />
+                </label>
               </div>
               <button
                 type="button"

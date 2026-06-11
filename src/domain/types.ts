@@ -169,6 +169,14 @@ export interface VersamentoContributo {
   /** Descrizione libera (usata soprattutto per 'altro'). */
   descrizione: string
   importo: number | null
+  /**
+   * Se il versamento è deducibile in dichiarazione (default true). Va messo a
+   * false per i contributi NON deducibili (es. volontari extra IVS). I contributi
+   * obbligatori — anche se di competenza pregressa o ravvedimenti — restano
+   * deducibili nell'anno di cassa. Non influisce sul conguaglio della gestione,
+   * che dipende solo dal tipo.
+   */
+  deducibile?: boolean
 }
 
 /** Tutti gli input che alimentano il motore di calcolo. */

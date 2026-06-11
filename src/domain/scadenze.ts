@@ -108,9 +108,15 @@ export function scadenzaPagata(scadenza: Scadenza, input: CalcoloInput): boolean
   )
 }
 
-/** Vero se la scadenza riguarda l'imposta sostitutiva (anziché i contributi INPS). */
-function isImposta(s: Scadenza): boolean {
-  return (s.riferimenti ?? []).some((r) => r.startsWith('imposta-'))
+/** Categoria di una scadenza ai fini del bilancio per gestione. */
+type CategoriaBilancio = 'imposte' | 'gs' | 'artComm'
+
+/** Classifica la scadenza per gestione: imposte, gestione separata o artigiani/commercianti. */
+function categoriaBilancio(s: Scadenza): CategoriaBilancio {
+  const rif = s.riferimenti ?? []
+  if (rif.some((r) => r.startsWith('imposta-'))) return 'imposte'
+  if (rif.some((r) => r.startsWith('gs-'))) return 'gs'
+  return 'artComm'
 }
 
 export interface BilancioCategoria {
@@ -123,30 +129,38 @@ export interface BilancioCategoria {
 }
 
 export interface BilancioAnno {
-  contributi: BilancioCategoria
+  /** Contributi artigiani/commercianti (fissi + eccedenza). */
+  artComm: BilancioCategoria
+  /** Contributi gestione separata. */
+  gs: BilancioCategoria
+  /** Imposta sostitutiva. */
   imposte: BilancioCategoria
 }
 
 /**
  * Bilancio dei pagamenti di un anno: confronta dovuto e pagato separando i
- * contributi INPS dalle imposte. Considera solo le scadenze TRACCIABILI (quelle
- * con un versamento collegato); le altre (es. previsioni future) sono escluse.
+ * contributi per GESTIONE (artigiani/commercianti, gestione separata) e le
+ * imposte. Tenere le gestioni distinte è coerente con il conguaglio INPS, che
+ * si applica per gestione senza mischiarle. Considera solo le scadenze
+ * TRACCIABILI (con un versamento collegato); le altre sono escluse.
  */
 export function bilancioPagamenti(scadenze: Scadenza[], input: CalcoloInput): BilancioAnno {
   const vuoto = (): BilancioCategoria => ({ dovuto: 0, pagato: 0, saldo: 0 })
-  const contributi = vuoto()
-  const imposte = vuoto()
+  const cat: Record<CategoriaBilancio, BilancioCategoria> = {
+    artComm: vuoto(),
+    gs: vuoto(),
+    imposte: vuoto(),
+  }
 
   for (const s of scadenze) {
     const versato = versatoPerScadenza(s, input)
     if (versato == null) continue // non tracciabile → fuori dal bilancio
-    const cat = isImposta(s) ? imposte : contributi
-    cat.dovuto += s.importo
-    cat.pagato += versato
+    const c = cat[categoriaBilancio(s)]
+    c.dovuto += s.importo
+    c.pagato += versato
   }
-  contributi.saldo = contributi.pagato - contributi.dovuto
-  imposte.saldo = imposte.pagato - imposte.dovuto
-  return { contributi, imposte }
+  for (const c of Object.values(cat)) c.saldo = c.pagato - c.dovuto
+  return cat
 }
 
 /**

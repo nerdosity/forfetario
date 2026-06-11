@@ -24,8 +24,8 @@ function inputDiEsempio(): CalcoloInput {
     contributiVersatiDuranteAnno: 1234.56,
     modalitaContributiVersati: 'dettaglio',
     contributiVersatiDettaglio: [
-      { id: 'v1', tipo: 'fissi-1', descrizione: '', importo: 1000 },
-      { id: 'v2', tipo: 'altro', descrizione: 'Ravvedimento', importo: 234.56 },
+      { id: 'v1', tipo: 'fissi-1', descrizione: '', importo: 1000, deducibile: true },
+      { id: 'v2', tipo: 'altro', descrizione: 'Ravvedimento', importo: 234.56, deducibile: true },
     ],
     contributiVersatiDuranteAnnoPrecedente: 1000,
     impostaSaldoVersatoAnnoCorrente: 100,

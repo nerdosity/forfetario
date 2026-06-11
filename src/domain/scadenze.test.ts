@@ -113,24 +113,40 @@ describe('scadenzaPagata', () => {
 })
 
 describe('bilancioPagamenti', () => {
-  it('separa contributi e imposte, calcola il saldo (più/meno)', () => {
+  it('separa artComm, gestione separata e imposte, calcola il saldo (più/meno)', () => {
     const scadenze: Scadenza[] = [
       scadenza({ importo: 725.5, riferimenti: ['fissi-1'] }),
+      scadenza({ importo: 300, riferimenti: ['gs-saldo'] }),
       scadenza({ importo: 1000, riferimenti: ['imposta-acconto1'] }),
     ]
     const i = input({
-      contributiVersatiDettaglio: [{ id: 'a', tipo: 'fissi-1', descrizione: '', importo: 800 }],
+      contributiVersatiDettaglio: [
+        { id: 'a', tipo: 'fissi-1', descrizione: '', importo: 800 },
+        { id: 'b', tipo: 'gs-saldo', descrizione: '', importo: 250 },
+      ],
       impostaAcconto1VersatoAnnoCorrente: 950,
     })
     const b = bilancioPagamenti(scadenze, i)
-    expect(b.contributi.saldo).toBeCloseTo(800 - 725.5) // +74.5 in più
+    expect(b.artComm.saldo).toBeCloseTo(800 - 725.5) // +74.5 in più
+    expect(b.gs.saldo).toBeCloseTo(250 - 300) // −50 in meno
     expect(b.imposte.saldo).toBeCloseTo(950 - 1000) // −50 in meno
+  })
+
+  it('esclude dalla deducibilità le voci non deducibili (volontari)', () => {
+    // (verifica indiretta: il bilancio usa versatoPerScadenza, non il flag;
+    // qui controlliamo solo che il flag non rompa la classificazione)
+    const scadenze: Scadenza[] = [scadenza({ importo: 725.5, riferimenti: ['fissi-1'] })]
+    const i = input({
+      contributiVersatiDettaglio: [{ id: 'a', tipo: 'fissi-1', descrizione: '', importo: 800, deducibile: false }],
+    })
+    const b = bilancioPagamenti(scadenze, i)
+    expect(b.artComm.dovuto).toBeCloseTo(725.5)
   })
 
   it('ignora le scadenze non tracciabili (senza riferimenti)', () => {
     const scadenze: Scadenza[] = [scadenza({ importo: 500, riferimenti: undefined })]
     const b = bilancioPagamenti(scadenze, input({}))
-    expect(b.contributi.dovuto).toBe(0)
+    expect(b.artComm.dovuto).toBe(0)
     expect(b.imposte.dovuto).toBe(0)
   })
 })

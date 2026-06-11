@@ -66,6 +66,8 @@ function normalizzaVersamento(raw: unknown): VersamentoContributo {
     tipo: TIPI_VERS.includes(o.tipo as TipoVersamento) ? (o.tipo as TipoVersamento) : 'altro',
     descrizione: typeof o.descrizione === 'string' ? o.descrizione : '',
     importo: numOrNull(o.importo),
+    // default true: voce deducibile salvo che sia stata esplicitamente esclusa
+    deducibile: o.deducibile === false ? false : true,
   }
 }
 

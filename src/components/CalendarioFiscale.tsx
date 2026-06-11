@@ -99,7 +99,7 @@ function TabellaScadenze({ titolo, sottotitolo, scadenze, input, mostraBilancio,
   const bilancio = bilancioPagamenti(scadenze, input)
   const hasBilancio =
     mostraBilancio &&
-    (bilancio.contributi.dovuto > 0.005 || bilancio.imposte.dovuto > 0.005)
+    (bilancio.artComm.dovuto > 0.005 || bilancio.gs.dovuto > 0.005 || bilancio.imposte.dovuto > 0.005)
   // Colonna rateazione: solo se almeno una voce della tabella è rateizzabile.
   const hasRateazione = !!onRateizza && scadenze.some((s) => s.chiaveRateazione)
 
@@ -237,11 +237,13 @@ function TabellaScadenze({ titolo, sottotitolo, scadenze, input, mostraBilancio,
         <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
           <p className={`${theme.groupLabel} mb-1`}>Bilancio pagamenti {titolo.replace('Scadenze ', '')}</p>
           <div className="divide-y divide-slate-200/70">
-            <RigaBilancio etichetta="Contributi INPS" cat={bilancio.contributi} />
+            <RigaBilancio etichetta="Contributi artigiani/commercianti" cat={bilancio.artComm} />
+            <RigaBilancio etichetta="Contributi gestione separata" cat={bilancio.gs} />
             <RigaBilancio etichetta="Imposta sostitutiva" cat={bilancio.imposte} />
           </div>
           <p className="mt-2 text-xs text-slate-400">
-            Calcolato sulle voci con un versamento collegato. Differenze entro ~1 € sono arrotondamenti F24.
+            Calcolato sulle voci con un versamento collegato, separato per gestione (il conguaglio INPS
+            si applica per gestione). Differenze entro ~1 € sono arrotondamenti F24.
           </p>
         </div>
       )}

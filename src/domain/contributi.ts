@@ -10,7 +10,11 @@ import { labelTipo } from '@/domain/labels'
  */
 export function contributiVersatiEffettivi(input: CalcoloInput): number {
   if (input.modalitaContributiVersati === 'dettaglio') {
-    return input.contributiVersatiDettaglio.reduce((s, r) => s + (r.importo ?? 0), 0)
+    // Solo le voci deducibili (default true) entrano nella deducibilità: le voci
+    // marcate non deducibili (es. contributi volontari extra IVS) sono escluse.
+    return input.contributiVersatiDettaglio
+      .filter((r) => r.deducibile !== false)
+      .reduce((s, r) => s + (r.importo ?? 0), 0)
   }
   return input.contributiVersatiDuranteAnno ?? 0
 }
