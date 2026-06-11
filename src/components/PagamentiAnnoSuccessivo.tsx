@@ -13,44 +13,53 @@ interface Props {
   onChange: (righe: VersamentoContributo[]) => void
 }
 
-// I pagamenti dell'anno successivo riguardano: saldo (competenza anno rif.),
-// acconti dell'anno successivo, rate fisse. Stesso set di tipi.
-const TIPI: { value: TipoVersamento; label: string }[] = [
-  { value: 'ecc-saldo', label: 'Eccedenza · saldo' },
-  { value: 'ecc-acconto-1', label: 'Eccedenza · 1° acconto' },
-  { value: 'ecc-acconto-2', label: 'Eccedenza · 2° acconto' },
-  { value: 'gs-saldo', label: 'G.S. · saldo' },
-  { value: 'gs-acconto-1', label: 'G.S. · 1° acconto' },
-  { value: 'gs-acconto-2', label: 'G.S. · 2° acconto' },
-  { value: 'fissi-1', label: 'Fissi · 1ª rata' },
-  { value: 'fissi-2', label: 'Fissi · 2ª rata' },
-  { value: 'fissi-3', label: 'Fissi · 3ª rata' },
-  { value: 'fissi-4-prec', label: 'Fissi · 4ª rata (anno rif.)' },
-  { value: 'altro', label: 'Altro' },
-]
+// Pagamenti effettuati nell'anno N+1 (dove N è l'anno di riferimento). Le voci
+// indicano la COMPETENZA precisa, così non si confondono gli anni:
+//  - saldo/acconti eccedenza e G.S.: saldo competenza N, acconti competenza N+1
+//  - rate fisse: 4ª competenza N (scade feb N+1) + 1ª-3ª competenza N+1
+// Le etichette ricevono l'anno per essere esplicite (vedi tipiPerAnno).
+const tipiPerAnno = (anno: number): { value: TipoVersamento; label: string }[] => {
+  const succ = anno + 1
+  return [
+    { value: 'ecc-saldo', label: `Eccedenza · saldo (comp. ${anno})` },
+    { value: 'ecc-acconto-1', label: `Eccedenza · 1° acconto (comp. ${succ})` },
+    { value: 'ecc-acconto-2', label: `Eccedenza · 2° acconto (comp. ${succ})` },
+    { value: 'gs-saldo', label: `G.S. · saldo (comp. ${anno})` },
+    { value: 'gs-acconto-1', label: `G.S. · 1° acconto (comp. ${succ})` },
+    { value: 'gs-acconto-2', label: `G.S. · 2° acconto (comp. ${succ})` },
+    { value: 'fissi-4-prec', label: `Fissi · 4ª rata (comp. ${anno})` },
+    { value: 'fissi-1', label: `Fissi · 1ª rata (comp. ${succ})` },
+    { value: 'fissi-2', label: `Fissi · 2ª rata (comp. ${succ})` },
+    { value: 'fissi-3', label: `Fissi · 3ª rata (comp. ${succ})` },
+    { value: 'altro', label: 'Altro (arretrati, ravvedimenti…)' },
+  ]
+}
 
-const MENU: { label: string; voci: { tipo: TipoVersamento; label: string }[] }[] = [
-  {
-    label: 'Artigiani/Commercianti',
-    voci: [
-      { tipo: 'ecc-saldo', label: 'Eccedenza · saldo' },
-      { tipo: 'ecc-acconto-1', label: 'Eccedenza · 1° acconto' },
-      { tipo: 'ecc-acconto-2', label: 'Eccedenza · 2° acconto' },
-      { tipo: 'fissi-1', label: 'Fissi · 1ª rata' },
-      { tipo: 'fissi-2', label: 'Fissi · 2ª rata' },
-      { tipo: 'fissi-3', label: 'Fissi · 3ª rata' },
-      { tipo: 'fissi-4-prec', label: 'Fissi · 4ª rata (anno rif.)' },
-    ],
-  },
-  {
-    label: 'Gestione separata',
-    voci: [
-      { tipo: 'gs-saldo', label: 'Saldo' },
-      { tipo: 'gs-acconto-1', label: '1° acconto' },
-      { tipo: 'gs-acconto-2', label: '2° acconto' },
-    ],
-  },
-]
+const menuPerAnno = (anno: number): { label: string; voci: { tipo: TipoVersamento; label: string }[] }[] => {
+  const succ = anno + 1
+  return [
+    {
+      label: 'Artigiani/Commercianti',
+      voci: [
+        { tipo: 'fissi-4-prec', label: `Fissi · 4ª rata (comp. ${anno})` },
+        { tipo: 'fissi-1', label: `Fissi · 1ª rata (comp. ${succ})` },
+        { tipo: 'fissi-2', label: `Fissi · 2ª rata (comp. ${succ})` },
+        { tipo: 'fissi-3', label: `Fissi · 3ª rata (comp. ${succ})` },
+        { tipo: 'ecc-saldo', label: `Eccedenza · saldo (comp. ${anno})` },
+        { tipo: 'ecc-acconto-1', label: `Eccedenza · 1° acconto (comp. ${succ})` },
+        { tipo: 'ecc-acconto-2', label: `Eccedenza · 2° acconto (comp. ${succ})` },
+      ],
+    },
+    {
+      label: 'Gestione separata',
+      voci: [
+        { tipo: 'gs-saldo', label: `Saldo (comp. ${anno})` },
+        { tipo: 'gs-acconto-1', label: `1° acconto (comp. ${succ})` },
+        { tipo: 'gs-acconto-2', label: `2° acconto (comp. ${succ})` },
+      ],
+    },
+  ]
+}
 
 /**
  * Pagamenti di contributi effettuati NELL'ANNO SUCCESSIVO a quello di
@@ -61,6 +70,8 @@ const MENU: { label: string; voci: { tipo: TipoVersamento; label: string }[] }[]
  */
 export function PagamentiAnnoSuccessivo({ anno, dettaglio, onChange }: Props) {
   const annoSucc = anno + 1
+  const TIPI = tipiPerAnno(anno)
+  const MENU = menuPerAnno(anno)
   const somma = dettaglio.reduce((s, r) => s + (r.importo ?? 0), 0)
 
   const giaUsato = (tipo: TipoVersamento, escludiId?: string) =>

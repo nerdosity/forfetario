@@ -512,7 +512,8 @@ export function calcolaScadenze({
     })
   }
   // ─── Ultima rata contributi fissi correnti (cade nell'anno+1) ─────────────
-  // Niente riferimento: il suo versamento starà nella lista dell'anno+1, non qui.
+  // Si versa nell'anno+1: il collegamento al pagamento usa 'fissi-4-prec' (nel
+  // contesto dell'anno+1 è la 4ª rata della competenza precedente).
   for (const regime of fissiCorrenti) {
     for (const rata of calcolaRateContributiFissi(regime, anno).rate) {
       if (rata.anno === annoSucc) {
@@ -524,6 +525,7 @@ export function calcolaScadenze({
           importo: rata.importo,
           componenti: [{ tipo: `Rata contributi fissi ${labelTipo(regime.tipo)} ${anno}`, importo: rata.importo }],
           annoScadenza: annoSucc,
+          riferimenti: ['fissi-4-prec'],
         })
       }
     }
@@ -686,16 +688,21 @@ export function calcolaScadenze({
     for (const regime of fissiAttiviADicembre) {
       const cf = regime.tipo === 'artigiani' ? datiSucc.contributoFisso.artigiani : datiSucc.contributoFisso.commercianti
       const mensile = applicaRiduzioneIVS(cf.ivsAnnuale / 12, cf.maternitaMensile, regime.riduzioneContributi)
-      // 1ª, 2ª, 3ª rata (3 mesi ciascuna) — la 4ª cade nell'anno dopo ancora
+      // 1ª, 2ª, 3ª rata (3 mesi ciascuna) — la 4ª cade nell'anno dopo ancora.
+      // Importo arrotondato al centesimo (come INPS); collegato ai pagamenti
+      // dell'anno+1 via 'fissi-1/2/3'.
+      const rifFissi: RiferimentoScadenza[] = ['fissi-1', 'fissi-2', 'fissi-3']
       for (let idx = 0; idx < 3; idx++) {
+        const importoRata = Math.round(mensile * 3 * 100) / 100
         globali.push({
           data: formattaScadenza(datiSucc.scadenze.rateContributiFissi[idx], annoSucc),
           descrizione: `Contributi fissi ${labelTipo(regime.tipo)} ${annoSucc} (3 mesi trim. ${idx + 1})`,
           categoria: `Contributi fissi ${labelTipo(regime.tipo).toLowerCase()}`,
           voce: `${ORDINALE_RATA[idx + 1]} rata trimestrale · competenza ${annoSucc}`,
-          importo: mensile * 3,
-          componenti: [{ tipo: `Rata contributi fissi ${labelTipo(regime.tipo)} ${annoSucc}`, importo: mensile * 3 }],
+          importo: importoRata,
+          componenti: [{ tipo: `Rata contributi fissi ${labelTipo(regime.tipo)} ${annoSucc}`, importo: importoRata }],
           annoScadenza: annoSucc,
+          riferimenti: [rifFissi[idx]],
           stimata,
         })
       }

@@ -219,11 +219,16 @@ export function calcola(input: CalcoloInput): RisultatoCalcolo {
   // Il saldo contributi UFFICIALE (come il calcolatore INPS) = eccedenza/G.S.
   // dovuta dell'anno − acconti DOVUTI (non quelli effettivamente versati). Gli
   // acconti dovuti = base acconto sui redditi dell'anno precedente con le costanti
-  // dell'anno corrente (lo stesso valore mostrato come acconti dell'anno). Quanto
-  // versato in più/meno rispetto al dovuto è gestito a parte come conguaglio
-  // (mostrato e suggerito), non incide sul saldo ufficiale.
-  const accontiGSDovuti = baseSeparataAcconto(regimiPrecedente, anno)
-  const accontiEccDovuti = baseEccedenzaAcconto(regimiPrecedente, anno)
+  // dell'anno corrente. Esistono SOLO se la gestione è ancora attiva nell'anno
+  // corrente (regime attivo a dicembre): se la gestione è chiusa, niente acconti
+  // dovuti (e quindi niente saldo). Quanto versato in più/meno è gestito a parte
+  // come conguaglio (mostrato e suggerito), non incide sul saldo ufficiale.
+  const gsAttivaCorrente = regimiCorrente.some((r) => r.tipo === 'separata' && r.meseFine === 12)
+  const artCommAttivaCorrente = regimiCorrente.some(
+    (r) => (r.tipo === 'artigiani' || r.tipo === 'commercianti') && r.meseFine === 12,
+  )
+  const accontiGSDovuti = gsAttivaCorrente ? baseSeparataAcconto(regimiPrecedente, anno) : 0
+  const accontiEccDovuti = artCommAttivaCorrente ? baseEccedenzaAcconto(regimiPrecedente, anno) : 0
 
   const saldoContributiGS = Math.max(0, datiCorrente.totaleContributiSeparata - accontiGSDovuti)
   const saldoContributiEccArtComm = Math.max(0, datiCorrente.totaleContributiEccedenzaArtComm - accontiEccDovuti)
