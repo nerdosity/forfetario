@@ -1,34 +1,139 @@
 import { useState } from 'react'
-import { Trash2, TriangleAlert, CalendarRange, Landmark, History, Wallet, CalendarClock } from 'lucide-react'
+import { Trash2, TriangleAlert, CalendarRange } from 'lucide-react'
 import { Button, Modal as FbModal, ModalHeader, ModalBody, ModalFooter } from 'flowbite-react'
 import { RegimeEditor } from '@/components/RegimeEditor'
 import { GestoreAnni } from '@/components/GestoreAnni'
 import { ContributiVersati } from '@/components/ContributiVersati'
-import { PagamentiAnnoSuccessivo } from '@/components/PagamentiAnnoSuccessivo'
 import { Card, Field, MoneyInput, Select } from '@/components/ui'
 import { anniDisponibili } from '@/data/taxData'
-import type { CalcoloInput, RisultatoCalcolo } from '@/domain/types'
+import type { CalcoloInput, DatiAnno, RisultatoCalcolo } from '@/domain/types'
+import { datiDellAnno } from '@/domain/types'
+import { regimeVuoto } from '@/domain/regimeFactory'
 import { theme } from '@/theme'
 
-type InputState = Omit<CalcoloInput, 'anno'> & { anno: number }
-
 interface InputPanelProps {
-  input: InputState
+  input: CalcoloInput
   calcoli: RisultatoCalcolo | null
-  onChange: (partial: Partial<InputState>) => void
+  onChange: (partial: Partial<CalcoloInput>) => void
   onAnniChanged: () => void
   /** Azzera i dati del solo anno di riferimento corrente. */
   onAzzeraAnnoCorrente: () => void
 }
 
-/** Tab "Dati": tutti gli input di calcolo disposti in card su griglia. */
+/**
+ * Sezione di un singolo anno solare: regimi + contributi versati + imposte
+ * versate durante quell'anno. Tutte e tre le sezioni (anno-1, riferimento,
+ * anno+1) usano questo componente, leggendo/scrivendo su input.anni[anno].
+ */
+function SezioneAnno({
+  anno,
+  evidenzia,
+  sottotitolo,
+  dati,
+  calcoli,
+  onChange,
+}: {
+  anno: number
+  evidenzia?: boolean
+  sottotitolo: string
+  dati: DatiAnno
+  calcoli: RisultatoCalcolo | null
+  onChange: (d: DatiAnno) => void
+}) {
+  const set = (patch: Partial<DatiAnno>) => onChange({ ...dati, ...patch })
+  const hasGS = dati.regimi.some((r) => r.tipo === 'separata')
+
+  return (
+    <Card
+      title={`Anno ${anno}`}
+      icon={CalendarRange}
+      iconIntent={evidenzia ? 'info' : 'neutral'}
+    >
+      <p className={`${theme.helpText} -mt-2 mb-4`}>{sottotitolo}</p>
+
+      <RegimeEditor titolo="Regimi" anno={anno} regimi={dati.regimi} onChange={(r) => set({ regimi: r })} />
+
+      <div className="mt-5">
+        <p className={`${theme.groupLabel} mb-2`}>Contributi INPS versati nel {anno}</p>
+        <ContributiVersati
+          anno={anno}
+          calcoli={calcoli}
+          hasGSCorrente={hasGS}
+          modalita={dati.modalitaContributi}
+          totale={dati.contributiVersatiTotale}
+          dettaglio={dati.contributiVersati}
+          onChangeModalita={(m) => set({ modalitaContributi: m })}
+          onChangeTotale={(v) => set({ contributiVersatiTotale: v })}
+          onChangeDettaglio={(righe) => set({ contributiVersati: righe })}
+        />
+      </div>
+
+      <div className="mt-5">
+        <p className={`${theme.groupLabel} mb-2`}>Imposta sostitutiva versata nel {anno}</p>
+        <div className="space-y-3">
+          <Field
+            label="Saldo imposta (competenza anno prec.)"
+            small
+            info={`Saldo dell'imposta sostitutiva ${anno - 1}, versato a giugno ${anno}.`}
+          >
+            <MoneyInput
+              value={dati.impostaSaldoVersato}
+              onChange={(v) => set({ impostaSaldoVersato: v })}
+              placeholder="0"
+              min={0}
+              step={0.01}
+              nullable
+            />
+          </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="1° acconto" small info={`1° acconto imposta versato a giugno ${anno}.`}>
+              <MoneyInput
+                value={dati.impostaAcconto1Versato}
+                onChange={(v) => set({ impostaAcconto1Versato: v })}
+                placeholder="0"
+                min={0}
+                step={0.01}
+                nullable
+              />
+            </Field>
+            <Field label="2° acconto" small info={`2° acconto imposta versato a novembre ${anno}.`}>
+              <MoneyInput
+                value={dati.impostaAcconto2Versato}
+                onChange={(v) => set({ impostaAcconto2Versato: v })}
+                placeholder="0"
+                min={0}
+                step={0.01}
+                nullable
+              />
+            </Field>
+          </div>
+        </div>
+      </div>
+    </Card>
+  )
+}
+
+/** Tab "Dati": le 3 sezioni per anno (anno-1, riferimento, anno+1). */
 export function InputPanel({ input, calcoli, onChange, onAnniChanged, onAzzeraAnnoCorrente }: InputPanelProps) {
   const [confermaAzzera, setConfermaAzzera] = useState(false)
+  const anno = input.anno
 
   const azzera = () => {
     onAzzeraAnnoCorrente()
     setConfermaAzzera(false)
   }
+
+  // Aggiorna i dati di un anno specifico nella mappa.
+  const setAnno = (a: number, dati: DatiAnno) => {
+    onChange({ anni: { ...input.anni, [a]: dati } })
+  }
+
+  // Dati dei tre anni (con default vuoto se l'anno non è ancora presente).
+  const datiPrec = datiDellAnno(input, anno - 1)
+  const datiRif = datiDellAnno(input, anno)
+  const datiSucc = datiDellAnno(input, anno + 1)
+  // Garantisce almeno un regime vuoto da editare per le sezioni mai toccate.
+  const conRegime = (d: DatiAnno): DatiAnno => (d.regimi.length ? d : { ...d, regimi: [regimeVuoto()] })
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -37,11 +142,11 @@ export function InputPanel({ input, calcoli, onChange, onAnniChanged, onAzzeraAn
         <div className="flex flex-wrap items-end gap-3 sm:gap-4">
           <Field
             label="Anno di riferimento"
-            info="Anno per cui si calcolano imposte e contributi. Determina anche quali costanti INPS vengono usate."
+            info="Anno per cui si calcolano imposte e contributi. Le tre sezioni mostrano l'anno precedente, quello di riferimento e il successivo: i dati di ogni anno si conservano navigando."
           >
             <div className="w-32 sm:w-40">
               <Select<number>
-                value={input.anno}
+                value={anno}
                 onChange={(v) => onChange({ anno: v })}
                 options={anniDisponibili().map((a) => ({ value: a, label: String(a) }))}
               />
@@ -54,153 +159,34 @@ export function InputPanel({ input, calcoli, onChange, onAnniChanged, onAzzeraAn
 
         <Button color="red" outline size="sm" onClick={() => setConfermaAzzera(true)}>
           <Trash2 size={15} className="mr-2" aria-hidden />
-          Azzera dati {input.anno}
+          Azzera dati {anno}
         </Button>
       </div>
 
-      {/* Griglia di card */}
-      <div className="grid gap-4 sm:gap-6 lg:grid-cols-2">
-        {/* Regimi anno corrente */}
-        <Card title={`Regimi anno ${input.anno}`} icon={CalendarRange} iconIntent="info">
-          <RegimeEditor
-            titolo=""
-            anno={input.anno}
-            regimi={input.regimiCorrente}
-            onChange={(r) => onChange({ regimiCorrente: r })}
-          />
-        </Card>
-
-        {/* Contributi versati anno corrente */}
-        <Card title={`Contributi versati nel ${input.anno}`} icon={Landmark} iconIntent="warning">
-          <ContributiVersati
-            anno={input.anno}
-            calcoli={calcoli}
-            hasGSCorrente={input.regimiCorrente.some((r) => r.tipo === 'separata')}
-            modalita={input.modalitaContributiVersati}
-            totale={input.contributiVersatiDuranteAnno}
-            dettaglio={input.contributiVersatiDettaglio}
-            onChangeModalita={(m) => onChange({ modalitaContributiVersati: m })}
-            onChangeTotale={(v) => onChange({ contributiVersatiDuranteAnno: v })}
-            onChangeDettaglio={(righe) => onChange({ contributiVersatiDettaglio: righe })}
-          />
-        </Card>
-
-        {/* Pagamenti effettuati nell'anno successivo (saldo anno rif. + acconti anno succ.) */}
-        <Card title={`Pagamenti fatti nel ${input.anno + 1}`} icon={CalendarClock} iconIntent="info">
-          <PagamentiAnnoSuccessivo
-            anno={input.anno}
-            dettaglio={input.versamentiAnnoSuccessivo}
-            onChange={(righe) => onChange({ versamentiAnnoSuccessivo: righe })}
-          />
-        </Card>
-
-        {/* Dati anno precedente */}
-        <Card title={`Dati anno ${input.anno - 1}`} icon={History} iconIntent="neutral">
-          <p className={`${theme.helpText} -mt-2 mb-4`}>
-            Usati per il calcolo degli acconti e per il riepilogo dell'anno precedente.
-          </p>
-          <Field
-            label="Contributi INPS versati"
-            info={`Contributi versati durante il ${input.anno - 1}: usati per la deducibilità dell'imposta sostitutiva ${input.anno - 1} mostrata nel riepilogo.`}
-          >
-            <MoneyInput
-              value={input.contributiVersatiDuranteAnnoPrecedente}
-              onChange={(v) => onChange({ contributiVersatiDuranteAnnoPrecedente: v })}
-              placeholder="0"
-              min={0}
-              step={0.01}
-              nullable
-            />
-          </Field>
-          <div className="mt-4">
-            <RegimeEditor
-              titolo={`Regimi anno ${input.anno - 1}`}
-              anno={input.anno - 1}
-              regimi={input.regimiPrecedente}
-              onChange={(r) => onChange({ regimiPrecedente: r })}
-            />
-          </div>
-        </Card>
-
-        {/* Imposte versate (acconti imposta sostitutiva) */}
-        <Card title="Imposte versate" icon={Wallet} iconIntent="income">
-          <p className={`${theme.helpText} -mt-2 mb-4`}>
-            Acconti d'imposta sostitutiva già pagati, usati per calcolare i saldi netti.
-            I contributi versati vanno nell'apposita sezione qui sopra.
-          </p>
-
-          <div className="space-y-5">
-            <div className="space-y-3">
-              <p className={theme.groupLabel}>Versati nel {input.anno}</p>
-              <Field
-                label="Saldo imposta (anno prec.)"
-                small
-                info={`Saldo dell'imposta sostitutiva ${input.anno - 1}, versato a giugno ${input.anno}.`}
-              >
-                <MoneyInput
-                  value={input.impostaSaldoVersatoAnnoCorrente}
-                  onChange={(v) => onChange({ impostaSaldoVersatoAnnoCorrente: v })}
-                  placeholder="0"
-                  min={0}
-                  step={0.01}
-                  nullable
-                />
-              </Field>
-              <div className="grid grid-cols-2 gap-3">
-                <Field
-                  label="1° acconto"
-                  small
-                  info={`1° acconto d'imposta sostitutiva, versato a giugno ${input.anno} (sulle imposte ${input.anno - 1}).`}
-                >
-                  <MoneyInput
-                    value={input.impostaAcconto1VersatoAnnoCorrente}
-                    onChange={(v) => onChange({ impostaAcconto1VersatoAnnoCorrente: v })}
-                    placeholder="0"
-                    min={0}
-                    step={0.01}
-                    nullable
-                  />
-                </Field>
-                <Field
-                  label="2° acconto"
-                  small
-                  info={`2° acconto d'imposta sostitutiva, versato a novembre ${input.anno}.`}
-                >
-                  <MoneyInput
-                    value={input.impostaAcconto2VersatoAnnoCorrente}
-                    onChange={(v) => onChange({ impostaAcconto2VersatoAnnoCorrente: v })}
-                    placeholder="0"
-                    min={0}
-                    step={0.01}
-                    nullable
-                  />
-                </Field>
-              </div>
-            </div>
-
-            <hr className="border-slate-100" />
-
-            <div className="space-y-3">
-              <p className={theme.groupLabel}>
-                Acconti versati nel {input.anno - 1}, per il {input.anno - 1}
-              </p>
-              <Field
-                label="Imposta sostitutiva"
-                small
-                info={`Acconti d'imposta sostitutiva versati a giugno e novembre ${input.anno - 1}. Usati per calcolare il saldo dell'anno precedente mostrato nel riepilogo.`}
-              >
-                <MoneyInput
-                  value={input.accontiImposteVersatiPerAnnoPrecedente}
-                  onChange={(v) => onChange({ accontiImposteVersatiPerAnnoPrecedente: v })}
-                  placeholder="0 (es: primo anno)"
-                  min={0}
-                  step={0.01}
-                  nullable
-                />
-              </Field>
-            </div>
-          </div>
-        </Card>
+      {/* Tre sezioni: anno-1, riferimento, anno+1 */}
+      <div className="grid gap-4 sm:gap-6 xl:grid-cols-3">
+        <SezioneAnno
+          anno={anno - 1}
+          sottotitolo={`Anno precedente: usato per acconti e saldi del ${anno}.`}
+          dati={conRegime(datiPrec)}
+          calcoli={null}
+          onChange={(d) => setAnno(anno - 1, d)}
+        />
+        <SezioneAnno
+          anno={anno}
+          evidenzia
+          sottotitolo="Anno di riferimento: la dichiarazione e i contributi che stai calcolando."
+          dati={conRegime(datiRif)}
+          calcoli={calcoli}
+          onChange={(d) => setAnno(anno, d)}
+        />
+        <SezioneAnno
+          anno={anno + 1}
+          sottotitolo={`Anno successivo: i pagamenti fatti nel ${anno + 1} (saldo ${anno}, acconti ${anno + 1}, 4ª rata ${anno}).`}
+          dati={conRegime(datiSucc)}
+          calcoli={calcoli}
+          onChange={(d) => setAnno(anno + 1, d)}
+        />
       </div>
 
       {/* Modal di conferma azzeramento */}
@@ -210,13 +196,13 @@ export function InputPanel({ input, calcoli, onChange, onAnniChanged, onAzzeraAn
           <div className="text-center">
             <TriangleAlert className="mx-auto mb-4 h-12 w-12 text-red-500" aria-hidden />
             <h3 className="mb-2 text-lg font-semibold text-slate-800">
-              Azzerare i dati del {input.anno}?
+              Azzerare i dati del {anno}?
             </h3>
             <p className="mb-1 text-sm text-slate-500">
-              Verranno cancellati regimi, contributi versati e acconti dell'anno {input.anno}.
+              Verranno cancellati regimi, contributi e imposte versate dell'anno {anno}.
             </p>
             <p className="text-sm text-slate-500">
-              I dati dell'anno {input.anno - 1} non saranno toccati. L'operazione non è reversibile.
+              I dati degli altri anni non saranno toccati. L'operazione non è reversibile.
             </p>
           </div>
         </ModalBody>

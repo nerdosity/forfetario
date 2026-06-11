@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { versatoPerScadenza, scadenzaPagata, bilancioPagamenti, calcolaScadenze } from './scadenze'
-import type { CalcoloInput, Scadenza } from './types'
+import type { CalcoloInput, Scadenza, VersamentoContributo } from './types'
 
 function scadenza(over: Partial<Scadenza>): Scadenza {
   return {
@@ -13,22 +13,33 @@ function scadenza(over: Partial<Scadenza>): Scadenza {
   }
 }
 
-function input(over: Partial<CalcoloInput>): CalcoloInput {
+/**
+ * Helper test: costruisce un CalcoloInput per-anno (anno rif. 2025). Gli
+ * override col vecchio vocabolario (contributiVersatiDettaglio, imposta*…)
+ * vengono mappati su anni[2025], così i test esistenti restano leggibili.
+ */
+function input(over: {
+  contributiVersatiDettaglio?: VersamentoContributo[]
+  modalitaContributiVersati?: 'totale' | 'dettaglio'
+  contributiVersatiDuranteAnno?: number | null
+  impostaSaldoVersatoAnnoCorrente?: number | null
+  impostaAcconto1VersatoAnnoCorrente?: number | null
+  impostaAcconto2VersatoAnnoCorrente?: number | null
+} = {}): CalcoloInput {
   return {
     anno: 2025,
-    regimiCorrente: [],
-    regimiPrecedente: [],
-    contributiVersatiDuranteAnno: null,
-    modalitaContributiVersati: 'dettaglio',
-    contributiVersatiDettaglio: [],
-    versamentiAnnoSuccessivo: [],
-    contributiVersatiDuranteAnnoPrecedente: null,
-    impostaSaldoVersatoAnnoCorrente: null,
-    impostaAcconto1VersatoAnnoCorrente: null,
-    impostaAcconto2VersatoAnnoCorrente: null,
-    accontiImposteVersatiPerAnnoPrecedente: null,
+    anni: {
+      2025: {
+        regimi: [],
+        modalitaContributi: over.modalitaContributiVersati ?? 'dettaglio',
+        contributiVersatiTotale: over.contributiVersatiDuranteAnno ?? null,
+        contributiVersati: over.contributiVersatiDettaglio ?? [],
+        impostaSaldoVersato: over.impostaSaldoVersatoAnnoCorrente ?? null,
+        impostaAcconto1Versato: over.impostaAcconto1VersatoAnnoCorrente ?? null,
+        impostaAcconto2Versato: over.impostaAcconto2VersatoAnnoCorrente ?? null,
+      },
+    },
     rateazioniImposta: {},
-    ...over,
   }
 }
 

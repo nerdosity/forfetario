@@ -179,64 +179,78 @@ export interface VersamentoContributo {
   deducibile?: boolean
 }
 
-/** Tutti gli input che alimentano il motore di calcolo. */
+/**
+ * Dati di UN anno solare. Tutto ciò che appartiene a quell'anno: i regimi di
+ * competenza e i versamenti effettuati DURANTE quell'anno (contributi e imposte).
+ * I versamenti restano legati all'anno solare in cui sono stati fatti, così
+ * navigando tra gli anni i dati si "portano appresso" senza reinserirli.
+ */
+export interface DatiAnno {
+  /** Regimi/periodi di competenza dell'anno. */
+  regimi: Regime[]
+
+  /** Modalità di inserimento dei contributi versati nell'anno. */
+  modalitaContributi: 'totale' | 'dettaglio'
+
+  /** Cifra unica contributi versati nell'anno (modalità 'totale'). */
+  contributiVersatiTotale: number | null
+
+  /** Righe di dettaglio dei contributi versati DURANTE l'anno (modalità 'dettaglio'). */
+  contributiVersati: VersamentoContributo[]
+
+  /** Imposta sostitutiva: saldo versato durante l'anno (saldo della competenza precedente). */
+  impostaSaldoVersato: number | null
+
+  /** Imposta sostitutiva: 1° acconto versato durante l'anno (giugno). */
+  impostaAcconto1Versato: number | null
+
+  /** Imposta sostitutiva: 2° acconto versato durante l'anno (novembre). */
+  impostaAcconto2Versato: number | null
+}
+
+/** DatiAnno vuoto (un solo regime vuoto, nessun versamento). */
+export function datiAnnoVuoto(regimi: Regime[]): DatiAnno {
+  return {
+    regimi,
+    modalitaContributi: 'totale',
+    contributiVersatiTotale: null,
+    contributiVersati: [],
+    impostaSaldoVersato: null,
+    impostaAcconto1Versato: null,
+    impostaAcconto2Versato: null,
+  }
+}
+
+/**
+ * Tutti gli input che alimentano il motore di calcolo.
+ *
+ * Lo stato è organizzato PER ANNO SOLARE: `anni` è una mappa anno→dati. `anno` è
+ * l'anno di riferimento selezionato. Il motore, dato l'anno N, legge `anni[N]`
+ * (competenza) e `anni[N-1]` (per acconti/saldi); i versamenti che marcano le
+ * scadenze dell'anno N+1 stanno in `anni[N+1]`. Così un pagamento si inserisce
+ * una volta nell'anno solare giusto e vale in tutti i contesti.
+ */
 export interface CalcoloInput {
+  /** Anno di riferimento selezionato. */
   anno: number
-  regimiCorrente: Regime[]
-  regimiPrecedente: Regime[]
 
-  /**
-   * Cifra unica dei contributi INPS versati durante l'anno (modalità 'totale').
-   * NON è il valore effettivo usato dal motore: quello dipende dalla modalità
-   * selezionata (vedi `contributiVersatiEffettivi`). Conservato a parte così da
-   * non perdere la cifra manuale quando si passa alla lista di dettaglio.
-   */
-  contributiVersatiDuranteAnno: number | null
-
-  /** Modalità di inserimento dei contributi versati nell'anno corrente. */
-  modalitaContributiVersati: 'totale' | 'dettaglio'
-
-  /** Righe di dettaglio dei versamenti (usate quando la modalità è 'dettaglio'). */
-  contributiVersatiDettaglio: VersamentoContributo[]
-
-  /**
-   * Pagamenti di contributi fatti NELL'ANNO SUCCESSIVO a quello di riferimento
-   * (es. se l'anno è 2025, i pagamenti effettuati nel 2026: saldo eccedenza 2025,
-   * acconti 2026, rate fisse). Servono a marcare come pagate le scadenze del
-   * calendario dell'anno successivo e a sapere quale rata sul reddito è ancora
-   * aperta per applicarci il conguaglio. Stessa struttura dei versamenti correnti.
-   */
-  versamentiAnnoSuccessivo: VersamentoContributo[]
-
-  /**
-   * Contributi INPS versati DURANTE l'anno precedente (deducibili per il
-   * calcolo dell'imposta sostitutiva dell'anno precedente, mostrata nel
-   * riepilogo).
-   */
-  contributiVersatiDuranteAnnoPrecedente: number | null
-
-  /** Imposta sostitutiva: saldo dell'anno precedente, versato a giugno. */
-  impostaSaldoVersatoAnnoCorrente: number | null
-
-  /** Imposta sostitutiva: 1° acconto per l'anno corrente, versato a giugno. */
-  impostaAcconto1VersatoAnnoCorrente: number | null
-
-  /** Imposta sostitutiva: 2° acconto per l'anno corrente, versato a novembre. */
-  impostaAcconto2VersatoAnnoCorrente: number | null
-
-  /** Acconti imposta sostitutiva versati PER l'anno precedente (giu + nov). */
-  accontiImposteVersatiPerAnnoPrecedente: number | null
+  /** Dati per anno solare: { 2024: {...}, 2025: {...}, 2026: {...} }. */
+  anni: Record<number, DatiAnno>
 
   /**
    * Scelte di rateazione dei versamenti d'imposta, per chiave (vedi
    * Scadenza.chiaveRateazione). Assente o {inizio:'giugno', numeroRate:1}
-   * equivale al versamento unico ordinario.
+   * equivale al versamento unico ordinario. Globale (non per anno).
    */
   rateazioniImposta: Record<string, OpzioniRateazione>
 
   // Gli acconti contributi (G.S. ed eccedenza Art/Comm) NON sono campi a sé:
-  // si ricavano dalle righe 'gs-acconto' / 'ecc-acconto' di contributiVersatiDettaglio
-  // (vedi accontoVersatoDaLista). Così non si inseriscono due volte.
+  // si ricavano dalle righe 'gs-acconto' / 'ecc-acconto' di DatiAnno.contributiVersati.
+}
+
+/** Restituisce i dati di un anno, o un DatiAnno vuoto se l'anno non è presente. */
+export function datiDellAnno(input: CalcoloInput, anno: number): DatiAnno {
+  return input.anni[anno] ?? datiAnnoVuoto([])
 }
 
 // ---------------------------------------------------------------------------

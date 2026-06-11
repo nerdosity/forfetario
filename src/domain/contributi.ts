@@ -1,22 +1,22 @@
-import type { CalcoloInput, Regime, RiduzioneContributi, TipoVersamento } from '@/domain/types'
+import type { DatiAnno, Regime, RiduzioneContributi, TipoVersamento } from '@/domain/types'
 import { contributoFissoAnno, datiAnno } from '@/data/taxData'
 import { formattaScadenza } from '@/domain/dates'
 import { labelTipo } from '@/domain/labels'
 
 /**
- * Valore effettivo dei contributi versati nell'anno, usato per la deducibilità.
+ * Valore effettivo dei contributi versati in un anno, usato per la deducibilità.
  * Dipende dalla modalità: cifra unica manuale oppure somma delle righe di
  * dettaglio. Tenere separate le due fonti evita di perdere dati allo switch.
  */
-export function contributiVersatiEffettivi(input: CalcoloInput): number {
-  if (input.modalitaContributiVersati === 'dettaglio') {
+export function contributiVersatiEffettivi(dati: DatiAnno): number {
+  if (dati.modalitaContributi === 'dettaglio') {
     // Solo le voci deducibili (default true) entrano nella deducibilità: le voci
     // marcate non deducibili (es. contributi volontari extra IVS) sono escluse.
-    return input.contributiVersatiDettaglio
+    return dati.contributiVersati
       .filter((r) => r.deducibile !== false)
       .reduce((s, r) => s + (r.importo ?? 0), 0)
   }
-  return input.contributiVersatiDuranteAnno ?? 0
+  return dati.contributiVersatiTotale ?? 0
 }
 
 /**
@@ -25,11 +25,11 @@ export function contributiVersatiEffettivi(input: CalcoloInput): number {
  * novembre): le sommiamo entrambe. In modalità 'cifra unica' non c'è dettaglio,
  * quindi 0.
  */
-export function accontoVersatoDaLista(input: CalcoloInput, categoria: 'gs' | 'ecc'): number {
-  if (input.modalitaContributiVersati !== 'dettaglio') return 0
+export function accontoVersatoDaLista(dati: DatiAnno, categoria: 'gs' | 'ecc'): number {
+  if (dati.modalitaContributi !== 'dettaglio') return 0
   const tipi: TipoVersamento[] =
     categoria === 'gs' ? ['gs-acconto-1', 'gs-acconto-2'] : ['ecc-acconto-1', 'ecc-acconto-2']
-  return input.contributiVersatiDettaglio
+  return dati.contributiVersati
     .filter((r) => tipi.includes(r.tipo))
     .reduce((s, r) => s + (r.importo ?? 0), 0)
 }
@@ -99,16 +99,16 @@ export function baseSeparataAcconto(regimi: Regime[], annoCostanti: number): num
  * art/comm: fissi annuali + eccedenza; per G.S.: contributi G.S.).
  */
 export function creditoContributivoGestione(
-  input: CalcoloInput,
+  dati: DatiAnno,
   gestione: 'artComm' | 'gs',
   dovutoGestione: number,
 ): number {
-  if (input.modalitaContributiVersati !== 'dettaglio') return 0
+  if (dati.modalitaContributi !== 'dettaglio') return 0
   // Solo versamenti di competenza dell'anno corrente (no saldo/4ª-rata dell'anno prima)
   const tipiArtComm: TipoVersamento[] = ['fissi-1', 'fissi-2', 'fissi-3', 'ecc-acconto-1', 'ecc-acconto-2']
   const tipiGs: TipoVersamento[] = ['gs-acconto-1', 'gs-acconto-2']
   const tipi = gestione === 'gs' ? tipiGs : tipiArtComm
-  const versato = input.contributiVersatiDettaglio
+  const versato = dati.contributiVersati
     .filter((r) => tipi.includes(r.tipo))
     .reduce((s, r) => s + (r.importo ?? 0), 0)
   return Math.max(0, versato - dovutoGestione)

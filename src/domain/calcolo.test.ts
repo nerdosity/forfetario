@@ -24,31 +24,52 @@ const regimeArtigiani: Regime = {
   riduzioneContributi: 'nessuna',
 }
 
-const inputBase: CalcoloInput = {
-  anno: 2024,
-  regimiCorrente: [regimeSeparata],
-  regimiPrecedente: [{ ...regimeSeparata, id: 'prev', fatturato: 30000 }],
-  contributiVersatiDuranteAnno: null,
-  modalitaContributiVersati: 'totale',
-  contributiVersatiDettaglio: [],
-  versamentiAnnoSuccessivo: [],
-  contributiVersatiDuranteAnnoPrecedente: null,
-  impostaSaldoVersatoAnnoCorrente: null,
-  impostaAcconto1VersatoAnnoCorrente: null,
-  impostaAcconto2VersatoAnnoCorrente: null,
-  accontiImposteVersatiPerAnnoPrecedente: null,
-  rateazioniImposta: {},
+/** Costruisce un CalcoloInput per-anno dai parametri di test (anno 2024 di base). */
+function mkInput(opt: {
+  anno?: number
+  regimiCorrente?: Regime[]
+  regimiPrecedente?: Regime[]
+  contributiVersatiDuranteAnno?: number | null
+  contributiVersatiDuranteAnnoPrecedente?: number | null
+  impostaAcconto1VersatoAnnoCorrente?: number | null
+} = {}): CalcoloInput {
+  const anno = opt.anno ?? 2024
+  return {
+    anno,
+    anni: {
+      [anno]: {
+        regimi: opt.regimiCorrente ?? [regimeSeparata],
+        modalitaContributi: 'totale',
+        contributiVersatiTotale: opt.contributiVersatiDuranteAnno ?? null,
+        contributiVersati: [],
+        impostaSaldoVersato: null,
+        impostaAcconto1Versato: opt.impostaAcconto1VersatoAnnoCorrente ?? null,
+        impostaAcconto2Versato: null,
+      },
+      [anno - 1]: {
+        regimi: opt.regimiPrecedente ?? [{ ...regimeSeparata, id: 'prev', fatturato: 30000 }],
+        modalitaContributi: 'totale',
+        contributiVersatiTotale: opt.contributiVersatiDuranteAnnoPrecedente ?? null,
+        contributiVersati: [],
+        impostaSaldoVersato: null,
+        impostaAcconto1Versato: null,
+        impostaAcconto2Versato: null,
+      },
+    },
+    rateazioniImposta: {},
+  }
 }
+
+const inputBase: CalcoloInput = mkInput()
 
 describe('rate fisse — competenza temporale', () => {
   // Artigiano a regime tutto l'anno, sia nel corrente sia nel precedente
   const artInteroAnno: Regime = { ...regimeArtigiani, meseInizio: 1, giornoInizio: 1, riduzioneContributi: '35' }
-  const input2025: CalcoloInput = {
-    ...inputBase,
+  const input2025: CalcoloInput = mkInput({
     anno: 2025,
     regimiCorrente: [{ ...artInteroAnno, id: 'cur' }],
     regimiPrecedente: [{ ...artInteroAnno, id: 'prev' }],
-  }
+  })
 
   it('4ª rata dell\'anno precedente usa le tariffe 2024, non 2025', () => {
     const r = calcola(input2025)
@@ -101,20 +122,20 @@ describe('calcola — regime separata base', () => {
 
 describe('calcola — deducibilità contributi versati', () => {
   it('contributi versati riducono imponibile netto', () => {
-    const conDeducibilita = calcola({ ...inputBase, contributiVersatiDuranteAnno: 5000 })
+    const conDeducibilita = calcola(mkInput({ contributiVersatiDuranteAnno: 5000 }))
     const senza = calcola(inputBase)
     expect(conDeducibilita.imponibileNettoTotalePerImposte).toBeLessThan(senza.imponibileNettoTotalePerImposte)
   })
 
   it('contributi versati > imponibile → imposta = 0', () => {
-    const r = calcola({ ...inputBase, contributiVersatiDuranteAnno: 999999 })
+    const r = calcola(mkInput({ contributiVersatiDuranteAnno: 999999 }))
     expect(r.totaleImposte).toBe(0)
   })
 })
 
 describe('calcola — credito imposte', () => {
   it('acconti > dovuto → credito', () => {
-    const r = calcola({ ...inputBase, impostaAcconto1VersatoAnnoCorrente: 99999 })
+    const r = calcola(mkInput({ impostaAcconto1VersatoAnnoCorrente: 99999 }))
     expect(r.creditoImposteAnnoCorrente).toBeGreaterThan(0)
     expect(r.saldoImposteDaVersareAnnoCorrente).toBe(0)
   })
@@ -122,29 +143,26 @@ describe('calcola — credito imposte', () => {
 
 describe('calcola — artigiani con eccedenza', () => {
   it('contributi fissi > 0', () => {
-    const r = calcola({ ...inputBase, regimiCorrente: [regimeArtigiani] })
+    const r = calcola(mkInput({ regimiCorrente: [regimeArtigiani] }))
     expect(r.totaleContributiFissiArtComm).toBeGreaterThan(0)
   })
 
   it('eccedenza artigiani con fatturato alto', () => {
     const altoFatturato: Regime = { ...regimeArtigiani, fatturato: 80000 }
-    const r = calcola({ ...inputBase, regimiCorrente: [altoFatturato] })
+    const r = calcola(mkInput({ regimiCorrente: [altoFatturato] }))
     expect(r.totaleContributiEccedenzaArtComm).toBeGreaterThan(0)
   })
 
   it('riduzione 35% abbassa contributi fissi', () => {
-    const pieno = calcola({ ...inputBase, regimiCorrente: [regimeArtigiani] })
-    const ridotto = calcola({
-      ...inputBase,
-      regimiCorrente: [{ ...regimeArtigiani, riduzioneContributi: '35' }],
-    })
+    const pieno = calcola(mkInput({ regimiCorrente: [regimeArtigiani] }))
+    const ridotto = calcola(mkInput({ regimiCorrente: [{ ...regimeArtigiani, riduzioneContributi: '35' }] }))
     expect(ridotto.totaleContributiFissiArtComm).toBeLessThan(pieno.totaleContributiFissiArtComm)
   })
 })
 
 describe('calcola — scadenze', () => {
   it('genera scadenze anno corrente e successivo', () => {
-    const r = calcola({ ...inputBase, regimiPrecedente: [{ ...regimeSeparata, id: 'p', fatturato: 30000 }] })
+    const r = calcola(mkInput({ regimiPrecedente: [{ ...regimeSeparata, id: 'p', fatturato: 30000 }] }))
     expect(r.scadenzeAnnoCorrente.length).toBeGreaterThanOrEqual(0)
     expect(r.scadenzeAnnoSuccessivo.length).toBeGreaterThan(0)
   })
@@ -168,7 +186,7 @@ describe('calcola — anno precedente', () => {
 
   it('deducibilità anno precedente abbassa imposte precedenti', () => {
     const senza = calcola(inputBase)
-    const con = calcola({ ...inputBase, contributiVersatiDuranteAnnoPrecedente: 5000 })
+    const con = calcola(mkInput({ contributiVersatiDuranteAnnoPrecedente: 5000 }))
     expect(con.datiAnnoPrecedente.totaleImposte).toBeLessThan(senza.datiAnnoPrecedente.totaleImposte)
   })
 })

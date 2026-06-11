@@ -19,28 +19,17 @@ import { SaldiCrediti } from '@/components/SaldiCrediti'
 import { Dichiarazione } from '@/components/Dichiarazione'
 import { calcola } from '@/domain/calcolo'
 import { haDatiPerDichiarazione } from '@/domain/dichiarazione'
-import { regimeVuoto } from '@/domain/regimeFactory'
 import type { CalcoloInput } from '@/domain/types'
 import { anniDisponibili } from '@/data/taxData'
 import { caricaInput, salvaInput } from '@/data/inputStorage'
 import { theme } from '@/theme'
 import { useInputState } from '@/hooks/useInputState'
 
-// Stato di default: tutto vuoto, un periodo vuoto per anno
+// Stato di default: nessun dato (mappa anni vuota), anno = primo disponibile
 function inputDefault(): CalcoloInput {
   return {
     anno: anniDisponibili()[0],
-    regimiCorrente: [regimeVuoto()],
-    regimiPrecedente: [regimeVuoto()],
-    contributiVersatiDuranteAnno: null,
-    modalitaContributiVersati: 'totale',
-    contributiVersatiDettaglio: [],
-    versamentiAnnoSuccessivo: [],
-    contributiVersatiDuranteAnnoPrecedente: null,
-    impostaSaldoVersatoAnnoCorrente: null,
-    impostaAcconto1VersatoAnnoCorrente: null,
-    impostaAcconto2VersatoAnnoCorrente: null,
-    accontiImposteVersatiPerAnnoPrecedente: null,
+    anni: {},
     rateazioniImposta: {},
   }
 }
@@ -95,23 +84,20 @@ export default function App() {
     forceUpdate()
   }, [setInput])
 
-  // Azzera SOLO i dati dell'anno di riferimento corrente (regimi e contributi/acconti
-  // dell'anno corrente). Anno selezionato e dati dell'anno precedente restano intatti.
+  // Azzera SOLO i dati dell'anno di riferimento selezionato (rimuove la sua voce
+  // dalla mappa anni). Anno selezionato e dati degli altri anni restano intatti.
   const handleAzzeraAnnoCorrente = useCallback(() => {
-    setInput((prev) => ({
-      ...prev,
-      regimiCorrente: [regimeVuoto()],
-      contributiVersatiDuranteAnno: null,
-      accontiImposteVersatiPerAnnoCorrente: null,
-      accontiContributiSeparataVersatiPerAnnoCorrente: null,
-      accontiContributiEccedenzaArtCommVersatiPerAnnoCorrente: null,
-    }))
+    setInput((prev) => {
+      const anni = { ...prev.anni }
+      delete anni[prev.anno]
+      return { ...prev, anni }
+    })
   }, [setInput])
 
   const prev = calcoli.datiAnnoPrecedente
   const hasDatiPrecedente = prev.totaleFatturato > 0 || prev.totaleImponibileLordo > 0
   // Con un solo periodo, "Dettaglio regimi" coincide con "Riepilogo": è ridondante.
-  const hasPiuRegimi = input.regimiCorrente.length > 1
+  const hasPiuRegimi = (input.anni[input.anno]?.regimi.length ?? 0) > 1
   // "Dichiarazione" ha senso solo con almeno un regime con fatturato inserito.
   const hasDatiDichiarazione = haDatiPerDichiarazione(calcoli)
 

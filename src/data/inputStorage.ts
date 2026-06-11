@@ -1,4 +1,5 @@
-import type { CalcoloInput, OpzioniRateazione, Regime, TipoVersamento, VersamentoContributo } from '@/domain/types'
+import type { CalcoloInput, DatiAnno, OpzioniRateazione, Regime, TipoVersamento, VersamentoContributo } from '@/domain/types'
+import { datiAnnoVuoto } from '@/domain/types'
 import { regimeVuoto, versamentoVuoto } from '@/domain/regimeFactory'
 import { normalizzaOpzioni, rateazioneNeutra } from '@/domain/rateazione'
 import { anniDisponibili } from '@/data/taxData'
@@ -92,9 +93,79 @@ function normalizzaRateazioni(raw: unknown): Record<string, OpzioniRateazione> {
   return out
 }
 
+/** Ricostruisce un DatiAnno valido da dati grezzi. */
+function normalizzaDatiAnno(raw: unknown): DatiAnno {
+  const base = datiAnnoVuoto([regimeVuoto()])
+  if (typeof raw !== 'object' || raw === null) return base
+  const o = raw as Record<string, unknown>
+  return {
+    regimi: normalizzaRegimi(o.regimi),
+    modalitaContributi: o.modalitaContributi === 'dettaglio' ? 'dettaglio' : 'totale',
+    contributiVersatiTotale: numOrNull(o.contributiVersatiTotale),
+    contributiVersati: normalizzaDettaglio(o.contributiVersati),
+    impostaSaldoVersato: numOrNull(o.impostaSaldoVersato),
+    impostaAcconto1Versato: numOrNull(o.impostaAcconto1Versato),
+    impostaAcconto2Versato: numOrNull(o.impostaAcconto2Versato),
+  }
+}
+
+/** Normalizza la mappa anni→DatiAnno (chiavi numeriche valide). */
+function normalizzaAnni(raw: unknown): Record<number, DatiAnno> {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return {}
+  const out: Record<number, DatiAnno> = {}
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    const anno = Number(k)
+    if (Number.isInteger(anno) && anno > 1990 && anno < 2200) out[anno] = normalizzaDatiAnno(v)
+  }
+  return out
+}
+
 /**
- * Carica l'input salvato, fondendolo con uno stato di default. Restituisce
- * `null` se non c'è nulla di valido in localStorage (l'app userà il default).
+ * MIGRAZIONE dal vecchio formato mono-anno (campi piatti regimiCorrente/
+ * Precedente, contributiVersati*, imposta*…) al nuovo per-anno. Mappa:
+ * - anno → regimi correnti, contributi/imposte versati durante l'anno
+ * - anno-1 → regimi precedenti, contributi versati durante l'anno precedente
+ *   (gli acconti imposta "per l'anno precedente" diventano gli acconti versati
+ *   durante l'anno-1; il saldo/acconti "versati nell'anno corrente" restano
+ *   nell'anno corrente).
+ * - versamentiAnnoSuccessivo → anno+1.
+ */
+function migraDalVecchio(o: Record<string, unknown>, anno: number): Record<number, DatiAnno> {
+  const anni: Record<number, DatiAnno> = {}
+  // Anno di riferimento
+  anni[anno] = {
+    regimi: normalizzaRegimi(o.regimiCorrente),
+    modalitaContributi: o.modalitaContributiVersati === 'dettaglio' ? 'dettaglio' : 'totale',
+    contributiVersatiTotale: numOrNull(o.contributiVersatiDuranteAnno),
+    contributiVersati: normalizzaDettaglio(o.contributiVersatiDettaglio),
+    impostaSaldoVersato: numOrNull(o.impostaSaldoVersatoAnnoCorrente),
+    impostaAcconto1Versato: numOrNull(o.impostaAcconto1VersatoAnnoCorrente),
+    impostaAcconto2Versato: numOrNull(o.impostaAcconto2VersatoAnnoCorrente),
+  }
+  // Anno precedente
+  anni[anno - 1] = {
+    regimi: normalizzaRegimi(o.regimiPrecedente),
+    modalitaContributi: 'totale',
+    contributiVersatiTotale: numOrNull(o.contributiVersatiDuranteAnnoPrecedente),
+    contributiVersati: [],
+    impostaSaldoVersato: null,
+    // gli acconti imposta "per l'anno precedente" sono stati versati durante l'anno-1;
+    // li conserviamo come unico totale sul 1° acconto (l'utente potrà ripartirli).
+    impostaAcconto1Versato: numOrNull(o.accontiImposteVersatiPerAnnoPrecedente),
+    impostaAcconto2Versato: null,
+  }
+  // Anno successivo (pagamenti già fatti per N+1)
+  const versSucc = normalizzaDettaglio(o.versamentiAnnoSuccessivo)
+  if (versSucc.length > 0) {
+    anni[anno + 1] = { ...datiAnnoVuoto([regimeVuoto()]), modalitaContributi: 'dettaglio', contributiVersati: versSucc }
+  }
+  return anni
+}
+
+/**
+ * Carica l'input salvato. Restituisce `null` se non c'è nulla di valido.
+ * Riconosce sia il nuovo formato (con `anni`) sia il vecchio mono-anno, che
+ * viene migrato automaticamente.
  */
 export function caricaInput(base: CalcoloInput): CalcoloInput | null {
   try {
@@ -106,19 +177,12 @@ export function caricaInput(base: CalcoloInput): CalcoloInput | null {
     const anniOk = anniDisponibili()
     const anno = typeof o.anno === 'number' && anniOk.includes(o.anno) ? o.anno : base.anno
 
+    // Formato nuovo (ha la mappa `anni`) oppure migrazione dal vecchio mono-anno
+    const anni = o.anni !== undefined ? normalizzaAnni(o.anni) : migraDalVecchio(o, anno)
+
     return {
       anno,
-      regimiCorrente: normalizzaRegimi(o.regimiCorrente),
-      regimiPrecedente: normalizzaRegimi(o.regimiPrecedente),
-      contributiVersatiDuranteAnno: numOrNull(o.contributiVersatiDuranteAnno),
-      modalitaContributiVersati: o.modalitaContributiVersati === 'dettaglio' ? 'dettaglio' : 'totale',
-      contributiVersatiDettaglio: normalizzaDettaglio(o.contributiVersatiDettaglio),
-      versamentiAnnoSuccessivo: normalizzaDettaglio(o.versamentiAnnoSuccessivo),
-      contributiVersatiDuranteAnnoPrecedente: numOrNull(o.contributiVersatiDuranteAnnoPrecedente),
-      impostaSaldoVersatoAnnoCorrente: numOrNull(o.impostaSaldoVersatoAnnoCorrente),
-      impostaAcconto1VersatoAnnoCorrente: numOrNull(o.impostaAcconto1VersatoAnnoCorrente),
-      impostaAcconto2VersatoAnnoCorrente: numOrNull(o.impostaAcconto2VersatoAnnoCorrente),
-      accontiImposteVersatiPerAnnoPrecedente: numOrNull(o.accontiImposteVersatiPerAnnoPrecedente),
+      anni,
       rateazioniImposta: normalizzaRateazioni(o.rateazioniImposta),
     }
   } catch {

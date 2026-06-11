@@ -1,4 +1,5 @@
 import type { CalcoloInput, ComponenteScadenza, OpzioniRateazione, Regime, Scadenza, RiferimentoScadenza, TipoVersamento } from '@/domain/types'
+import { datiDellAnno } from '@/domain/types'
 import { datiAnno, anniDisponibili, type ScadenzeAnno } from '@/data/taxData'
 import { proiettaDatiAnno } from '@/data/proiezioneAnno'
 import { calcolaRateContributiFissi, applicaRiduzioneIVS, baseEccedenzaAcconto, baseSeparataAcconto } from '@/domain/contributi'
@@ -85,25 +86,22 @@ export function versatoPerScadenza(scadenza: Scadenza, input: CalcoloInput): num
   const rif = scadenza.riferimenti
   if (!rif || rif.length === 0) return null
 
-  // Le scadenze che cadono nell'anno SUCCESSIVO (saldo competenza anno + acconti
-  // anno+1) si pagano nell'anno successivo: i loro versamenti stanno nella lista
-  // dedicata. Le scadenze dell'anno di riferimento usano i versamenti correnti.
-  const isAnnoSuccessivo = scadenza.annoScadenza === input.anno + 1
-  const listaVersamenti = isAnnoSuccessivo ? input.versamentiAnnoSuccessivo : input.contributiVersatiDettaglio
+  // Una scadenza si paga nell'anno SOLARE in cui cade (scadenza.annoScadenza):
+  // i suoi versamenti stanno in anni[annoScadenza]. Così i pagamenti seguono
+  // sempre l'anno giusto, senza distinzioni corrente/successivo.
+  const dati = datiDellAnno(input, scadenza.annoScadenza)
 
   const importoVoce = (tipo: TipoVersamento): number =>
-    input.modalitaContributiVersati === 'dettaglio'
-      ? (listaVersamenti ?? [])
+    dati.modalitaContributi === 'dettaglio'
+      ? dati.contributiVersati
           .filter((r) => r.tipo === tipo)
           .reduce((s, r) => s + (r.importo ?? 0), 0)
       : 0
 
   return rif.reduce((tot, r) => {
-    // I versamenti d'imposta correnti restano gli stessi campi solo per le
-    // scadenze dell'anno di riferimento (l'anno+1 non ha campi imposta dedicati).
-    if (r === 'imposta-saldo') return tot + (isAnnoSuccessivo ? 0 : input.impostaSaldoVersatoAnnoCorrente ?? 0)
-    if (r === 'imposta-acconto1') return tot + (isAnnoSuccessivo ? 0 : input.impostaAcconto1VersatoAnnoCorrente ?? 0)
-    if (r === 'imposta-acconto2') return tot + (isAnnoSuccessivo ? 0 : input.impostaAcconto2VersatoAnnoCorrente ?? 0)
+    if (r === 'imposta-saldo') return tot + (dati.impostaSaldoVersato ?? 0)
+    if (r === 'imposta-acconto1') return tot + (dati.impostaAcconto1Versato ?? 0)
+    if (r === 'imposta-acconto2') return tot + (dati.impostaAcconto2Versato ?? 0)
     return tot + importoVoce(r)
   }, 0)
 }
@@ -435,9 +433,11 @@ export function calcolaScadenze({
   // una rata pagata in MENO non riduce il credito — va regolarizzata a parte (con
   // mora), non si compensa col saldo. Si confrontano solo le rate di competenza
   // dell'anno (fisse 1ª-3ª + acconti); saldo e 4ª rata sono competenza precedente.
+  // Versamenti dell'anno di riferimento (competenza corrente), dalla mappa anni.
+  const datiRif = input ? datiDellAnno(input, anno) : undefined
   const importoVersato = (tipo: TipoVersamento): number =>
-    input?.modalitaContributiVersati === 'dettaglio'
-      ? input.contributiVersatiDettaglio
+    datiRif?.modalitaContributi === 'dettaglio'
+      ? datiRif.contributiVersati
           .filter((r) => r.tipo === tipo)
           .reduce((s, r) => s + (r.importo ?? 0), 0)
       : 0

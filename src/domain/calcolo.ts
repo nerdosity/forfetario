@@ -5,6 +5,7 @@ import type {
   RisultatoAnno,
   RisultatoCalcolo,
 } from '@/domain/types'
+import { datiDellAnno } from '@/domain/types'
 import { aliquotaContributi, datiAnno } from '@/data/taxData'
 import { giorniPermanenza } from '@/domain/dates'
 import { getMesiInPeriodo, applicaRiduzioneIVS, contributiVersatiEffettivi, rateFissePerTrimestre, baseEccedenzaAcconto, baseSeparataAcconto } from '@/domain/contributi'
@@ -168,23 +169,19 @@ function calcolaDatiAnno(
 
 /** Calcola tutto: anno corrente + anno precedente + saldi + scadenze. */
 export function calcola(input: CalcoloInput): RisultatoCalcolo {
-  const {
-    anno,
-    regimiCorrente,
-    regimiPrecedente,
-    contributiVersatiDuranteAnnoPrecedente,
-    impostaAcconto1VersatoAnnoCorrente,
-    impostaAcconto2VersatoAnnoCorrente,
-    accontiImposteVersatiPerAnnoPrecedente,
-  } = input
+  const { anno } = input
+  const datiAnnoRif = datiDellAnno(input, anno)
+  const datiAnnoPrec = datiDellAnno(input, anno - 1)
+  const regimiCorrente = datiAnnoRif.regimi
+  const regimiPrecedente = datiAnnoPrec.regimi
 
-  // Acconti imposta usati per il saldo: 1° (giugno) + 2° (novembre). Il saldo
-  // dell'anno precedente NON è un acconto, è il saldo a sé.
+  // Acconti imposta versati PER l'anno di riferimento = i due acconti versati
+  // DURANTE l'anno di riferimento (giugno + novembre di quell'anno solare).
   const accontiImposteVersatiPerAnnoCorrente =
-    (impostaAcconto1VersatoAnnoCorrente ?? 0) + (impostaAcconto2VersatoAnnoCorrente ?? 0)
+    (datiAnnoRif.impostaAcconto1Versato ?? 0) + (datiAnnoRif.impostaAcconto2Versato ?? 0)
 
-  const deducibiliAnnoCorrente = contributiVersatiEffettivi(input)
-  const deducibiliAnnoPrecedente = contributiVersatiDuranteAnnoPrecedente ?? 0
+  const deducibiliAnnoCorrente = contributiVersatiEffettivi(datiAnnoRif)
+  const deducibiliAnnoPrecedente = contributiVersatiEffettivi(datiAnnoPrec)
 
   const datiCorrente = calcolaDatiAnno(regimiCorrente, anno, deducibiliAnnoCorrente)
 
@@ -243,7 +240,8 @@ export function calcola(input: CalcoloInput): RisultatoCalcolo {
     saldoContributiEccArtComm,
     totaleImposteCorrente: datiCorrente.totaleImposte,
     totaleImpostePrecedente: datiPrecedente.totaleImposte,
-    accontiImposteVersatiPerAnnoPrecedente: accontiImposteVersatiPerAnnoPrecedente ?? 0,
+    accontiImposteVersatiPerAnnoPrecedente:
+      (datiAnnoPrec.impostaAcconto1Versato ?? 0) + (datiAnnoPrec.impostaAcconto2Versato ?? 0),
     totaleContributiSeparataPrecedente: datiPrecedente.totaleContributiSeparata,
     totaleContributiEccedenzaArtCommPrecedente: datiPrecedente.totaleContributiEccedenzaArtComm,
     // Dettaglio per documentare i saldi (dovuto − acconti DOVUTI, come INPS).

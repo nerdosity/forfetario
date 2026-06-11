@@ -7,7 +7,7 @@ import {
   contributiVersatiEffettivi,
   accontoVersatoDaLista,
 } from './contributi'
-import type { CalcoloInput, Regime } from './types'
+import type { DatiAnno, Regime } from './types'
 
 describe('getMesiInPeriodo', () => {
   it('anno intero → 12', () => expect(getMesiInPeriodo(1, 1, 12, 31)).toBe(12))
@@ -120,49 +120,59 @@ describe('rateFissePerTrimestre', () => {
 })
 
 describe('contributiVersatiEffettivi', () => {
-  const base = { contributiVersatiDuranteAnno: 1000 } as CalcoloInput
-
   it('modalità totale: usa la cifra unica', () => {
-    const input = { ...base, modalitaContributiVersati: 'totale', contributiVersatiDettaglio: [] } as CalcoloInput
-    expect(contributiVersatiEffettivi(input)).toBe(1000)
+    const dati = { modalitaContributi: 'totale', contributiVersatiTotale: 1000, contributiVersati: [] } as unknown as DatiAnno
+    expect(contributiVersatiEffettivi(dati)).toBe(1000)
   })
 
   it('modalità dettaglio: somma le righe (ignora la cifra unica)', () => {
-    const input = {
-      ...base,
-      modalitaContributiVersati: 'dettaglio',
-      contributiVersatiDettaglio: [
+    const dati = {
+      modalitaContributi: 'dettaglio',
+      contributiVersatiTotale: 1000,
+      contributiVersati: [
         { id: 'a', tipo: 'fissi-1', descrizione: '', importo: 300 },
         { id: 'b', tipo: 'altro', descrizione: 'x', importo: 250 },
         { id: 'c', tipo: 'altro', descrizione: 'vuoto', importo: null },
       ],
-    } as CalcoloInput
-    expect(contributiVersatiEffettivi(input)).toBe(550)
+    } as unknown as DatiAnno
+    expect(contributiVersatiEffettivi(dati)).toBe(550)
+  })
+
+  it('esclude le voci non deducibili (volontari)', () => {
+    const dati = {
+      modalitaContributi: 'dettaglio',
+      contributiVersatiTotale: null,
+      contributiVersati: [
+        { id: 'a', tipo: 'fissi-1', descrizione: '', importo: 300 },
+        { id: 'b', tipo: 'altro', descrizione: 'volontari', importo: 200, deducibile: false },
+      ],
+    } as unknown as DatiAnno
+    expect(contributiVersatiEffettivi(dati)).toBe(300)
   })
 })
 
 describe('accontoVersatoDaLista', () => {
   it('somma entrambe le rate d\'acconto G.S. (1° e 2°)', () => {
-    const input = {
-      modalitaContributiVersati: 'dettaglio',
-      contributiVersatiDettaglio: [
+    const dati = {
+      modalitaContributi: 'dettaglio',
+      contributiVersati: [
         { id: 'a', tipo: 'gs-acconto-1', descrizione: '', importo: 500 },
         { id: 'b', tipo: 'gs-acconto-2', descrizione: '', importo: 450 },
         { id: 'c', tipo: 'gs-saldo', descrizione: '', importo: 800 },
         { id: 'd', tipo: 'ecc-acconto-1', descrizione: '', importo: 300 },
         { id: 'e', tipo: 'ecc-acconto-2', descrizione: '', importo: 300 },
       ],
-    } as CalcoloInput
-    expect(accontoVersatoDaLista(input, 'gs')).toBe(950)
-    expect(accontoVersatoDaLista(input, 'ecc')).toBe(600)
+    } as unknown as DatiAnno
+    expect(accontoVersatoDaLista(dati, 'gs')).toBe(950)
+    expect(accontoVersatoDaLista(dati, 'ecc')).toBe(600)
   })
 
   it('in modalità cifra unica non ci sono acconti da lista → 0', () => {
-    const input = {
-      modalitaContributiVersati: 'totale',
-      contributiVersatiDuranteAnno: 1000,
-      contributiVersatiDettaglio: [],
-    } as unknown as CalcoloInput
-    expect(accontoVersatoDaLista(input, 'gs')).toBe(0)
+    const dati = {
+      modalitaContributi: 'totale',
+      contributiVersatiTotale: 1000,
+      contributiVersati: [],
+    } as unknown as DatiAnno
+    expect(accontoVersatoDaLista(dati, 'gs')).toBe(0)
   })
 })
