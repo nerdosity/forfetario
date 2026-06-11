@@ -124,11 +124,14 @@ export function generaCodeline(p: ParametriCodeline): string | null {
  * input valido; questo flag indica solo la copertura della validazione.
  */
 export function codelineAffidabile(p: ParametriCodeline): boolean {
+  // Rate verificate sullo strumento ufficiale INPS: 0-4 (fissi) e 6 (eccedenza
+  // saldo/acconto a percentuale, causale AP). Tutte confermate al centesimo.
+  const rataOk = (p.rata >= 0 && p.rata <= 4) || p.rata === 6
   return (
     /^\d{8}$/.test(p.matricola) &&
     p.codiceSoggetto === '10' &&
     (p.sap ?? SAP_DEFAULT) === '7009' &&
-    p.rata >= 0 && p.rata <= 4 &&
+    rataOk &&
     generaCodeline(p) !== null
   )
 }
@@ -144,6 +147,8 @@ export interface ScadenzaContributo {
   descrizione: string
   importo: number
   annoScadenza: number
+  /** Data di scadenza in formato leggibile (es. "16 Febbraio 2026"). */
+  data?: string
 }
 
 /** Causale INPS della riga (AF = fissi/minimale, AP = eccedente il minimale). */
@@ -156,6 +161,8 @@ export interface RigaCodeline {
   anno: number
   rata: number
   importo: number
+  /** Data di scadenza leggibile (quando si versa). */
+  data?: string
   /** Codeline calcolata (17 cifre) o null se parametri non validi. */
   codeline: string | null
   /** Vero se nel dominio validato sui campioni reali (titolare, sede 7009). */
@@ -198,6 +205,7 @@ export function righeCodelineDaScadenze(
       anno,
       rata,
       importo: s.importo,
+      data: s.data,
       codeline: generaCodeline(params),
       affidabile: codelineAffidabile(params),
     })

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { FileSpreadsheet, ExternalLink, Copy } from 'lucide-react'
-import { Badge, Button, Table, TableBody, TableCell, TableHead, TableHeadCell, TableRow, TextInput } from 'flowbite-react'
+import { Button, Table, TableBody, TableCell, TableHead, TableHeadCell, TableRow, TextInput } from 'flowbite-react'
 import type { RisultatoCalcolo } from '@/domain/types'
 import { generaRighiDichiarazione, type CampoDichiarazione } from '@/domain/dichiarazione'
 import { righeCodelineDaScadenze } from '@/domain/codelineInps'
@@ -158,7 +158,10 @@ function SezioneCodeline({ calcoli }: { calcoli: RisultatoCalcolo }) {
             <TableBody className="divide-y divide-slate-100">
               {righe.map((r, i) => (
                 <TableRow key={i} className="bg-white">
-                  <TableCell className="py-2.5 pr-4 text-slate-700">{r.descrizione}</TableCell>
+                  <TableCell className="py-2.5 pr-4 text-slate-700">
+                    {r.descrizione}
+                    {r.data && <span className="block text-xs text-slate-400">si versa entro il {r.data}</span>}
+                  </TableCell>
                   <TableCell className="hidden py-2.5 font-mono text-slate-600 sm:table-cell">{r.causale}</TableCell>
                   <TableCell className="py-2.5 text-right tabular-nums whitespace-nowrap">{formatEuro(r.importo)}</TableCell>
                   <TableCell className="py-2.5">
@@ -191,32 +194,20 @@ function SezioneCodeline({ calcoli }: { calcoli: RisultatoCalcolo }) {
               ))}
             </TableBody>
           </Table>
-          {righe.some((r) => r.codeline && !r.affidabile) && (
-            <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
-              <Badge color="warning" className="mt-0.5 w-fit shrink-0">Da verificare</Badge>
-              <p className="text-sm text-amber-800">
-                Alcune righe usano un codice soggetto o una sede non coperti dalla validazione
-                (icona di avviso). L'algoritmo è quello ufficiale, ma per sicurezza verifica queste
-                codeline sullo strumento del Cassetto previdenziale INPS prima del pagamento.
-              </p>
-            </div>
-          )}
-          <p className={`${theme.helpText} mt-2`}>
-            Codice INPS da riportare nel campo "matricola INPS/codice INPS" della sezione INPS del modello F24.
-            Calcolato con l'algoritmo ufficiale INPS (controcodice modulo 99 a blocchi e check digit finale
-            modulo 11) descritto nella{' '}
+          <p className={`${theme.helpText} mt-3`}>
+            Codice da riportare nel campo "matricola INPS/codice INPS" della sezione INPS del modello F24,
+            calcolato con l'algoritmo ufficiale (
             <a
               href="https://servizi2.inps.it/servizi/Bussola/VisualizzaDoc.aspx?sVirtualURL=/Circolari/Circolare%20numero%20123%20del%209-6-1998.htm&Accessibile=yes"
               target="_blank"
               rel="noopener noreferrer"
               className="text-blue-600 underline hover:text-blue-700"
             >
-              Circolare INPS n. 123 del 9/6/1998
-            </a>.
-          </p>
-          <p className={`${theme.helpText} mt-1 italic`}>
-            Strumento di supporto non ufficiale: verifica il codice sul Cassetto previdenziale INPS
-            prima del versamento. Nessuna responsabilità per errori o pagamenti respinti.
+              Circolare INPS 123/1998
+            </a>
+            ).{righe.some((r) => r.codeline && !r.affidabile) && ' Le righe con (i) usano soggetto/sede fuori dal campione di test.'}{' '}
+            Strumento non ufficiale: verifica sul Cassetto INPS prima del versamento, nessuna responsabilità
+            per pagamenti respinti.
           </p>
         </div>
       )}
@@ -267,14 +258,11 @@ export function Dichiarazione({ anno, calcoli }: Props) {
         <SezioneCodeline calcoli={calcoli} />
 
         {righi.haCampiDaCompletare && (
-          <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
-            <Badge color="warning" className="mt-0.5 w-fit shrink-0">Da completare</Badge>
-            <p className="text-sm text-amber-800">
-              I campi in arancione (es. il codice ATECO) non sono ricavabili dai dati inseriti:
-              riportarli a mano. Il documento è un promemoria di compilazione, non sostituisce la
-              dichiarazione né i controlli del software ufficiale.
-            </p>
-          </div>
+          <p className={theme.helpText}>
+            I campi <span className="text-amber-600">in arancione</span> (es. il codice ATECO) vanno
+            riportati a mano: non sono ricavabili dai dati inseriti. Promemoria di compilazione, non
+            sostituisce la dichiarazione né il software ufficiale.
+          </p>
         )}
       </div>
     </Card>
