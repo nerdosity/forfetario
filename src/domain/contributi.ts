@@ -30,46 +30,49 @@ export function accontoVersatoDaLista(input: CalcoloInput, categoria: 'gs' | 'ec
     .reduce((s, r) => s + (r.importo ?? 0), 0)
 }
 
+/** Reddito imponibile (fatturato × coefficiente) di un regime. */
+const imponibileRegime = (r: Regime): number => (r.fatturato * r.coefficiente) / 100
+
 /**
- * Contributi IVS sull'eccedenza (oltre il minimale) per un regime
- * artigiani/commercianti, usando le COSTANTI di un anno indicato (che può
- * differire dall'anno del regime: serve per gli acconti, che applicano al
- * reddito storico le aliquote/minimale dell'anno in corso, come fa l'INPS).
+ * Base degli acconti contributi col metodo INPS: eccedenza IVS sui redditi
+ * artigiani/commercianti di un anno, calcolata sul reddito ANNUO AGGREGATO
+ * della gestione, col minimale PIENO (non proporzionato ai mesi) e le COSTANTI
+ * dell'anno in cui l'acconto si versa. È così che lo strumento ufficiale INPS
+ * "Contributi eccedenti il minimale" dimensiona gli acconti: parte dal reddito
+ * comunicato come importo annuo, applica minimale e aliquote dell'anno corrente.
  *
- * Replica la logica del motore: minimale e soglia prima fascia proporzionati ai
- * mesi, due fasce sopra la soglia (aliquota +1% sulla seconda), riduzione IVS.
- * Restituisce 0 per la gestione separata o se il reddito non supera il minimale.
+ * Distingue artigiani e commercianti (aliquote diverse): somma le due eccedenze
+ * calcolate separatamente, ciascuna sul proprio reddito di gestione.
  */
-export function eccedenzaIVSConCostanti(regime: Regime, annoCostanti: number): number {
-  if (regime.tipo === 'separata') return 0
-  const { minimaleReddito, sogliaPrimaFascia } = datiAnno(annoCostanti)
-  const aliquota = regime.tipo === 'artigiani'
-    ? datiAnno(annoCostanti).aliquotaArtigiani
-    : datiAnno(annoCostanti).aliquotaCommercianti
-  const mesi = getMesiInPeriodo(regime.meseInizio, regime.giornoInizio, regime.meseFine, regime.giornoFine)
-  const imponibile = (regime.fatturato * regime.coefficiente) / 100
-  const minimaleProporz = (minimaleReddito * mesi) / 12
-  if (imponibile <= minimaleProporz) return 0
-  const sogliaProporz = (sogliaPrimaFascia * mesi) / 12
-  let bruti: number
-  if (imponibile <= sogliaProporz) {
-    bruti = ((imponibile - minimaleProporz) * aliquota) / 100
-  } else {
-    const fascia1 = sogliaProporz - minimaleProporz
-    const fascia2 = imponibile - sogliaProporz
-    bruti = (fascia1 * aliquota) / 100 + (fascia2 * (aliquota + 1)) / 100
+export function baseEccedenzaAcconto(regimi: Regime[], annoCostanti: number): number {
+  const dati = datiAnno(annoCostanti)
+  const calcola = (tipo: 'artigiani' | 'commercianti'): number => {
+    const periodi = regimi.filter((r) => r.tipo === tipo)
+    if (periodi.length === 0) return 0
+    const reddito = periodi.reduce((s, r) => s + imponibileRegime(r), 0)
+    if (reddito <= dati.minimaleReddito) return 0
+    const aliquota = tipo === 'artigiani' ? dati.aliquotaArtigiani : dati.aliquotaCommercianti
+    let bruti: number
+    if (reddito <= dati.sogliaPrimaFascia) {
+      bruti = ((reddito - dati.minimaleReddito) * aliquota) / 100
+    } else {
+      const fascia1 = dati.sogliaPrimaFascia - dati.minimaleReddito
+      const fascia2 = reddito - dati.sogliaPrimaFascia
+      bruti = (fascia1 * aliquota) / 100 + (fascia2 * (aliquota + 1)) / 100
+    }
+    // Riduzione: usa quella del primo periodo della gestione (in pratica omogenea).
+    return applicaRiduzioneIVS(bruti, 0, periodi[0].riduzioneContributi)
   }
-  return applicaRiduzioneIVS(bruti, 0, regime.riduzioneContributi)
+  return calcola('artigiani') + calcola('commercianti')
 }
 
 /**
- * Contributi gestione separata per un regime, con le COSTANTI di un anno
- * indicato (per gli acconti calcolati sul reddito storico ma aliquota corrente).
+ * Base dell'acconto gestione separata col metodo INPS: contributi sul reddito
+ * G.S. annuo aggregato, con l'aliquota dell'anno in cui l'acconto si versa.
  */
-export function contributiSeparataConCostanti(regime: Regime, annoCostanti: number): number {
-  if (regime.tipo !== 'separata') return 0
-  const imponibile = (regime.fatturato * regime.coefficiente) / 100
-  return (imponibile * datiAnno(annoCostanti).aliquotaSeparata) / 100
+export function baseSeparataAcconto(regimi: Regime[], annoCostanti: number): number {
+  const reddito = regimi.filter((r) => r.tipo === 'separata').reduce((s, r) => s + imponibileRegime(r), 0)
+  return (reddito * datiAnno(annoCostanti).aliquotaSeparata) / 100
 }
 
 /**

@@ -1,7 +1,7 @@
 import type { CalcoloInput, ComponenteScadenza, OpzioniRateazione, Regime, Scadenza, RiferimentoScadenza, TipoVersamento } from '@/domain/types'
 import { datiAnno, anniDisponibili, type ScadenzeAnno } from '@/data/taxData'
 import { proiettaDatiAnno } from '@/data/proiezioneAnno'
-import { calcolaRateContributiFissi, applicaRiduzioneIVS, eccedenzaIVSConCostanti, contributiSeparataConCostanti } from '@/domain/contributi'
+import { calcolaRateContributiFissi, applicaRiduzioneIVS, baseEccedenzaAcconto, baseSeparataAcconto } from '@/domain/contributi'
 import { espandiRateazione } from '@/domain/rateazione'
 import { formattaScadenza } from '@/domain/dates'
 import { labelTipo } from '@/domain/labels'
@@ -221,16 +221,10 @@ export function calcolaScadenze({
     }
   }
 
-  /**
-   * Base degli acconti contributi, col metodo INPS: il contributo (eccedenza
-   * Art/Comm o gestione separata) si ricalcola sui REGIMI dell'anno storico
-   * indicato, ma usando le COSTANTI (minimale, soglia, aliquote) dell'anno in
-   * cui l'acconto si versa. Es. acconto 2025 = su redditi 2024, costanti 2025.
-   */
-  const baseAccontoEcc = (regimiStorici: Regime[], annoCostanti: number): number =>
-    regimiConFissi(regimiStorici).reduce((s, r) => s + eccedenzaIVSConCostanti(r, annoCostanti), 0)
-  const baseAccontoGS = (regimiStorici: Regime[], annoCostanti: number): number =>
-    regimiSeparata(regimiStorici).reduce((s, r) => s + contributiSeparataConCostanti(r, annoCostanti), 0)
+  // Base acconti col metodo INPS: reddito di gestione annuo aggregato, minimale
+  // pieno, costanti dell'anno in cui l'acconto si versa (vedi contributi.ts).
+  const baseAccontoEcc = baseEccedenzaAcconto
+  const baseAccontoGS = baseSeparataAcconto
 
   // Espande una scadenza d'imposta nelle sue rate, se l'utente ha scelto
   // una rateazione per la sua chiave; altrimenti la lascia invariata.

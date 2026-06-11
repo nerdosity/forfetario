@@ -60,6 +60,15 @@ describe('verifica formula eccedenza vs INPS (caso reale)', () => {
     expect(Math.abs(baseApp - baseInps)).toBeGreaterThan(5)
   })
 
+  it('IPOTESI: l\'acconto usa minimale PIENO (no proporzione mesi)', () => {
+    // Reddito 2024 = 26713 su 11 mesi (attività dal 15/2) vs su 12 mesi.
+    // minimale pieno → 636,32 ; minimale proporz. 11/12 → di più.
+    const minimalePieno = eccedenzaArtigiani(26713, 2025) / 2
+    // eslint-disable-next-line no-console
+    console.log('Acconto con minimale pieno:', minimalePieno.toFixed(2), '— INPS: 636.32')
+    expect(minimalePieno).toBeCloseTo(636.32, 1)
+  })
+
   it('verifica quadratura: 2 acconti + saldo = eccedenza 2025', () => {
     // eslint-disable-next-line no-console
     console.log('Quadratura INPS: 636.32 + 636.32 + 1223.20 =', (636.32 + 636.32 + 1223.20).toFixed(2))
