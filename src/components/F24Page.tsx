@@ -162,7 +162,7 @@ export function F24Page({ anno, calcoli, anagrafica: anag, onVaiAiDati }: Props)
                     </TableCell>
                     <TableCell className="py-2.5 text-right tabular-nums whitespace-nowrap">{formatEuro(r.importo)}</TableCell>
                     <TableCell className="py-2.5">
-                      <div className="flex justify-end">
+                      <div className="flex w-full justify-end">
                         <Button size="xs" color="light" disabled={!r.codeline || !scad} onClick={() => scad && apriF24Inps(r, scad)}>
                           <FileDown size={14} className="mr-1" aria-hidden /> Apri F24
                         </Button>
@@ -195,10 +195,12 @@ export function F24Page({ anno, calcoli, anagrafica: anag, onVaiAiDati }: Props)
                     {s.data && <span className="block text-xs text-slate-400">entro il {s.data}</span>}
                   </TableCell>
                   <TableCell className="py-2.5 text-right tabular-nums whitespace-nowrap">{formatEuro(s.importo)}</TableCell>
-                  <TableCell className="py-2.5 text-right">
-                    <Button size="xs" color="light" onClick={() => apriF24Imposta(s)}>
-                      <FileDown size={14} className="mr-1" aria-hidden /> Apri F24
-                    </Button>
+                  <TableCell className="py-2.5">
+                    <div className="flex w-full justify-end">
+                      <Button size="xs" color="light" onClick={() => apriF24Imposta(s)}>
+                        <FileDown size={14} className="mr-1" aria-hidden /> Apri F24
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
