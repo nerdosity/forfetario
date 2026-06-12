@@ -173,13 +173,15 @@ function disegnaModulo(
   // ── Saldo finale della delega ──
   scrivi(formatImporto(totErario + totInps, F24.saldoFinale.lunghezza), F24.saldoFinale)
 
-  // ── Data del versamento (riquadro "DATA": giorno | mese | anno, centrati) ──
+  // ── Data del versamento: una cifra per casella (GG MM AAAA → 8 celle) ──
   const gma = scadenzaInCifre(scadenza)
   if (gma) {
-    const [gg, mm, aaaa] = gma
-    scriviCentrato(gg, F24.dataGiorno)
-    scriviCentrato(mm, F24.dataMese)
-    scriviCentrato(aaaa, F24.dataAnno)
+    const cifre = (gma[0] + gma[1] + gma[2]).split('') // GGMMAAAA, 8 cifre
+    cifre.forEach((c, i) => {
+      const x = F24.dataCelle[i]
+      if (x === undefined) return
+      scriviCentrato(c, { x, y: F24.dataCelleY, size: F24.dataCelleFont })
+    })
   }
 }
 

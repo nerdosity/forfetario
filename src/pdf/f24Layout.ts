@@ -130,12 +130,12 @@ export const F24 = {
   etichettaRata: F(144, 807, 10),
   scadenzaTesta: F(144, 795, 9),
   // Data versamento nel riquadro "DATA" (l'ADE non la stampa: misurata da noi).
-  // Testo CENTRATO sulla X: l'anno (112) era già ben centrato → resta il
-  // riferimento; giorno e mese spostati a destra per centrarli allo stesso modo.
-  // Caselle grandi → font grande.
-  dataGiorno: F(48, 54, 20),
-  dataMese: F(76, 54, 20),
-  dataAnno: F(112, 54, 20),
+  // Una cifra per casella, come l'F24 vero. Blocco px (37,1130), celle da 21px,
+  // immagine 870×1236 (scala 0.684). Centro cella i = (37 + 21*i + 10.5) × 0.684.
+  // 8 celle: GG(0,1) MM(2,3) AAAA(4,5,6,7). Y baseline 53.7.
+  dataCelle: [32.5, 46.9, 61.2, 75.6, 90.0, 104.3, 118.7, 133.1],
+  dataCelleY: 53.7,
+  dataCelleFont: 19,
 } as const
 
 /** Passo verticale tra le righe ripetute (erario/INPS/regioni…). */

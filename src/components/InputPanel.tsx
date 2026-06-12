@@ -226,8 +226,9 @@ export function InputPanel({ input, calcoli, anagrafica, onChangeAnagrafica, onC
         </p>
       )}
 
-      {/* Tre sezioni: anno-1, riferimento, anno+1 */}
-      <div className="grid gap-4 sm:gap-6 xl:grid-cols-3">
+      {/* Tre sezioni: anno-1, riferimento, anno+1. A 3 colonne da lg (1024px):
+          con xl (1280) molti desktop scendevano a 1 colonna sembrando "mobile". */}
+      <div className="grid gap-4 sm:gap-6 lg:grid-cols-3">
         <SezioneAnno
           anno={anno - 1}
           sottotitolo={`Anno precedente: usato per acconti e saldi del ${anno}.`}
