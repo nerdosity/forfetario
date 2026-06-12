@@ -129,11 +129,13 @@ export const F24 = {
   // Etichetta rata + scadenza accanto allo stemma (non nel tracciato ADE: nostre).
   etichettaRata: F(144, 807, 10),
   scadenzaTesta: F(144, 795, 9),
-  // Data versamento nel riquadro "DATA" (l'ADE non la stampa: misurata da noi,
-  // caselle giorno/mese/anno, font maggiore perché le caselle sono grandi).
-  dataGiorno: F(39, 54, 13),
-  dataMese: F(67.7, 54, 13),
-  dataAnno: F(112, 54, 13),
+  // Data versamento nel riquadro "DATA" (l'ADE non la stampa: misurata da noi).
+  // Testo CENTRATO sulla X: l'anno (112) era già ben centrato → resta il
+  // riferimento; giorno e mese spostati a destra per centrarli allo stesso modo.
+  // Caselle grandi → font grande.
+  dataGiorno: F(48, 54, 20),
+  dataMese: F(76, 54, 20),
+  dataAnno: F(112, 54, 20),
 } as const
 
 /** Passo verticale tra le righe ripetute (erario/INPS/regioni…). */
