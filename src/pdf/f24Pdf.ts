@@ -13,7 +13,6 @@ import type { AnagraficaContribuente } from '@/data/anagraficaStorage'
  */
 
 const NERO = rgb(0.1, 0.16, 0.23)
-const GRIGIO_CHIARO = rgb(0.75, 0.75, 0.75)
 
 /** Una riga della sezione ERARIO (imposte). */
 export interface RigaErarioF24 {
@@ -76,7 +75,6 @@ export async function generaPdfF24(moduli: ModuloF24[], titolo = 'Modelli F24'):
   const doc = await PDFDocument.create()
   doc.setTitle(titolo)
   const courier = await doc.embedFont(StandardFonts.CourierBold)
-  const times = await doc.embedFont(StandardFonts.TimesRomanBold)
 
   const modello = await PDFDocument.load(await fetch(modelloF24Url).then((r) => r.arrayBuffer()))
   const indicePagina = Math.min(2, modello.getPageCount() - 1)
@@ -84,7 +82,7 @@ export async function generaPdfF24(moduli: ModuloF24[], titolo = 'Modelli F24'):
   for (const m of moduli) {
     const [pagina] = await doc.copyPages(modello, [indicePagina])
     doc.addPage(pagina)
-    disegnaModulo(pagina, m, courier, times)
+    disegnaModulo(pagina, m, courier)
   }
 
   const bytes = await doc.save()
@@ -101,15 +99,11 @@ function disegnaModulo(
   pagina: PDFPage,
   { etichettaRata, scadenza, erario, inps, anagrafica }: ModuloF24,
   courier: PDFFont,
-  times: PDFFont,
 ): void {
   const scrivi = (testo: string, x: number, y: number, size: number) => {
     if (!testo || testo.trim().length === 0) return
     pagina.drawText(testo, { x, y, size, font: courier, color: NERO })
   }
-
-  // Filigrana FAC-SIMILE.
-  pagina.drawText('FAC-SIMILE', { x: 185, y: 60, size: 40, font: times, color: GRIGIO_CHIARO })
 
   // ── Info rata/scadenza accanto allo stemma (area calcolata dallo screen) ──
   if (etichettaRata) scrivi(etichettaRata.toUpperCase(), 144, 815, 10)
@@ -136,34 +130,44 @@ function disegnaModulo(
   })
   if (totErario > 0) {
     scrivi(fmtImporto(totErario), 313, 521, 9) // totale colonna debiti sez. erario
-    scrivi(fmtImporto(totErario), 486, 521, 9) // saldo sezione
-    scrivi('+', 481, 521, 9)
+    scrivi(fmtImporto(totErario), 486, 521, 9) // saldo sezione (sempre a debito)
   }
 
-  // ── Sezione INPS: coordinate misurate sul modello (rigo a Y≈485, passo 11.9) ──
-  // Periodo in formato MM | AAAA: mese e anno in caselle separate.
+  // ── Sezione INPS: coordinate misurate sul modello (immagine 870×1234, scala
+  // 0.684; prima riga a Y≈486.5, passo 11.9). Periodo in caselle MM | AAAA. ──
   const meseAnno = (p: string): [string, string] => {
     const m = p.match(/(\d{1,2})\s*\/\s*(\d{4})/)
     return m ? [m[1].padStart(2, '0'), m[2]] : ['', '']
   }
+  // Importo INPS allineato a destra: padding più corto del campo erario (15 char
+  // troppi per la colonna INPS) così che termini entro il riquadro "a debito".
+  const fmtImportoInps = (euro: number): string => {
+    const cents = Math.round(euro * 100)
+    if (cents === 0) return ''
+    return new Intl.NumberFormat('it-IT', { minimumFractionDigits: 2 })
+      .format(cents / 100).replace(',', ' ').padStart(11)
+  }
   let totInps = 0
   inps.forEach((r, i) => {
-    const y = 485.4 - 11.9 * i
+    const y = 486.5 - 11.9 * i
     const [dalM, dalA] = meseAnno(r.periodoDal)
     const [alM, alA] = meseAnno(r.periodoAl)
-    scrivi(r.codiceSede, 26.6, y, 8)
-    scrivi(r.causale, 64.5, y, 8)
-    scrivi(r.codeline, 105.2, y, 8)
-    scrivi(dalM, 302.9, y, 8)
-    scrivi(dalA, 329.5, y, 8)
-    scrivi(alM, 378.6, y, 8)
-    scrivi(alA, 405.3, y, 8)
-    scrivi(fmtImporto(r.importo), 470, y, 8)
+    scrivi(r.codiceSede, 26, y, 8)
+    scrivi(r.causale, 65, y, 8)
+    scrivi(r.codeline, 102.6, y, 8)
+    scrivi(dalM, 221, y, 8)
+    scrivi(dalA, 235.3, y, 8)
+    scrivi(alM, 271.6, y, 8)
+    scrivi(alA, 286.7, y, 8)
+    scrivi(fmtImportoInps(r.importo), 333, y, 8) // termina ~404 (bordo "a debito")
     totInps += r.importo
   })
   if (totInps > 0) {
-    // Totale "E" sezione INPS: importi a debito (sotto le righe).
-    scrivi(fmtImporto(totInps), 470, 420, 8)
+    // Totale "C" sezione INPS (a debito) e SALDO (C-D), rigo a Y≈429 (px 585).
+    // Saldo allineato a destra: bordo px 842 → 576 PDF. Nessun segno: l'F24 è
+    // sempre un versamento, il saldo è a debito (positivo).
+    scrivi(fmtImportoInps(totInps), 333, 429, 8) // totale C (a debito)
+    scrivi(fmtImporto(totInps), 504, 429, 8)     // SALDO (C-D), termina ~576
   }
 
   // ── Saldo finale della delega ──
