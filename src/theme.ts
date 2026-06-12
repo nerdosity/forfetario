@@ -86,7 +86,10 @@ export const theme = {
  * nello spazio disponibile senza scroll. Passare con `theme={tableTheme}`.
  */
 export const tableTheme = {
-  root: { shadow: 'hidden', wrapper: 'relative' },
+  // wrapper: overflow-x-auto + max-w-full così una tabella più larga della
+  // colonna scorre DENTRO di sé, senza spingere la pagina (niente scroll
+  // orizzontale del body su mobile).
+  root: { shadow: 'hidden', wrapper: 'relative max-w-full overflow-x-auto' },
   body: { cell: { base: 'px-3 py-2.5 align-top' } },
   head: { cell: { base: 'bg-slate-50 px-3 py-2' } },
 } as const

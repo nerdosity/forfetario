@@ -11,4 +11,7 @@ body {
   font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
     Helvetica, Arial, sans-serif;
   background-color: #f8fafc;
+  /* Nessuno scroll orizzontale di pagina: gli elementi larghi (tabelle) scorrono
+     internamente col proprio overflow-x-auto, non spingono il body. */
+  overflow-x: hidden;
 }
