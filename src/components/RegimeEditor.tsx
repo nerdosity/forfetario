@@ -173,13 +173,16 @@ export function RegimeEditor({ titolo, anno, regimi, onChange }: RegimeEditorPro
             </Field>
           </div>
 
-          <Field label="Fatturato periodo" small info="Compensi incassati nel periodo, al lordo di imposte e contributi.">
+          <Field
+            label="Fatturato (compensi incassati nel periodo)"
+            info="Totale dei compensi incassati nel periodo, al lordo di imposte e contributi. È il dato di partenza: l'imponibile si ottiene applicando il coefficiente di redditività."
+          >
             <MoneyInput
-              small
               value={regime.fatturato}
               onChange={(v) => aggiorna(regime.id, 'fatturato', v ?? 0)}
               min={0}
               step={1000}
+              placeholder="es. 30000"
             />
           </Field>
 
