@@ -192,6 +192,42 @@ describe('calcola — anno precedente', () => {
   })
 })
 
+describe('calcola — acconti G.S. (regola ADE 80%, caso reale RPF 2023)', () => {
+  // Dichiarazione reale, periodo d'imposta 2022: imponibile G.S. 19.901,
+  // contributo dovuto (RR6) = 5.220, acconti 2023 dal software ADE =
+  // 2.088,02 × 2 = 4.176 (= 80% del dovuto, due rate del 40%).
+  const regimeGS: Regime = {
+    ...regimeSeparata,
+    meseInizio: 1, giornoInizio: 1,
+    fatturato: 29703, // × 67% = 19.901 imponibile
+  }
+  const input2023: CalcoloInput = mkInput({
+    anno: 2023,
+    regimiCorrente: [{ ...regimeGS, id: 'gs23' }],
+    regimiPrecedente: [{ ...regimeGS, id: 'gs22' }],
+  })
+
+  it('dovuto G.S. 2022 = 5.220 (aliquota 26,23%)', () => {
+    const r = calcola(input2023)
+    expect(r.datiAnnoPrecedente.totaleContributiSeparata).toBeCloseTo(5220.03, 1)
+  })
+
+  it('acconti G.S. dovuti 2023 = 80% del dovuto 2022 ≈ 4.176', () => {
+    const r = calcola(input2023)
+    expect(r.accontiGSVersatiPerAnnoRif).toBeCloseTo(4176.02, 1)
+  })
+
+  it('le scadenze acconto G.S. 2023 valgono 2.088 ciascuna (40% + 40%)', () => {
+    const r = calcola(input2023)
+    const acconti = r.scadenzeAnnoCorrente.filter(
+      (s) => /Gestione separata/i.test(s.categoria ?? '') && /acconto/i.test(s.voce ?? ''),
+    )
+    expect(acconti).toHaveLength(2)
+    const totale = acconti.reduce((s, a) => s + a.importo, 0)
+    expect(totale).toBeCloseTo(4176.02, 1)
+  })
+})
+
 describe('calcola — nuovo utente (stato vuoto, nessun dato)', () => {
   // Un utente che apre l'app per la prima volta ha la mappa anni vuota.
   const vuoto = (anno: number): CalcoloInput => ({ anno, anni: {}, rateazioniImposta: {} })

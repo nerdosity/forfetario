@@ -62,11 +62,12 @@ const MENU: { label: string; voci: { tipo: TipoVersamento; label: string }[] }[]
  * regole di cassa INPS (nel forfettario i contributi a percentuale si versano
  * a saldo l'anno dopo, con acconti per l'anno in corso):
  * - G.S. saldo  → dovuto G.S. dell'anno precedente.
- * - G.S. acconto → dovuto G.S. dell'anno corrente, solo se ancora in G.S.
+ * - G.S. acconto → 40% del dovuto G.S. dell'anno precedente (regola ADE: acconto
+ *   = 80% in due rate del 40%), solo se ancora in G.S.
  * - Fissi 1-3 → rata trimestrale esatta dell'anno corrente.
  * - Fissi 4ª  → rata trimestrale dell'anno precedente (si versa a febbraio).
  * - Eccedenza saldo → eccedenza dovuta dell'anno precedente.
- * - Eccedenza acconto → eccedenza dovuta dell'anno corrente.
+ * - Eccedenza acconto → eccedenza dovuta dell'anno corrente, 50% a rata.
  */
 function suggerimento(
   tipo: TipoVersamento,
@@ -75,8 +76,8 @@ function suggerimento(
 ): number | null {
   if (!calcoli) return null
   const prec = calcoli.datiAnnoPrecedente
-  // Gli acconti si versano in due rate (giugno e novembre), 50% ciascuna
-  const accGS = hasGSCorrente ? calcoli.totaleContributiSeparata / 2 : 0
+  // G.S.: 40% del dovuto dell'anno precedente per rata; eccedenza: 50% a rata.
+  const accGS = hasGSCorrente ? ((prec?.totaleContributiSeparata ?? 0) * 0.8) / 2 : 0
   const accEcc = calcoli.totaleContributiEccedenzaArtComm / 2
   switch (tipo) {
     case 'gs-saldo': return prec?.totaleContributiSeparata ?? 0

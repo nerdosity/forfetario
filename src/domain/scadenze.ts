@@ -2,7 +2,7 @@ import type { CalcoloInput, ComponenteScadenza, OpzioniRateazione, Regime, Scade
 import { datiDellAnno } from '@/domain/types'
 import { datiAnno, anniDisponibili, type ScadenzeAnno } from '@/data/taxData'
 import { proiettaDatiAnno } from '@/data/proiezioneAnno'
-import { calcolaRateContributiFissi, applicaRiduzioneIVS, baseEccedenzaAcconto, baseSeparataAcconto } from '@/domain/contributi'
+import { calcolaRateContributiFissi, applicaRiduzioneIVS, baseEccedenzaAcconto } from '@/domain/contributi'
 import { espandiRateazione } from '@/domain/rateazione'
 import { formattaScadenza } from '@/domain/dates'
 import { labelTipo } from '@/domain/labels'
@@ -266,10 +266,10 @@ export function calcolaScadenze({
     return scadenzeOrdinate.map((s, i) => (i === target ? conConguaglioGestione(s, credito) : s))
   }
 
-  // Base acconti col metodo INPS: reddito di gestione annuo aggregato, minimale
-  // pieno, costanti dell'anno in cui l'acconto si versa (vedi contributi.ts).
+  // Base acconto eccedenza col metodo INPS: reddito di gestione annuo aggregato,
+  // minimale pieno, costanti dell'anno in cui l'acconto si versa (contributi.ts).
+  // La G.S. invece usa il DOVUTO dell'anno precedente (regola ADE dell'80%).
   const baseAccontoEcc = baseEccedenzaAcconto
-  const baseAccontoGS = baseSeparataAcconto
 
   // Espande una scadenza d'imposta nelle sue rate, se l'utente ha scelto
   // una rateazione per la sua chiave; altrimenti la lascia invariata.
@@ -365,8 +365,9 @@ export function calcolaScadenze({
 
   // ─── Acconti contributi per l'anno corrente (1° giugno, 2° novembre) ──────
   // Basati sui contributi dovuti dell'anno precedente, solo se ancora attivi.
-  // Base INPS: contributi G.S. sui redditi dell'anno prima, costanti dell'anno corrente.
-  const baseGSCorr = baseAccontoGS(regimiPrecedente, anno)
+  // Base ufficiale ADE: il contributo G.S. DOVUTO dell'anno precedente (quadro RR),
+  // con le costanti di quell'anno; l'acconto è l'80% in due rate del 40%.
+  const baseGSCorr = totaleContributiSeparataPrecedente ?? 0
   const accontoGSCorrTot =
     attivoADicembre(regimiSeparata(regimiCorrente)) && baseGSCorr > 0
       ? baseGSCorr * QUOTA_ACCONTO_GS
@@ -574,8 +575,9 @@ export function calcolaScadenze({
   const creditoGestioneGS = nettoGestione(rifGs)
 
   // ─── Saldo + acconti Gestione Separata ────────────────────────────────────
-  // Acconto anno+1 (proiezione): base sui redditi correnti, costanti dell'anno+1.
-  const baseGSSucc = baseAccontoGS(regimiCorrente, annoSucc)
+  // Acconto anno+1: 80% del contributo G.S. DOVUTO dell'anno corrente (quadro RR),
+  // come fa il software ADE.
+  const baseGSSucc = totaleContributiSeparataDovutoCorrente ?? 0
   const accontoGSAnnoSuccTot =
     attivoADicembre(regimiSeparata(regimiCorrente)) && baseGSSucc > 0
       ? baseGSSucc * QUOTA_ACCONTO_GS

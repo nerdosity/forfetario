@@ -8,7 +8,7 @@ import type {
 import { datiDellAnno } from '@/domain/types'
 import { aliquotaContributi, datiAnno } from '@/data/taxData'
 import { giorniPermanenza } from '@/domain/dates'
-import { getMesiInPeriodo, applicaRiduzioneIVS, contributiVersatiEffettivi, rateFissePerTrimestre, baseEccedenzaAcconto, baseSeparataAcconto, accontoVersatoDaLista } from '@/domain/contributi'
+import { getMesiInPeriodo, applicaRiduzioneIVS, contributiVersatiEffettivi, rateFissePerTrimestre, baseEccedenzaAcconto, accontoVersatoDaLista } from '@/domain/contributi'
 import { calcolaScadenze } from '@/domain/scadenze'
 import { contributoFissoAnno } from '@/data/taxData'
 
@@ -224,7 +224,10 @@ export function calcola(input: CalcoloInput): RisultatoCalcolo {
   const artCommAttivaCorrente = regimiCorrente.some(
     (r) => (r.tipo === 'artigiani' || r.tipo === 'commercianti') && r.meseFine === 12,
   )
-  const accontiGSDovuti = gsAttivaCorrente ? baseSeparataAcconto(regimiPrecedente, anno) : 0
+  // Acconti G.S. dovuti = 80% dei contributi G.S. dovuti dell'anno precedente
+  // (due rate del 40%), come da software ADE: verificato su dichiarazione reale
+  // (dovuto 2022 = 5.220 → acconti 2023 = 2.088,02 × 2 = 80%).
+  const accontiGSDovuti = gsAttivaCorrente ? 0.8 * datiPrecedente.totaleContributiSeparata : 0
   const accontiEccDovuti = artCommAttivaCorrente ? baseEccedenzaAcconto(regimiPrecedente, anno) : 0
 
   const saldoContributiGS = Math.max(0, datiCorrente.totaleContributiSeparata - accontiGSDovuti)

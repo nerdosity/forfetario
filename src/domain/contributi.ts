@@ -86,15 +86,9 @@ export function baseEccedenzaAcconto(regimi: Regime[], annoCostanti: number): nu
   return calcola('artigiani') + calcola('commercianti')
 }
 
-/**
- * Base dell'acconto gestione separata col metodo INPS: contributi sul reddito
- * G.S. annuo aggregato, con l'aliquota dell'anno in cui l'acconto si versa.
- */
-export function baseSeparataAcconto(regimi: Regime[], annoCostanti: number): number {
-  // Reddito imponibile arrotondato all'euro, come il calcolatore INPS.
-  const reddito = Math.round(regimi.filter((r) => r.tipo === 'separata').reduce((s, r) => s + imponibileRegime(r), 0))
-  return (reddito * datiFiscaliConFallback(annoCostanti).aliquotaSeparata) / 100
-}
+// Gli acconti G.S. NON hanno una base propria: sono l'80% del contributo G.S.
+// DOVUTO dell'anno precedente (due rate del 40%), regola ADE verificata sul
+// software ufficiale. Vedi calcolo.ts / scadenze.ts.
 
 // ---------------------------------------------------------------------------
 // Conteggio mesi (base per i contributi fissi Art/Comm)

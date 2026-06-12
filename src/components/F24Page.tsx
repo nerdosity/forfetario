@@ -148,7 +148,7 @@ export function F24Page({ anno, calcoli, anagrafica: anag, onVaiAiDati }: Props)
               <TableRow>
                 <TableHeadCell>Contributo</TableHeadCell>
                 <TableHeadCell className="text-right">Importo</TableHeadCell>
-                <TableHeadCell className="text-right">F24</TableHeadCell>
+                <TableHeadCell className="text-center">F24</TableHeadCell>
               </TableRow>
             </TableHead>
             <TableBody className="divide-y divide-slate-100">
@@ -162,7 +162,7 @@ export function F24Page({ anno, calcoli, anagrafica: anag, onVaiAiDati }: Props)
                     </TableCell>
                     <TableCell className="py-2.5 text-right tabular-nums whitespace-nowrap">{formatEuro(r.importo)}</TableCell>
                     <TableCell className="py-2.5">
-                      <div className="flex w-full justify-end">
+                      <div className="flex w-full justify-center">
                         <Button size="xs" color="light" disabled={!r.codeline || !scad} onClick={() => scad && apriF24Inps(r, scad)}>
                           <FileDown size={14} className="mr-1" aria-hidden /> Apri F24
                         </Button>
@@ -184,7 +184,7 @@ export function F24Page({ anno, calcoli, anagrafica: anag, onVaiAiDati }: Props)
               <TableRow>
                 <TableHeadCell>Adempimento</TableHeadCell>
                 <TableHeadCell className="text-right">Importo</TableHeadCell>
-                <TableHeadCell className="text-right">F24</TableHeadCell>
+                <TableHeadCell className="text-center">F24</TableHeadCell>
               </TableRow>
             </TableHead>
             <TableBody className="divide-y divide-slate-100">
@@ -196,7 +196,7 @@ export function F24Page({ anno, calcoli, anagrafica: anag, onVaiAiDati }: Props)
                   </TableCell>
                   <TableCell className="py-2.5 text-right tabular-nums whitespace-nowrap">{formatEuro(s.importo)}</TableCell>
                   <TableCell className="py-2.5">
-                    <div className="flex w-full justify-end">
+                    <div className="flex w-full justify-center">
                       <Button size="xs" color="light" onClick={() => apriF24Imposta(s)}>
                         <FileDown size={14} className="mr-1" aria-hidden /> Apri F24
                       </Button>
