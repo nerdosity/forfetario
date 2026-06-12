@@ -8,7 +8,7 @@ import type {
 import { datiDellAnno } from '@/domain/types'
 import { aliquotaContributi, datiAnno } from '@/data/taxData'
 import { giorniPermanenza } from '@/domain/dates'
-import { getMesiInPeriodo, applicaRiduzioneIVS, contributiVersatiEffettivi, rateFissePerTrimestre, baseEccedenzaAcconto, baseSeparataAcconto } from '@/domain/contributi'
+import { getMesiInPeriodo, applicaRiduzioneIVS, contributiVersatiEffettivi, rateFissePerTrimestre, baseEccedenzaAcconto, baseSeparataAcconto, accontoVersatoDaLista } from '@/domain/contributi'
 import { calcolaScadenze } from '@/domain/scadenze'
 import { contributoFissoAnno } from '@/data/taxData'
 
@@ -264,8 +264,12 @@ export function calcola(input: CalcoloInput): RisultatoCalcolo {
     creditoImposteAnnoCorrente: creditoImposte,
     // Acconti DOVUTI (come INPS): coerenti col saldo ufficiale (dovuto - dovuti).
     accontiGSVersatiPerAnnoRif: accontiGSDovuti,
+    // Acconti effettivamente VERSATI dall'utente nell'anno (rate gs/ecc acconto),
+    // mostrati a fianco dei dovuti per orientarsi su quanto pagato davvero.
+    accontiGSVersatiRealiPerAnnoRif: accontoVersatoDaLista(datiAnnoRif, 'gs'),
     saldoContributiGSAnnoCorrente: saldoContributiGS,
     accontiEccArtCommVersatiPerAnnoRif: accontiEccDovuti,
+    accontiEccArtCommVersatiRealiPerAnnoRif: accontoVersatoDaLista(datiAnnoRif, 'ecc'),
     saldoContributiEccArtCommAnnoCorrente: saldoContributiEccArtComm,
     scadenzeAnnoCorrente,
     scadenzeAnnoSuccessivo,

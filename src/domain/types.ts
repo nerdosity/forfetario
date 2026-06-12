@@ -295,14 +295,20 @@ export interface RisultatoCalcolo extends RisultatoAnno {
   /** Eventuale credito imposte (acconti > dovuto). */
   creditoImposteAnnoCorrente: number
 
-  /** Acconti G.S. effettivamente usati. */
+  /** Acconti G.S. DOVUTI (metodo INPS) usati per il saldo. */
   accontiGSVersatiPerAnnoRif: number
+
+  /** Acconti G.S. effettivamente VERSATI dall'utente nell'anno (se inseriti). */
+  accontiGSVersatiRealiPerAnnoRif: number
 
   /** Saldo G.S. anno corrente. */
   saldoContributiGSAnnoCorrente: number
 
-  /** Acconti eccedenza Art/Comm effettivamente usati. */
+  /** Acconti eccedenza Art/Comm DOVUTI (metodo INPS) usati per il saldo. */
   accontiEccArtCommVersatiPerAnnoRif: number
+
+  /** Acconti eccedenza Art/Comm effettivamente VERSATI dall'utente (se inseriti). */
+  accontiEccArtCommVersatiRealiPerAnnoRif: number
 
   /** Saldo eccedenza Art/Comm anno corrente. */
   saldoContributiEccArtCommAnnoCorrente: number
