@@ -133,7 +133,7 @@ export const F24 = {
   // Una cifra per casella, come l'F24 vero. Blocco px (37,1130), celle da 21px,
   // immagine 870×1236 (scala 0.684). Centro cella i = (37 + 21*i + 10.5) × 0.684.
   // 8 celle: GG(0,1) MM(2,3) AAAA(4,5,6,7). Y baseline 53.7.
-  dataCelle: [35.5, 49.9, 64.2, 78.6, 93.0, 107.3, 121.7, 136.1],
+  dataCelle: [34.5, 48.9, 63.2, 77.6, 92.0, 106.3, 120.7, 135.1],
   dataCelleY: 53.7,
   dataCelleFont: 19,
 } as const
