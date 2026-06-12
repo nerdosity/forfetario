@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { FileDown, FileText } from 'lucide-react'
+import { FileDown, FileText, TriangleAlert, ArrowRight } from 'lucide-react'
 import { Button, Table, TableBody, TableCell, TableHead, TableHeadCell, TableRow } from 'flowbite-react'
 import type { RisultatoCalcolo, Scadenza } from '@/domain/types'
 import { righeCodelineDaScadenze, type RigaCodeline } from '@/domain/codelineInps'
@@ -13,6 +13,8 @@ interface Props {
   anno: number
   calcoli: RisultatoCalcolo
   anagrafica: AnagraficaContribuente
+  /** Porta l'utente alla sezione "Anagrafica e dati" per completare i campi. */
+  onVaiAiDati: () => void
 }
 
 // Periodo "01/AAAA - 12/AAAA" dalla competenza letta nella voce della scadenza.
@@ -23,11 +25,15 @@ function periodoCompetenza(voce: string | undefined, annoDefault: number): { dal
 }
 
 /** Pagina F24: genera i modelli F24 (imposte + contributi INPS). */
-export function F24Page({ anno, calcoli, anagrafica: anag }: Props) {
+export function F24Page({ anno, calcoli, anagrafica: anag, onVaiAiDati }: Props) {
   const matricolaValida = /^\d{8}$/.test(anag.matricolaInps)
   const soggettoValido = /^\d{2}$/.test(anag.codiceSoggettoInps)
   const sedeValida = /^\d{4}$/.test(anag.sedeInps)
   const datiInpsCompleti = matricolaValida && soggettoValido && sedeValida
+
+  // Anagrafica persona: serve a compilare la sezione contribuente degli F24.
+  // Il minimo utile è il codice fiscale; cognome/nome completano l'intestazione.
+  const haDatiPersona = anag.codiceFiscale.trim().length > 0
 
   // Scadenze contributi (INPS) e relative codeline.
   const scadenzeContributi = useMemo(
@@ -92,16 +98,48 @@ export function F24Page({ anno, calcoli, anagrafica: anag }: Props) {
     else window.open(url, '_blank', 'noopener')
   }
 
+  // Dati utente mancanti per generare ciascun batch di F24.
+  const mancano: string[] = []
+  if (!haDatiPersona) mancano.push('il codice fiscale (per gli F24 dell’imposta sostitutiva)')
+  if (!datiInpsCompleti) mancano.push('sede, matricola e codice soggetto INPS (per gli F24 dei contributi)')
+
   return (
     <div className="space-y-6">
+      {/* Avviso: dati anagrafici mancanti per generare i modelli */}
+      {mancano.length > 0 && (
+        <div className="flex flex-col gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-2.5">
+            <TriangleAlert size={18} className="mt-0.5 shrink-0 text-amber-600" aria-hidden />
+            <div className="text-sm text-amber-800">
+              <p className="font-medium">Mancano alcuni dati per compilare gli F24.</p>
+              <p className="mt-0.5">
+                Inserisci {mancano.length === 1 ? mancano[0] : (
+                  <>{mancano[0]} e {mancano[1]}</>
+                )} nella sezione anagrafica.
+              </p>
+            </div>
+          </div>
+          <Button size="sm" color="warning" onClick={onVaiAiDati} className="shrink-0 self-start sm:self-auto">
+            Vai ai dati
+            <ArrowRight size={15} className="ml-2" aria-hidden />
+          </Button>
+        </div>
+      )}
+
       {/* Contributi INPS */}
       <Card title="Contributi INPS" icon={FileText} iconIntent="warning"
         info="Modelli F24 per i contributi artigiani/commercianti, con codeline e causale precompilate.">
         {!datiInpsCompleti ? (
-          <p className={theme.helpText}>
-            Per generare i modelli F24 dei contributi inserisci sede, matricola e codice soggetto INPS nella
-            sezione <span className="font-medium text-slate-600">Anagrafica e dati</span>: servono a calcolare la codeline.
-          </p>
+          <div className="flex flex-wrap items-center gap-3">
+            <p className={`${theme.helpText} flex-1 min-w-[16rem]`}>
+              Per generare i modelli F24 dei contributi inserisci sede, matricola e codice soggetto INPS nella
+              sezione anagrafica: servono a calcolare la codeline.
+            </p>
+            <Button size="xs" color="light" onClick={onVaiAiDati} className="shrink-0">
+              Vai ai dati
+              <ArrowRight size={14} className="ml-1.5" aria-hidden />
+            </Button>
+          </div>
         ) : righeInps.length === 0 ? (
           <p className={theme.helpText}>Nessuna scadenza di contributi artigiani/commercianti.</p>
         ) : (

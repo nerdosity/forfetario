@@ -104,17 +104,16 @@ function disegnaModulo(
     if (!testo || testo.trim().length === 0) return
     pagina.drawText(testo, { x, y, size, font: courier, color: NERO })
   }
-  // Scrive un importo allineato a destra: il testo TERMINA esattamente a xFine
-  // (larghezza misurata sul font reale, niente padding a indovinare).
-  const aDestra = (testo: string, xFine: number, y: number, size: number) => {
+  // Scrive un testo centrato orizzontalmente sulla X-centro della casella.
+  const alCentro = (testo: string, xCentro: number, y: number, size: number) => {
     if (!testo || testo.trim().length === 0) return
     const larghezza = courier.widthOfTextAtSize(testo, size)
-    pagina.drawText(testo, { x: xFine - larghezza, y, size, font: courier, color: NERO })
+    pagina.drawText(testo, { x: xCentro - larghezza / 2, y, size, font: courier, color: NERO })
   }
 
   // ── Info rata/scadenza accanto allo stemma (area calcolata dallo screen) ──
-  if (etichettaRata) scrivi(etichettaRata.toUpperCase(), 144, 815, 10)
-  if (scadenza) scrivi(`SCADENZA: ${scadenza}`, 144, 803, 9)
+  if (etichettaRata) scrivi(etichettaRata.toUpperCase(), 144, 807, 10)
+  if (scadenza) scrivi(`SCADENZA: ${scadenza}`, 144, 795, 9)
 
   // ── Contribuente (record M) ──
   scrivi(fmtSpaziato(anagrafica.codiceFiscale), 117, 724, 12)
@@ -125,60 +124,98 @@ function disegnaModulo(
   scrivi(anagrafica.comuneNascita.toUpperCase(), 272, 677, 12)
   scrivi(fmtSpaziato(anagrafica.provinciaNascita), 542, 677, 12)
 
-  // ── Sezione ERARIO (record A): righe alle Y 593, 581, … (passo 12) ──
+  // Riferimenti condivisi dal layout ufficiale (sezione erario): font, passo
+  // riga e colonne "importi a debito" / "saldo" sono incolonnati verticalmente
+  // sul modello F24, quindi valgono identici per erario e INPS. Centrare l'INPS
+  // significa riusare questi numeri, non rimisurarli a mano.
+  const FONT = 9
+  const PASSO = 12            // distanza verticale tra righe (erario: 593, 581, …)
+  const X_IMPORTO = 313       // X di partenza dell'importo "a debito" (fmtImporto, a destra)
+  const X_SALDO = 486         // X di partenza del SALDO di sezione
+
+  // ── Sezione ERARIO (record A): prima riga Y 593, passo 12 ──
   let totErario = 0
   erario.forEach((r, i) => {
-    const y = 593 - 12 * i
-    scrivi(r.codiceTributo, 175, y, 9)
-    scrivi(r.rateazione ?? '', 232, y, 9)
-    scrivi(String(r.annoRiferimento), 282, y, 9)
-    scrivi(fmtImporto(r.importo), 313, y, 9)
+    const y = 593 - PASSO * i
+    scrivi(r.codiceTributo, 175, y, FONT)
+    scrivi(r.rateazione ?? '', 232, y, FONT)
+    scrivi(String(r.annoRiferimento), 282, y, FONT)
+    scrivi(fmtImporto(r.importo), X_IMPORTO, y, FONT)
     totErario += r.importo
   })
   if (totErario > 0) {
-    scrivi(fmtImporto(totErario), 313, 521, 9) // totale colonna debiti sez. erario
-    scrivi(fmtImporto(totErario), 486, 521, 9) // saldo sezione (sempre a debito)
+    scrivi(fmtImporto(totErario), X_IMPORTO, 521, FONT) // totale colonna debiti
+    scrivi(fmtImporto(totErario), X_SALDO, 521, FONT)   // saldo sezione (a debito)
   }
 
-  // ── Sezione INPS: coordinate misurate sul modello (immagine 870×1234, scala
-  // 0.684; prima riga a Y≈486.5, passo 11.9). Periodo in caselle MM | AAAA. ──
+  // ── Sezione INPS: campi propri (sede/causale/codeline/periodo) con X misurate
+  // sul modello; importo e saldo riusano le colonne dell'erario. Periodo MM|AAAA. ──
   const meseAnno = (p: string): [string, string] => {
     const m = p.match(/(\d{1,2})\s*\/\s*(\d{4})/)
     return m ? [m[1].padStart(2, '0'), m[2]] : ['', '']
   }
-  // Importo INPS "nudo" (es. "720 05"): la virgola diventa spazio per la casella
-  // dei centesimi. L'allineamento a destra lo gestisce aDestra().
-  const fmtImportoInps = (euro: number): string => {
-    const cents = Math.round(euro * 100)
-    if (cents === 0) return ''
-    return new Intl.NumberFormat('it-IT', { minimumFractionDigits: 2 })
-      .format(cents / 100).replace(',', ' ')
-  }
-  // Bordi destri dei riquadri "importi a debito" (px 590) e SALDO C-D (px 842).
-  const X_DEBITO = 403 // 590 px × 0.684
-  const X_SALDO = 575  // 842 px × 0.684
+  // Centri orizzontali (PDF) delle caselle del periodo MM | AAAA (centro px × 0.684).
+  const CX_DAL_M = 227.8, CX_DAL_A = 249.7, CX_AL_M = 278.5, CX_AL_A = 301.1
+  // Prima riga INPS allineata alla griglia dell'erario: stessa distanza dal saldo.
+  // Saldo INPS (C-D) a px 585; prima riga dati a px ~511. Y prima riga ≈ 484.
+  const Y_INPS_RIGA1 = 484
+  const Y_INPS_SALDO = 427
   let totInps = 0
   inps.forEach((r, i) => {
-    const y = 486.5 - 11.9 * i
+    const y = Y_INPS_RIGA1 - PASSO * i
     const [dalM, dalA] = meseAnno(r.periodoDal)
     const [alM, alA] = meseAnno(r.periodoAl)
-    scrivi(r.codiceSede, 26, y, 9)
-    scrivi(r.causale, 65, y, 9)
-    scrivi(r.codeline, 102.6, y, 9)
-    scrivi(dalM, 221, y, 9)
-    scrivi(dalA, 235.3, y, 9)
-    scrivi(alM, 271.6, y, 9)
-    scrivi(alA, 286.7, y, 9)
-    aDestra(fmtImportoInps(r.importo), X_DEBITO, y, 9) // termina al bordo "a debito"
+    scrivi(r.codiceSede, 26, y, FONT)
+    scrivi(r.causale, 65, y, FONT)
+    scrivi(r.codeline, 102.6, y, FONT)
+    alCentro(dalM, CX_DAL_M, y, FONT)
+    alCentro(dalA, CX_DAL_A, y, FONT)
+    alCentro(alM, CX_AL_M, y, FONT)
+    alCentro(alA, CX_AL_A, y, FONT)
+    scrivi(fmtImporto(r.importo), X_IMPORTO, y, FONT) // stessa colonna dell'erario
     totInps += r.importo
   })
   if (totInps > 0) {
-    // Totale "C" sezione INPS (a debito) e SALDO (C-D), rigo a Y≈429 (px 585).
-    // Nessun segno: l'F24 è sempre un versamento, il saldo è a debito (positivo).
-    aDestra(fmtImportoInps(totInps), X_DEBITO, 429, 9) // totale C (a debito)
-    aDestra(fmtImportoInps(totInps), X_SALDO, 429, 9)  // SALDO (C-D)
+    // Totale "C" e SALDO (C-D): stesse colonne dell'erario. Nessun segno: l'F24
+    // è sempre un versamento, il saldo è a debito (positivo).
+    scrivi(fmtImporto(totInps), X_IMPORTO, Y_INPS_SALDO, FONT) // totale C (a debito)
+    scrivi(fmtImporto(totInps), X_SALDO, Y_INPS_SALDO, FONT)   // SALDO (C-D)
   }
 
   // ── Saldo finale della delega ──
   scrivi(fmtImporto(totErario + totInps), 486, 125, 9)
+
+  // ── Data del versamento (riquadro "DATA": giorno | mese | anno, in basso a
+  // sinistra). Riquadro misurato su immagine 870×1234: origine px (36,1127),
+  // dim 172×37 → caselle centrate, Y baseline ≈ 56. La scadenza arriva come
+  // "GG MeseEsteso AAAA"; la spezziamo nelle tre caselle. ──
+  const gma = scadenzaInCifre(scadenza)
+  if (gma) {
+    const [gg, mm, aaaa] = gma
+    alCentro(gg, 39, 56, 9)    // giorno (centro px ~57)
+    alCentro(mm, 67.7, 56, 9)  // mese (centro px ~99)
+    alCentro(aaaa, 112, 56, 9) // anno (centro px ~164)
+  }
+}
+
+/** Mesi estesi italiani → numero a 2 cifre, per il parsing della scadenza. */
+const MESI_IT: Record<string, string> = {
+  gennaio: '01', febbraio: '02', marzo: '03', aprile: '04', maggio: '05', giugno: '06',
+  luglio: '07', agosto: '08', settembre: '09', ottobre: '10', novembre: '11', dicembre: '12',
+}
+
+/**
+ * Estrae [giorno, mese, anno] (cifre) da una scadenza in formato "GG MeseEsteso
+ * AAAA" (es. "30 Giugno 2025") o "GG/MM/AAAA". Null se non riconosciuta.
+ */
+function scadenzaInCifre(scadenza: string | undefined): [string, string, string] | null {
+  if (!scadenza) return null
+  const esteso = scadenza.trim().match(/^(\d{1,2})\s+([A-Za-zàèéìòù]+)\s+(\d{4})$/)
+  if (esteso) {
+    const mm = MESI_IT[esteso[2].toLowerCase()]
+    if (mm) return [esteso[1].padStart(2, '0'), mm, esteso[3]]
+  }
+  const numerico = scadenza.trim().match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})$/)
+  if (numerico) return [numerico[1].padStart(2, '0'), numerico[2].padStart(2, '0'), numerico[3]]
+  return null
 }

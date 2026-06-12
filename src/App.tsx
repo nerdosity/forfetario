@@ -223,7 +223,9 @@ export default function App() {
         {tab === 'dichiarazione' && hasDatiDichiarazione && (
           <Dichiarazione anno={input.anno} calcoli={calcoli} />
         )}
-        {tab === 'f24' && <F24Page anno={input.anno} calcoli={calcoli} anagrafica={anagrafica} />}
+        {tab === 'f24' && (
+          <F24Page anno={input.anno} calcoli={calcoli} anagrafica={anagrafica} onVaiAiDati={() => setTab('dati')} />
+        )}
         {tab === 'precedente' && hasDatiPrecedente && (
           <RiepilogoPrecedente anno={input.anno} calcoli={calcoli} />
         )}
