@@ -122,7 +122,16 @@ export function ContributiVersati({
   }
   const rimuovi = (id: string) => onChangeDettaglio(dettaglio.filter((r) => r.id !== id))
   const aggiorna = (id: string, patch: Partial<VersamentoContributo>) =>
-    onChangeDettaglio(dettaglio.map((r) => (r.id === id ? { ...r, ...patch } : r)))
+    onChangeDettaglio(
+      dettaglio.map((r) => {
+        if (r.id !== id) return r
+        const next = { ...r, ...patch }
+        // I versamenti obbligatori (tutti tranne 'altro') sono sempre deducibili:
+        // forziamo true per sicurezza, la scelta resta solo per 'altro'.
+        if (next.tipo !== 'altro') next.deducibile = true
+        return next
+      }),
+    )
 
   const suggerimentoRiga = (r: VersamentoContributo): number | null =>
     r.tipo === 'altro' ? null : suggerimento(r.tipo, calcoli, hasGSCorrente)
@@ -179,60 +188,69 @@ export function ContributiVersati({
           )}
 
           {dettaglio.map((r) => (
-            <div key={r.id} className="flex items-start gap-2">
-              <div className="grid flex-1 grid-cols-1 gap-2 sm:grid-cols-2">
-                <Select<TipoVersamento>
-                  small
-                  value={r.tipo}
-                  onChange={(v) => {
-                    if (giaUsato(v, r.id)) return // tipo già presente in un'altra riga
-                    aggiorna(r.id, { tipo: v })
-                  }}
-                  // Mostra solo i tipi non già usati altrove (più quello corrente)
-                  options={TIPI.filter((t) => !giaUsato(t.value, r.id))}
-                />
-                <MoneyInput
-                  small
-                  value={r.importo}
-                  onChange={(v) => aggiorna(r.id, { importo: v })}
-                  placeholder={placeholderRiga(r)}
-                  min={0}
-                  step={0.01}
-                  nullable
-                />
-                {r.tipo === 'altro' && (
+            <div key={r.id} className="space-y-2">
+              <div className="flex items-start gap-2">
+                {/* Tipo: elastico. Importo: stretto (~8 cifre). Cestino: a destra. */}
+                <div className="min-w-0 flex-1">
+                  <Select<TipoVersamento>
+                    small
+                    value={r.tipo}
+                    onChange={(v) => {
+                      if (giaUsato(v, r.id)) return // tipo già presente in un'altra riga
+                      aggiorna(r.id, { tipo: v })
+                    }}
+                    // Mostra solo i tipi non già usati altrove (più quello corrente)
+                    options={TIPI.filter((t) => !giaUsato(t.value, r.id))}
+                  />
+                </div>
+                <div className="w-28 shrink-0">
+                  <MoneyInput
+                    small
+                    value={r.importo}
+                    onChange={(v) => aggiorna(r.id, { importo: v })}
+                    placeholder={placeholderRiga(r)}
+                    min={0}
+                    step={0.01}
+                    nullable
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => rimuovi(r.id)}
+                  className={`${theme.btnIconDanger} mt-0.5 shrink-0`}
+                  aria-label="Rimuovi versamento"
+                >
+                  <Trash2 size={15} aria-hidden />
+                </button>
+              </div>
+              {/* La deducibilità si chiede SOLO per i versamenti "altro" (volontari):
+                  i contributi previdenziali obbligatori sono sempre deducibili. */}
+              {r.tipo === 'altro' && (
+                <div className="space-y-2">
+                  <label className="inline-flex items-center gap-1.5 text-xs text-slate-600">
+                    <input
+                      type="checkbox"
+                      checked={r.deducibile !== false}
+                      onChange={(e) => aggiorna(r.id, { deducibile: e.target.checked })}
+                      className="h-3.5 w-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500/30"
+                    />
+                    deducibile in dichiarazione
+                    <Tooltip
+                      content="Spunta per i contributi previdenziali obbligatori (anche rate pregresse o ravvedimenti pagati quest'anno: deducibili per cassa). Togli la spunta per i versamenti volontari extra IVS, che vanno solo annotati e non sono deducibili."
+                      label="Quando è deducibile"
+                      posizione="sotto"
+                      allinea="sinistra"
+                    />
+                  </label>
                   <input
                     type="text"
                     value={r.descrizione}
                     onChange={(e) => aggiorna(r.id, { descrizione: e.target.value })}
                     placeholder="Descrizione (es. ravvedimento, rata pregressa…)"
-                    className="col-span-2 rounded-md border border-slate-300 px-2 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                    className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
                   />
-                )}
-                <label className="col-span-2 inline-flex items-center gap-1.5 text-xs text-slate-600">
-                  <input
-                    type="checkbox"
-                    checked={r.deducibile !== false}
-                    onChange={(e) => aggiorna(r.id, { deducibile: e.target.checked })}
-                    className="h-3.5 w-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500/30"
-                  />
-                  Deducibile in dichiarazione
-                  <Tooltip
-                    content="Lascia spuntato per i contributi previdenziali obbligatori (anche rate pregresse o ravvedimenti pagati quest'anno: deducibili per cassa). Togli la spunta per i contributi volontari extra IVS, che vanno solo annotati e non sono deducibili."
-                    label="Quando è deducibile"
-                    posizione="sotto"
-                    allinea="sinistra"
-                  />
-                </label>
-              </div>
-              <button
-                type="button"
-                onClick={() => rimuovi(r.id)}
-                className={`${theme.btnIconDanger} mt-0.5`}
-                aria-label="Rimuovi versamento"
-              >
-                <Trash2 size={15} aria-hidden />
-              </button>
+                </div>
+              )}
             </div>
           ))}
 

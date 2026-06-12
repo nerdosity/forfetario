@@ -6,7 +6,9 @@ const nuovoId = () => `regime-${++contatore}`
 let contatoreVers = 0
 /** Crea una riga di versamento contributi vuota. */
 export function versamentoVuoto(tipo: TipoVersamento = 'altro'): VersamentoContributo {
-  return { id: `vers-${++contatoreVers}`, tipo, descrizione: '', importo: null }
+  // deducibile=true di default: per i tipi obbligatori non è modificabile (sempre
+  // deducibile); per 'altro' è il valore iniziale, l'utente può togliere la spunta.
+  return { id: `vers-${++contatoreVers}`, tipo, descrizione: '', importo: null, deducibile: true }
 }
 
 /**
