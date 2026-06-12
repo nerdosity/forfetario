@@ -4,7 +4,7 @@ import { applicaRiduzioneIVS } from './contributi'
 
 /**
  * Verifica contro lo strumento ufficiale INPS "Contributi eccedenti il minimale"
- * (caso reale FEDELE GIOVANNI, gestione artigiani, riduzione 35%).
+ * (caso di prova, gestione artigiani, riduzione 35%).
  * INPS per anno competenza 2025: reddito 2025 = 34.554, reddito 2024 = 26.713.
  *   eccedenza dovuta 2025 = 2.495,84
  *   1° acconto = 636,32 · 2° acconto = 636,32 · saldo = 1.223,20

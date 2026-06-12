@@ -96,38 +96,6 @@ export function baseSeparataAcconto(regimi: Regime[], annoCostanti: number): num
   return (reddito * datiFiscaliConFallback(annoCostanti).aliquotaSeparata) / 100
 }
 
-/**
- * Conguaglio contributivo di una gestione INPS: differenza, in NETTO, tra quanto
- * versato e quanto dovuto per quella gestione nella COMPETENZA dell'anno di
- * riferimento. Positivo = versato in più (credito); negativo = versato in meno.
- * Si compensa sulla prima rata calcolata sul reddito non ancora pagata (saldo →
- * acconti) della stessa gestione; non si mescolano gestioni diverse.
- *
- * IMPORTANTE: si considerano solo i versamenti di COMPETENZA dell'anno corrente
- * (rate fisse 1ª-3ª che si versano nell'anno + acconti eccedenza). Si ESCLUDONO
- * `ecc-saldo` e `fissi-4-prec`, che sono versamenti per la competenza dell'anno
- * PRECEDENTE (il loro conguaglio appartiene a quell'anno). Restano comunque
- * deducibili in dichiarazione: l'esclusione vale solo per questo conguaglio.
- *
- * `dovutoGestione` è il totale dovuto per quella gestione nella competenza (per
- * art/comm: fissi annuali + eccedenza; per G.S.: contributi G.S.).
- */
-export function creditoContributivoGestione(
-  dati: DatiAnno,
-  gestione: 'artComm' | 'gs',
-  dovutoGestione: number,
-): number {
-  if (dati.modalitaContributi !== 'dettaglio') return 0
-  // Solo versamenti di competenza dell'anno corrente (no saldo/4ª-rata dell'anno prima)
-  const tipiArtComm: TipoVersamento[] = ['fissi-1', 'fissi-2', 'fissi-3', 'ecc-acconto-1', 'ecc-acconto-2']
-  const tipiGs: TipoVersamento[] = ['gs-acconto-1', 'gs-acconto-2']
-  const tipi = gestione === 'gs' ? tipiGs : tipiArtComm
-  const versato = dati.contributiVersati
-    .filter((r) => tipi.includes(r.tipo))
-    .reduce((s, r) => s + (r.importo ?? 0), 0)
-  return Math.max(0, versato - dovutoGestione)
-}
-
 // ---------------------------------------------------------------------------
 // Conteggio mesi (base per i contributi fissi Art/Comm)
 // ---------------------------------------------------------------------------
@@ -170,7 +138,7 @@ export function applicaRiduzioneIVS(
 // Rate contributi fissi (artigiani/commercianti)
 // ---------------------------------------------------------------------------
 
-export interface RataContributo {
+interface RataContributo {
   /** Data leggibile "GG Mese AAAA". */
   data: string
   descrizione: string

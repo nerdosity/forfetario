@@ -104,6 +104,13 @@ function disegnaModulo(
     if (!testo || testo.trim().length === 0) return
     pagina.drawText(testo, { x, y, size, font: courier, color: NERO })
   }
+  // Scrive un importo allineato a destra: il testo TERMINA esattamente a xFine
+  // (larghezza misurata sul font reale, niente padding a indovinare).
+  const aDestra = (testo: string, xFine: number, y: number, size: number) => {
+    if (!testo || testo.trim().length === 0) return
+    const larghezza = courier.widthOfTextAtSize(testo, size)
+    pagina.drawText(testo, { x: xFine - larghezza, y, size, font: courier, color: NERO })
+  }
 
   // ── Info rata/scadenza accanto allo stemma (area calcolata dallo screen) ──
   if (etichettaRata) scrivi(etichettaRata.toUpperCase(), 144, 815, 10)
@@ -139,35 +146,37 @@ function disegnaModulo(
     const m = p.match(/(\d{1,2})\s*\/\s*(\d{4})/)
     return m ? [m[1].padStart(2, '0'), m[2]] : ['', '']
   }
-  // Importo INPS allineato a destra: padding più corto del campo erario (15 char
-  // troppi per la colonna INPS) così che termini entro il riquadro "a debito".
+  // Importo INPS "nudo" (es. "720 05"): la virgola diventa spazio per la casella
+  // dei centesimi. L'allineamento a destra lo gestisce aDestra().
   const fmtImportoInps = (euro: number): string => {
     const cents = Math.round(euro * 100)
     if (cents === 0) return ''
     return new Intl.NumberFormat('it-IT', { minimumFractionDigits: 2 })
-      .format(cents / 100).replace(',', ' ').padStart(11)
+      .format(cents / 100).replace(',', ' ')
   }
+  // Bordi destri dei riquadri "importi a debito" (px 590) e SALDO C-D (px 842).
+  const X_DEBITO = 403 // 590 px × 0.684
+  const X_SALDO = 575  // 842 px × 0.684
   let totInps = 0
   inps.forEach((r, i) => {
     const y = 486.5 - 11.9 * i
     const [dalM, dalA] = meseAnno(r.periodoDal)
     const [alM, alA] = meseAnno(r.periodoAl)
-    scrivi(r.codiceSede, 26, y, 8)
-    scrivi(r.causale, 65, y, 8)
-    scrivi(r.codeline, 102.6, y, 8)
-    scrivi(dalM, 221, y, 8)
-    scrivi(dalA, 235.3, y, 8)
-    scrivi(alM, 271.6, y, 8)
-    scrivi(alA, 286.7, y, 8)
-    scrivi(fmtImportoInps(r.importo), 333, y, 8) // termina ~404 (bordo "a debito")
+    scrivi(r.codiceSede, 26, y, 9)
+    scrivi(r.causale, 65, y, 9)
+    scrivi(r.codeline, 102.6, y, 9)
+    scrivi(dalM, 221, y, 9)
+    scrivi(dalA, 235.3, y, 9)
+    scrivi(alM, 271.6, y, 9)
+    scrivi(alA, 286.7, y, 9)
+    aDestra(fmtImportoInps(r.importo), X_DEBITO, y, 9) // termina al bordo "a debito"
     totInps += r.importo
   })
   if (totInps > 0) {
     // Totale "C" sezione INPS (a debito) e SALDO (C-D), rigo a Y≈429 (px 585).
-    // Saldo allineato a destra: bordo px 842 → 576 PDF. Nessun segno: l'F24 è
-    // sempre un versamento, il saldo è a debito (positivo).
-    scrivi(fmtImportoInps(totInps), 333, 429, 8) // totale C (a debito)
-    scrivi(fmtImporto(totInps), 504, 429, 8)     // SALDO (C-D), termina ~576
+    // Nessun segno: l'F24 è sempre un versamento, il saldo è a debito (positivo).
+    aDestra(fmtImportoInps(totInps), X_DEBITO, 429, 9) // totale C (a debito)
+    aDestra(fmtImportoInps(totInps), X_SALDO, 429, 9)  // SALDO (C-D)
   }
 
   // ── Saldo finale della delega ──

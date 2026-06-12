@@ -16,7 +16,7 @@ import { formattaScadenza } from '@/domain/dates'
  */
 
 /** Tipo di versamento rateizzato, ricavato dalla chiave di rateazione. */
-export type TipoVersamentoImposta = 'saldo' | 'acconto1'
+type TipoVersamentoImposta = 'saldo' | 'acconto1'
 
 export interface DatiPdfRateazione {
   /** Es. "Imposta sostitutiva · Saldo · competenza 2025". */

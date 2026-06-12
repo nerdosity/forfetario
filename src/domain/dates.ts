@@ -3,7 +3,7 @@ export const NOMI_MESI = [
   'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic',
 ] as const
 
-export const NOMI_MESI_ESTESI = [
+const NOMI_MESI_ESTESI = [
   'Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
   'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre',
 ] as const
@@ -75,10 +75,4 @@ export function validaPeriodo(
 export function formattaScadenza(mmGiorno: string, anno: number): string {
   const [mm, gg] = mmGiorno.split('-').map(Number)
   return `${gg} ${NOMI_MESI_ESTESI[mm - 1]} ${anno}`
-}
-
-/** Estrae una Date ordinabile da "MM-GG" + anno (per ordinare le scadenze). */
-export function dataOrdinabile(mmGiorno: string, anno: number): number {
-  const [mm, gg] = mmGiorno.split('-').map(Number)
-  return new Date(anno, mm - 1, gg).getTime()
 }

@@ -152,7 +152,7 @@ export interface ScadenzaContributo {
 }
 
 /** Causale INPS della riga (AF = fissi/minimale, AP = eccedente il minimale). */
-export type CausaleInps = 'AF' | 'AP'
+type CausaleInps = 'AF' | 'AP'
 
 /** Una riga di versamento contributi con la sua codeline INPS. */
 export interface RigaCodeline {

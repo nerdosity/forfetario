@@ -33,8 +33,6 @@ const TIPI: { value: TipoVersamento; label: string }[] = [
   { value: 'altro', label: 'Altro' },
 ]
 
-const labelTipo = (t: TipoVersamento) => TIPI.find((x) => x.value === t)?.label ?? 'Altro'
-
 // Menu di aggiunta raggruppati per categoria (le voci 'altro' restano un bottone a sé)
 const MENU: { label: string; voci: { tipo: TipoVersamento; label: string }[] }[] = [
   {
@@ -286,5 +284,3 @@ export function ContributiVersati({
     </div>
   )
 }
-
-export { labelTipo as labelTipoVersamento }

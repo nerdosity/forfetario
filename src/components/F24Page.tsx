@@ -1,11 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { FileDown, FileText } from 'lucide-react'
-import { Button, Table, TableBody, TableCell, TableHead, TableHeadCell, TableRow, TextInput } from 'flowbite-react'
+import { Button, Table, TableBody, TableCell, TableHead, TableHeadCell, TableRow } from 'flowbite-react'
 import type { RisultatoCalcolo, Scadenza } from '@/domain/types'
 import { righeCodelineDaScadenze, type RigaCodeline } from '@/domain/codelineInps'
-import { SEDI_INPS } from '@/data/sediInps'
-import { caricaAnagrafica, salvaAnagrafica } from '@/data/anagraficaStorage'
-import { Card, Field } from '@/components/ui'
+import type { AnagraficaContribuente } from '@/data/anagraficaStorage'
+import { Card } from '@/components/ui'
 import { formatEuro } from '@/domain/labels'
 import { theme, tableTheme } from '@/theme'
 import type { ModuloF24, RigaInpsF24, RigaErarioF24 } from '@/pdf/f24Pdf'
@@ -13,6 +12,7 @@ import type { ModuloF24, RigaInpsF24, RigaErarioF24 } from '@/pdf/f24Pdf'
 interface Props {
   anno: number
   calcoli: RisultatoCalcolo
+  anagrafica: AnagraficaContribuente
 }
 
 // Periodo "01/AAAA - 12/AAAA" dalla competenza letta nella voce della scadenza.
@@ -22,16 +22,8 @@ function periodoCompetenza(voce: string | undefined, annoDefault: number): { dal
   return { dal: `01/${a}`, al: `12/${a}` }
 }
 
-/** Pagina F24: genera i bollettini in facsimile (imposte + contributi INPS). */
-export function F24Page({ anno, calcoli }: Props) {
-  const [anag, setAnag] = useState(caricaAnagrafica)
-  useEffect(() => { salvaAnagrafica(anag) }, [anag])
-
-  const [sedeTesto, setSedeTesto] = useState(() => {
-    const s = SEDI_INPS.find((x) => x.sap === anag.sedeInps)
-    return s ? `${s.nome} (${s.sap})` : ''
-  })
-
+/** Pagina F24: genera i modelli F24 (imposte + contributi INPS). */
+export function F24Page({ anno, calcoli, anagrafica: anag }: Props) {
   const matricolaValida = /^\d{8}$/.test(anag.matricolaInps)
   const soggettoValido = /^\d{2}$/.test(anag.codiceSoggettoInps)
   const sedeValida = /^\d{4}$/.test(anag.sedeInps)
@@ -102,60 +94,14 @@ export function F24Page({ anno, calcoli }: Props) {
 
   return (
     <div className="space-y-6">
-      {/* Dati INPS per le codeline */}
-      <Card title="Modelli F24 da scaricare" icon={FileText} iconIntent="info"
-        info="Genera i modelli F24 in facsimile per imposte e contributi INPS, con codeline e codici tributo precompilati.">
-        <p className={`${theme.helpText} -mt-2 mb-4`}>
-          Per i contributi INPS inserisci sede, matricola e codice soggetto: servono a calcolare la codeline.
-          I modelli sono facsimile di supporto, da verificare prima del versamento.
-        </p>
-        <div className="grid gap-4 sm:grid-cols-3">
-          <Field label="Sede INPS" htmlFor="f24-sede" info="Digita il nome della sede (SAP) e selezionala dall'elenco.">
-            <TextInput
-              id="f24-sede"
-              list="f24-sedi"
-              value={sedeTesto}
-              placeholder="es. Milano, Roma Eur…"
-              color={!sedeTesto || sedeValida ? undefined : 'failure'}
-              onChange={(e) => {
-                const t = e.target.value
-                setSedeTesto(t)
-                const sede = SEDI_INPS.find((s) => `${s.nome} (${s.sap})` === t)
-                setAnag((a) => ({ ...a, sedeInps: sede ? sede.sap : '' }))
-              }}
-            />
-            <datalist id="f24-sedi">
-              {SEDI_INPS.map((s) => <option key={s.sap} value={`${s.nome} (${s.sap})`} />)}
-            </datalist>
-          </Field>
-          <Field label="Matricola INPS azienda" htmlFor="f24-matr" info="8 cifre.">
-            <TextInput
-              id="f24-matr"
-              value={anag.matricolaInps}
-              maxLength={8}
-              placeholder="10130045"
-              color={!anag.matricolaInps || matricolaValida ? undefined : 'failure'}
-              onChange={(e) => setAnag((a) => ({ ...a, matricolaInps: e.target.value.replace(/\D/g, '').slice(0, 8) }))}
-              className="font-mono"
-            />
-          </Field>
-          <Field label="Codice soggetto" htmlFor="f24-sogg" info="10 = titolare.">
-            <TextInput
-              id="f24-sogg"
-              value={anag.codiceSoggettoInps}
-              maxLength={2}
-              color={soggettoValido ? undefined : 'failure'}
-              onChange={(e) => setAnag((a) => ({ ...a, codiceSoggettoInps: e.target.value.replace(/\D/g, '').slice(0, 2) }))}
-              className="font-mono"
-            />
-          </Field>
-        </div>
-      </Card>
-
       {/* Contributi INPS */}
-      <Card title="Contributi INPS" icon={FileText} iconIntent="warning">
+      <Card title="Contributi INPS" icon={FileText} iconIntent="warning"
+        info="Modelli F24 per i contributi artigiani/commercianti, con codeline e causale precompilate.">
         {!datiInpsCompleti ? (
-          <p className={theme.helpText}>Inserisci sede, matricola e codice soggetto per generare i modelli F24 dei contributi.</p>
+          <p className={theme.helpText}>
+            Per generare i modelli F24 dei contributi inserisci sede, matricola e codice soggetto INPS nella
+            sezione <span className="font-medium text-slate-600">Anagrafica e dati</span>: servono a calcolare la codeline.
+          </p>
         ) : righeInps.length === 0 ? (
           <p className={theme.helpText}>Nessuna scadenza di contributi artigiani/commercianti.</p>
         ) : (

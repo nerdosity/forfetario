@@ -13,6 +13,3 @@ export function labelTipo(tipo: TipoRegime): string {
 
 export const formatEuro = (value: number | null | undefined): string =>
   new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(value ?? 0)
-
-export const formatPercent = (value: number, frazioni = 1): string =>
-  `${value.toFixed(frazioni)}%`

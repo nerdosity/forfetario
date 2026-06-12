@@ -4,17 +4,21 @@ import { Button, Modal as FbModal, ModalHeader, ModalBody, ModalFooter } from 'f
 import { RegimeEditor } from '@/components/RegimeEditor'
 import { GestoreAnni } from '@/components/GestoreAnni'
 import { ContributiVersati } from '@/components/ContributiVersati'
+import { AnagraficaPanel } from '@/components/AnagraficaPanel'
 import { Card, Field, MoneyInput, Select } from '@/components/ui'
 import { anniDisponibili } from '@/data/taxData'
 import type { CalcoloInput, DatiAnno, RisultatoCalcolo } from '@/domain/types'
 import { datiDellAnno } from '@/domain/types'
 import { regimeVuoto } from '@/domain/regimeFactory'
 import { esportaInput, importaInput } from '@/data/inputStorage'
+import type { AnagraficaContribuente } from '@/data/anagraficaStorage'
 import { theme } from '@/theme'
 
 interface InputPanelProps {
   input: CalcoloInput
   calcoli: RisultatoCalcolo | null
+  anagrafica: AnagraficaContribuente
+  onChangeAnagrafica: (a: AnagraficaContribuente) => void
   onChange: (partial: Partial<CalcoloInput>) => void
   onAnniChanged: () => void
   /** Azzera i dati del solo anno di riferimento corrente. */
@@ -115,7 +119,7 @@ function SezioneAnno({
 }
 
 /** Tab "Dati": le 3 sezioni per anno (anno-1, riferimento, anno+1). */
-export function InputPanel({ input, calcoli, onChange, onAnniChanged, onAzzeraAnnoCorrente }: InputPanelProps) {
+export function InputPanel({ input, calcoli, anagrafica, onChangeAnagrafica, onChange, onAnniChanged, onAzzeraAnnoCorrente }: InputPanelProps) {
   const [confermaAzzera, setConfermaAzzera] = useState(false)
   const [esitoImport, setEsitoImport] = useState<{ ok: boolean; msg: string } | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -166,6 +170,9 @@ export function InputPanel({ input, calcoli, onChange, onAnniChanged, onAzzeraAn
 
   return (
     <div className="space-y-4 sm:space-y-6">
+      {/* Anagrafica: dati unici del contribuente, comuni a tutti gli anni */}
+      <AnagraficaPanel anagrafica={anagrafica} onChange={onChangeAnagrafica} />
+
       {/* Barra: anno di riferimento + azzera */}
       <div className="flex flex-wrap items-end justify-between gap-3 sm:gap-4">
         <div className="flex flex-wrap items-end gap-3 sm:gap-4">

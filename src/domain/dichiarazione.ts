@@ -27,7 +27,7 @@ export interface CampoDichiarazione {
 }
 
 /** Un rigo LM relativo a una singola attività (modulo). */
-export interface ModuloLM {
+interface ModuloLM {
   /** Indice del modulo (1-based), uno per attività/regime forfettario. */
   modulo: number
   /** Codice ATECO se noto (l'app non lo memorizza: resta da inserire). */

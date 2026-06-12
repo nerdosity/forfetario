@@ -24,6 +24,8 @@ import { haDatiPerDichiarazione } from '@/domain/dichiarazione'
 import type { CalcoloInput } from '@/domain/types'
 import { anniDisponibili } from '@/data/taxData'
 import { caricaInput, salvaInput } from '@/data/inputStorage'
+import { caricaAnagrafica, salvaAnagrafica } from '@/data/anagraficaStorage'
+import type { AnagraficaContribuente } from '@/data/anagraficaStorage'
 import { theme } from '@/theme'
 import { useInputState } from '@/hooks/useInputState'
 
@@ -52,12 +54,12 @@ const NAV: { id: TabId; label: string; icon: typeof LayoutDashboard }[] = [
   { id: 'dichiarazione', label: 'Dichiarazione', icon: FileSpreadsheet },
   { id: 'f24', label: 'F24', icon: FileDown },
   { id: 'precedente', label: 'Anno precedente', icon: History },
-  // "Dati" resta in fondo: viene spinto all'estrema destra della navbar
-  { id: 'dati', label: 'Dati', icon: SlidersHorizontal },
+  // Voce di inserimento dati: spinta all'estrema destra della navbar
+  { id: 'dati', label: 'Anagrafica e dati', icon: SlidersHorizontal },
 ]
 
 const TITOLO: Record<TabId, string> = {
-  dati: 'Dati di calcolo',
+  dati: 'Anagrafica, redditi e versamenti',
   riepilogo: 'Riepilogo',
   regimi: 'Dettaglio regimi',
   calendario: 'Calendario fiscale',
@@ -69,6 +71,7 @@ const TITOLO: Record<TabId, string> = {
 
 export default function App() {
   const [input, setInput] = useInputState(inputIniziale)
+  const [anagrafica, setAnagrafica] = useState<AnagraficaContribuente>(caricaAnagrafica)
   const [, forceUpdate] = useReducer((x: number) => x + 1, 0)
   const [tab, setTab] = useState<TabId>('riepilogo')
 
@@ -79,6 +82,12 @@ export default function App() {
     const t = setTimeout(() => salvaInput(input), 300)
     return () => clearTimeout(t)
   }, [input])
+
+  // Persisti l'anagrafica a ogni modifica (debounce)
+  useEffect(() => {
+    const t = setTimeout(() => salvaAnagrafica(anagrafica), 300)
+    return () => clearTimeout(t)
+  }, [anagrafica])
 
   const handleAnniChanged = useCallback(() => {
     setInput((prev) => {
@@ -186,6 +195,8 @@ export default function App() {
           <InputPanel
             input={input}
             calcoli={calcoli}
+            anagrafica={anagrafica}
+            onChangeAnagrafica={setAnagrafica}
             onChange={(partial) => setInput((p) => ({ ...p, ...partial }))}
             onAnniChanged={handleAnniChanged}
             onAzzeraAnnoCorrente={handleAzzeraAnnoCorrente}
@@ -212,7 +223,7 @@ export default function App() {
         {tab === 'dichiarazione' && hasDatiDichiarazione && (
           <Dichiarazione anno={input.anno} calcoli={calcoli} />
         )}
-        {tab === 'f24' && <F24Page anno={input.anno} calcoli={calcoli} />}
+        {tab === 'f24' && <F24Page anno={input.anno} calcoli={calcoli} anagrafica={anagrafica} />}
         {tab === 'precedente' && hasDatiPrecedente && (
           <RiepilogoPrecedente anno={input.anno} calcoli={calcoli} />
         )}

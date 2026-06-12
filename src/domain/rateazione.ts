@@ -23,7 +23,7 @@ export const MAGGIORAZIONE_LUGLIO = 0.004
  * dovuti: il software ufficiale non iscrive la riga interessi (codice 1668)
  * se l'importo non supera 1,03 € e lo azzera.
  */
-export const SOGLIA_INTERESSI_CENTS = 103
+const SOGLIA_INTERESSI_CENTS = 103
 
 /** Date nominali "MM-GG" delle rate, prima scadenza inclusa. */
 const DATE_RATE: Record<InizioRateazione, string[]> = {

@@ -22,7 +22,7 @@ export interface AnagraficaContribuente {
   sedeInps: string
 }
 
-export function anagraficaVuota(): AnagraficaContribuente {
+function anagraficaVuota(): AnagraficaContribuente {
   return {
     codiceFiscale: '',
     cognome: '',

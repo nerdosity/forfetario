@@ -16,7 +16,7 @@ export function Field({ label, info, small, htmlFor, children }: FieldProps) {
   return (
     <div className="flex flex-col gap-1">
       <div className="flex items-start gap-1.5">
-        <Label htmlFor={htmlFor} className={small ? 'text-xs' : undefined}>
+        <Label htmlFor={htmlFor} className={`font-medium text-slate-700 ${small ? 'text-xs' : 'text-sm'}`}>
           {label}
         </Label>
         {info && (
