@@ -105,7 +105,7 @@ export function SaldiCrediti({ anno, calcoli }: Props) {
                   <TableCell className="font-medium text-slate-800">{r.voce}</TableCell>
                   <TableCell className="text-right tabular-nums text-slate-600">{formatEuro(r.dovuto)}</TableCell>
                   <TableCell className="text-right tabular-nums text-slate-500">
-                    {r.acconti > 0.005 ? `− ${formatEuro(r.acconti)}` : '—'}
+                    {r.acconti > 0.005 ? `- ${formatEuro(r.acconti)}` : '—'}
                   </TableCell>
                   <TableCell className="text-right font-semibold tabular-nums">
                     {r.credito && r.credito > 0.005 ? (

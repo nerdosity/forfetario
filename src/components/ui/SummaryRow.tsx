@@ -6,7 +6,7 @@ interface SummaryRowProps {
   /** Importo in euro, formattato automaticamente. */
   value: number
   valueIntent?: Intent
-  /** Mostra il valore preceduto da segno (+/−). */
+  /** Mostra il valore preceduto da segno (+/-). */
   sign?: '+' | '-'
   total?: boolean
 }

@@ -140,8 +140,8 @@ describe('bilancioPagamenti', () => {
     })
     const b = bilancioPagamenti(scadenze, i)
     expect(b.artComm.saldo).toBeCloseTo(800 - 725.5) // +74.5 in più
-    expect(b.gs.saldo).toBeCloseTo(250 - 300) // −50 in meno
-    expect(b.imposte.saldo).toBeCloseTo(950 - 1000) // −50 in meno
+    expect(b.gs.saldo).toBeCloseTo(250 - 300) // -50 in meno
+    expect(b.imposte.saldo).toBeCloseTo(950 - 1000) // -50 in meno
   })
 
   it('esclude dalla deducibilità le voci non deducibili (volontari)', () => {

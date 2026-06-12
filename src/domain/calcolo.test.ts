@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { calcola } from './calcolo'
+import { anniDisponibili } from '@/data/taxData'
 import type { CalcoloInput, Regime } from './types'
 
 const regimeSeparata: Regime = {
@@ -188,5 +189,47 @@ describe('calcola — anno precedente', () => {
     const senza = calcola(inputBase)
     const con = calcola(mkInput({ contributiVersatiDuranteAnnoPrecedente: 5000 }))
     expect(con.datiAnnoPrecedente.totaleImposte).toBeLessThan(senza.datiAnnoPrecedente.totaleImposte)
+  })
+})
+
+describe('calcola — nuovo utente (stato vuoto, nessun dato)', () => {
+  // Un utente che apre l'app per la prima volta ha la mappa anni vuota.
+  const vuoto = (anno: number): CalcoloInput => ({ anno, anni: {}, rateazioniImposta: {} })
+
+  it('non lancia con anni: {} su ogni anno disponibile (incluso il più recente → annoSucc fuori dal DB)', () => {
+    for (const anno of anniDisponibili()) {
+      expect(() => calcola(vuoto(anno))).not.toThrow()
+    }
+  })
+
+  it('stato vuoto produce tutti zero, senza scadenze obbligatorie', () => {
+    const r = calcola(vuoto(anniDisponibili()[0]))
+    expect(r.totaleImponibileLordo).toBe(0)
+    expect(r.totaleContributiINPS).toBe(0)
+    expect(r.totaleImposte).toBe(0)
+    expect(r.saldoImposteDaVersareAnnoCorrente).toBe(0)
+    expect(r.saldoContributiGSAnnoCorrente).toBe(0)
+    expect(r.saldoContributiEccArtCommAnnoCorrente).toBe(0)
+    // nessuna scadenza con importo > 0
+    const conImporto = [...r.scadenzeAnnoCorrente, ...r.scadenzeAnnoSuccessivo].filter((s) => s.importo > 0.005)
+    expect(conImporto).toHaveLength(0)
+  })
+
+  it('anno più recente: annoSucc non in DB non blocca (usa proiezione/fallback)', () => {
+    const annoRecente = anniDisponibili()[0] // il più recente
+    expect(() => calcola(vuoto(annoRecente))).not.toThrow()
+    // con un regime artigiani attivo, gli acconti dell'anno+1 si proiettano senza lanciare
+    const conRegime = calcola({
+      anno: annoRecente,
+      anni: {
+        [annoRecente]: {
+          regimi: [{ ...regimeArtigiani, meseInizio: 1, giornoInizio: 1, fatturato: 60000 }],
+          modalitaContributi: 'totale', contributiVersatiTotale: null, contributiVersati: [],
+          impostaSaldoVersato: null, impostaAcconto1Versato: null, impostaAcconto2Versato: null,
+        },
+      },
+      rateazioniImposta: {},
+    })
+    expect(conRegime.scadenzeAnnoSuccessivo.length).toBeGreaterThan(0)
   })
 })

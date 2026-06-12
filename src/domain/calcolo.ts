@@ -130,7 +130,7 @@ function calcolaDatiAnno(
     totaleFatturato += regime.fatturato
   }
 
-  // Imposta sostitutiva: si applica all'imponibile netto (lordo − contributi versati)
+  // Imposta sostitutiva: si applica all'imponibile netto (lordo - contributi versati)
   const imponibileNettoTotalePerImposte = Math.max(0, totaleImponibileLordo - contributiDeducibili)
   let totaleImposte = 0
 
@@ -214,7 +214,7 @@ export function calcola(input: CalcoloInput): RisultatoCalcolo {
   const creditoImposte = Math.max(0, accontiImposteEff - datiCorrente.totaleImposte)
 
   // Il saldo contributi UFFICIALE (come il calcolatore INPS) = eccedenza/G.S.
-  // dovuta dell'anno − acconti DOVUTI (non quelli effettivamente versati). Gli
+  // dovuta dell'anno - acconti DOVUTI (non quelli effettivamente versati). Gli
   // acconti dovuti = base acconto sui redditi dell'anno precedente con le costanti
   // dell'anno corrente. Esistono SOLO se la gestione è ancora attiva nell'anno
   // corrente (regime attivo a dicembre): se la gestione è chiusa, niente acconti
@@ -244,7 +244,7 @@ export function calcola(input: CalcoloInput): RisultatoCalcolo {
       (datiAnnoPrec.impostaAcconto1Versato ?? 0) + (datiAnnoPrec.impostaAcconto2Versato ?? 0),
     totaleContributiSeparataPrecedente: datiPrecedente.totaleContributiSeparata,
     totaleContributiEccedenzaArtCommPrecedente: datiPrecedente.totaleContributiEccedenzaArtComm,
-    // Dettaglio per documentare i saldi (dovuto − acconti DOVUTI, come INPS).
+    // Dettaglio per documentare i saldi (dovuto - acconti DOVUTI, come INPS).
     totaleContributiSeparataDovutoCorrente: datiCorrente.totaleContributiSeparata,
     accontiGSVersatiNelCorrente: accontiGSDovuti,
     totaleContributiEccArtCommDovutoCorrente: datiCorrente.totaleContributiEccedenzaArtComm,
@@ -262,7 +262,7 @@ export function calcola(input: CalcoloInput): RisultatoCalcolo {
     accontiImposteEffettivamenteVersatiPerAnnoCorrente: accontiImposteEff,
     saldoImposteDaVersareAnnoCorrente: saldoImposteDaVersare,
     creditoImposteAnnoCorrente: creditoImposte,
-    // Acconti DOVUTI (come INPS): coerenti col saldo ufficiale (dovuto − dovuti).
+    // Acconti DOVUTI (come INPS): coerenti col saldo ufficiale (dovuto - dovuti).
     accontiGSVersatiPerAnnoRif: accontiGSDovuti,
     saldoContributiGSAnnoCorrente: saldoContributiGS,
     accontiEccArtCommVersatiPerAnnoRif: accontiEccDovuti,

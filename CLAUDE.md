@@ -43,7 +43,7 @@ The codebase separates **pure domain logic** from **React UI** — keep that bou
 
 - A year holds an array of *regimi* (periods); a year can mix types mid-year, so dates are per-period and most amounts are prorated by `giorniPermanenza / giorniInAnno`.
 - Three `tipo` values: `separata` (flat % of income, auto-paid), `artigiani`/`commercianti` (fixed quarterly installments + contributions on income above the minimum, two-bracket above `sogliaPrimaFascia`).
-- Core formula: `imposta = (imponibile − contributi versati) × aliquota`. Paid contributions are split across regimes proportionally to each regime's share of total imponibile.
+- Core formula: `imposta = (imponibile - contributi versati) × aliquota`. Paid contributions are split across regimes proportionally to each regime's share of total imponibile.
 - Only *imposte* have a following-year saldo; contributions are always paid in-year.
 
 ## Conventions

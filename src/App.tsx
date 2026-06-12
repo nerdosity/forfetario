@@ -7,6 +7,7 @@ import {
   Calendar,
   FileText,
   FileSpreadsheet,
+  FileDown,
   History,
   ChevronRight,
 } from 'lucide-react'
@@ -17,6 +18,7 @@ import { DettaglioRegimi } from '@/components/DettaglioRegimi'
 import { CalendarioFiscale } from '@/components/CalendarioFiscale'
 import { SaldiCrediti } from '@/components/SaldiCrediti'
 import { Dichiarazione } from '@/components/Dichiarazione'
+import { F24Page } from '@/components/F24Page'
 import { calcola } from '@/domain/calcolo'
 import { haDatiPerDichiarazione } from '@/domain/dichiarazione'
 import type { CalcoloInput } from '@/domain/types'
@@ -40,7 +42,7 @@ function inputIniziale(): CalcoloInput {
   return caricaInput(def) ?? def
 }
 
-type TabId = 'dati' | 'riepilogo' | 'regimi' | 'calendario' | 'saldi' | 'dichiarazione' | 'precedente'
+type TabId = 'dati' | 'riepilogo' | 'regimi' | 'calendario' | 'saldi' | 'dichiarazione' | 'f24' | 'precedente'
 
 const NAV: { id: TabId; label: string; icon: typeof LayoutDashboard }[] = [
   { id: 'riepilogo', label: 'Riepilogo', icon: LayoutDashboard },
@@ -48,6 +50,7 @@ const NAV: { id: TabId; label: string; icon: typeof LayoutDashboard }[] = [
   { id: 'calendario', label: 'Calendario', icon: Calendar },
   { id: 'saldi', label: 'Saldi e crediti', icon: FileText },
   { id: 'dichiarazione', label: 'Dichiarazione', icon: FileSpreadsheet },
+  { id: 'f24', label: 'F24', icon: FileDown },
   { id: 'precedente', label: 'Anno precedente', icon: History },
   // "Dati" resta in fondo: viene spinto all'estrema destra della navbar
   { id: 'dati', label: 'Dati', icon: SlidersHorizontal },
@@ -60,6 +63,7 @@ const TITOLO: Record<TabId, string> = {
   calendario: 'Calendario fiscale',
   saldi: 'Saldi e crediti',
   dichiarazione: 'Righi dichiarazione',
+  f24: 'Modelli F24',
   precedente: 'Riepilogo anno precedente',
 }
 
@@ -208,6 +212,7 @@ export default function App() {
         {tab === 'dichiarazione' && hasDatiDichiarazione && (
           <Dichiarazione anno={input.anno} calcoli={calcoli} />
         )}
+        {tab === 'f24' && <F24Page anno={input.anno} calcoli={calcoli} />}
         {tab === 'precedente' && hasDatiPrecedente && (
           <RiepilogoPrecedente anno={input.anno} calcoli={calcoli} />
         )}

@@ -72,7 +72,7 @@ function RigaBilancio({ etichetta, cat }: { etichetta: string; cat: BilancioCate
     ? 'In pari'
     : cat.saldo > 0
       ? `+ ${formatEuro(cat.saldo)} in più`
-      : `− ${formatEuro(-cat.saldo)} in meno`
+      : `- ${formatEuro(-cat.saldo)} in meno`
   return (
     <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 py-1.5 text-sm">
       <span className="font-medium text-slate-600">{etichetta}</span>
@@ -137,7 +137,7 @@ function TabellaScadenze({ titolo, sottotitolo, scadenze, input, mostraBilancio,
                 const dettaglio = dettaglioUtile(s)
                 const tenue = pagata || stato === 'scaduta'
                 const testo = pagata ? 'text-slate-400 line-through' : tenue ? 'text-slate-400' : 'text-slate-800'
-                // Differenza dovuto − pagato. Entro ±1 € è solo arrotondamento (F24
+                // Differenza dovuto - pagato. Entro ±1 € è solo arrotondamento (F24
                 // si paga all'euro): si mostra in verde, non come mancanza/eccedenza.
                 const diff = versato == null ? null : s.importo - versato
                 const entroArrotond = diff != null && Math.abs(diff) <= 1
@@ -149,7 +149,7 @@ function TabellaScadenze({ titolo, sottotitolo, scadenze, input, mostraBilancio,
                 const diffTesto =
                   diff == null ? '—'
                   : Math.abs(diff) < 0.005 ? '0,00 €'
-                  : diff > 0 ? `− ${formatEuro(diff)}` : `+ ${formatEuro(-diff)}`
+                  : diff > 0 ? `- ${formatEuro(diff)}` : `+ ${formatEuro(-diff)}`
                 return (
                   <TableRow key={i} className="bg-white">
                     <TableCell className={testo}>

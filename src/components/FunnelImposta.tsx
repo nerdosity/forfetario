@@ -26,7 +26,7 @@ interface Uscita {
  * esce di lato con la quota che NON finisce in tasca (parte non imponibile,
  * contributi INPS, imposta). In fondo resta il guadagno netto effettivo.
  *
- *   Fatturato − quota non imponibile − INPS − imposta = Netto in tasca
+ *   Fatturato - quota non imponibile - INPS - imposta = Netto in tasca
  */
 export function FunnelImposta({
   fatturato,
@@ -98,7 +98,7 @@ export function FunnelImposta({
                   </span>
                   <span className={`inline-flex h-2.5 w-2.5 shrink-0 rounded-full ${uscita.bg}`} aria-hidden />
                   <span className="min-w-0 flex-1 truncate text-xs text-slate-500">{uscita.label}</span>
-                  <span className={`shrink-0 text-sm font-semibold tabular-nums ${uscita.color}`}>− {formatEuro(uscita.value)}</span>
+                  <span className={`shrink-0 text-sm font-semibold tabular-nums ${uscita.color}`}>- {formatEuro(uscita.value)}</span>
                 </div>
               )}
             </div>
@@ -109,7 +109,7 @@ export function FunnelImposta({
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3">
           <div>
             <p className="text-sm font-semibold text-emerald-800">Guadagno netto in tasca</p>
-            <p className="text-xs text-emerald-600/80">Fatturato − contributi INPS − imposta</p>
+            <p className="text-xs text-emerald-600/80">Fatturato - contributi INPS - imposta</p>
           </div>
           <p className="text-lg font-bold tabular-nums text-emerald-700 sm:text-xl">{formatEuro(nettoInTasca)}</p>
         </div>

@@ -133,11 +133,11 @@ export function generaRighiDichiarazione(calcoli: RisultatoCalcolo, anno: number
     {
       rigo: 'LM36',
       colonna: 1,
-      descrizione: 'Reddito netto (LM34 − LM35)',
+      descrizione: 'Reddito netto (LM34 - LM35)',
       valore: eu(redditoNetto),
       nota: contributiDedotti > redditoLordoTotale
         ? `Contributi dedotti limitati a ${eu(redditoLordoTotale)} (non superano il reddito lordo); l'eccedenza ${eu(contributiDedotti - redditoLordoTotale)} va nel quadro RS.`
-        : `${eu(redditoLordoTotale)} − ${eu(contributiDeducibiliEffettivi)}`,
+        : `${eu(redditoLordoTotale)} - ${eu(contributiDeducibiliEffettivi)}`,
     },
     {
       rigo: 'LM38',
@@ -172,14 +172,14 @@ export function generaRighiDichiarazione(calcoli: RisultatoCalcolo, anno: number
       colonna: 1,
       descrizione: 'Imposta a debito (saldo)',
       valore: eu(saldoDebito),
-      nota: 'LM42 − acconti, se positivo. Da versare a saldo.',
+      nota: 'LM42 - acconti, se positivo. Da versare a saldo.',
     },
     {
       rigo: 'LM47',
       colonna: 1,
       descrizione: 'Imposta a credito',
       valore: eu(saldoCredito),
-      nota: 'Acconti − LM42, se positivo. A credito.',
+      nota: 'Acconti - LM42, se positivo. A credito.',
     },
   ]
 

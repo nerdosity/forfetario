@@ -88,7 +88,7 @@ export function DettaglioRegimi({ anno, calcoli }: Props) {
                     Quota contributi deducibili
                     <Tooltip content={`Quota proporzionale dei contributi versati durante il ${anno} attribuita a questo regime in base al peso sul totale imponibile. Si deduce dall'imponibile prima di calcolare l'imposta sostitutiva.`} />
                   </span>
-                  <span className="font-medium text-amber-700">− {formatEuro(regime.contributiVersatiQuotaParte)}</span>
+                  <span className="font-medium text-amber-700">- {formatEuro(regime.contributiVersatiQuotaParte)}</span>
                 </div>
               )}
 

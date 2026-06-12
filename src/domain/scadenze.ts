@@ -19,7 +19,7 @@ const regimiConFissi = (regimi: Regime[]) =>
 
 /**
  * Spezza un acconto totale in due rate al centesimo come il calcolatore INPS:
- * 1ª rata arrotondata per difetto (floor a 2 decimali), 2ª rata = totale − 1ª
+ * 1ª rata arrotondata per difetto (floor a 2 decimali), 2ª rata = totale - 1ª
  * (così la somma è esatta). Es. 2456,53 → [1228,26, 1228,27].
  */
 const rateAcconto = (totale: number): [number, number] => {
@@ -48,7 +48,7 @@ interface ParamsScadenze {
   saldoImposteDaVersare: number
   saldoContributiGS: number
   saldoContributiEccArtComm: number
-  // dettaglio per documentare il saldo (dovuto − acconti già versati nell'anno)
+  // dettaglio per documentare il saldo (dovuto - acconti già versati nell'anno)
   totaleContributiSeparataDovutoCorrente?: number
   accontiGSVersatiNelCorrente?: number
   totaleContributiEccArtCommDovutoCorrente?: number
@@ -139,7 +139,7 @@ export interface BilancioCategoria {
   dovuto: number
   /** Totale effettivamente versato. */
   pagato: number
-  /** pagato − dovuto: positivo = versato in più, negativo = in meno. */
+  /** pagato - dovuto: positivo = versato in più, negativo = in meno. */
   saldo: number
 }
 
@@ -427,15 +427,15 @@ export function calcolaScadenze({
     })
   }
 
-  // ─── Conguaglio per gestione: NETTO (versato − dovuto) sulle rate obbligatorie ─
+  // ─── Conguaglio per gestione: NETTO (versato - dovuto) sulle rate obbligatorie ─
   // Il saldo è il punto in cui si scontano le differenze (in più e in meno) pagate
   // sulle altre rate della STESSA gestione. Si considerano tutte le rate
   // obbligatorie GIÀ VERSATE durante l'anno di riferimento e l'anno successivo
   // (anni solari di pagamento), di qualsiasi competenza: es. +1200 su una rata e
-  // −200 su un'altra → credito netto 1000 da scontare sul saldo. Le tre gestioni
+  // -200 su un'altra → credito netto 1000 da scontare sul saldo. Le tre gestioni
   // (artigiani/commercianti = IVS art/comm, gestione separata) restano SEPARATE.
   // Solo le rate effettivamente versate entrano (versato > 0): una rata non ancora
-  // pagata non genera un "−dovuto" fittizio. Questo esclude automaticamente il
+  // pagata non genera un "-dovuto" fittizio. Questo esclude automaticamente il
   // saldo a cui si applica il conguaglio (non ancora pagato), ma include un saldo
   // di competenza precedente già versato nell'anno (è una rata obbligatoria pagata).
   const rifEcc: RiferimentoScadenza[] = ['fissi-1', 'fissi-2', 'fissi-3', 'fissi-4-prec', 'ecc-saldo', 'ecc-acconto-1', 'ecc-acconto-2']

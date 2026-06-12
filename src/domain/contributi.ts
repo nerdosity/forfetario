@@ -1,7 +1,21 @@
 import type { DatiAnno, Regime, RiduzioneContributi, TipoVersamento } from '@/domain/types'
-import { contributoFissoAnno, datiAnno } from '@/data/taxData'
+import { datiAnno, anniDisponibili, type DatiAnno as DatiFiscali } from '@/data/taxData'
+import { proiettaDatiAnno } from '@/data/proiezioneAnno'
 import { formattaScadenza } from '@/domain/dates'
 import { labelTipo } from '@/domain/labels'
+
+/**
+ * Dati fiscali di un anno con FALLBACK: se l'anno non è nel database, li proietta
+ * dai dati storici (trend INPS) invece di lanciare. Così gli anni futuri (es.
+ * acconti dell'anno+1 non ancora pubblicato) non bloccano il calcolo.
+ */
+function datiFiscaliConFallback(anno: number): DatiFiscali {
+  if (anniDisponibili().includes(anno)) return datiAnno(anno)
+  const proiettato = proiettaDatiAnno(anno)
+  if (proiettato) return proiettato
+  // Estrema istanza: usa l'anno più recente disponibile.
+  return datiAnno(anniDisponibili()[0])
+}
 
 /**
  * Valore effettivo dei contributi versati in un anno, usato per la deducibilità.
@@ -49,7 +63,7 @@ const imponibileRegime = (r: Regime): number => (r.fatturato * r.coefficiente) /
  * calcolate separatamente, ciascuna sul proprio reddito di gestione.
  */
 export function baseEccedenzaAcconto(regimi: Regime[], annoCostanti: number): number {
-  const dati = datiAnno(annoCostanti)
+  const dati = datiFiscaliConFallback(annoCostanti)
   const calcola = (tipo: 'artigiani' | 'commercianti'): number => {
     const periodi = regimi.filter((r) => r.tipo === tipo)
     if (periodi.length === 0) return 0
@@ -79,7 +93,7 @@ export function baseEccedenzaAcconto(regimi: Regime[], annoCostanti: number): nu
 export function baseSeparataAcconto(regimi: Regime[], annoCostanti: number): number {
   // Reddito imponibile arrotondato all'euro, come il calcolatore INPS.
   const reddito = Math.round(regimi.filter((r) => r.tipo === 'separata').reduce((s, r) => s + imponibileRegime(r), 0))
-  return (reddito * datiAnno(annoCostanti).aliquotaSeparata) / 100
+  return (reddito * datiFiscaliConFallback(annoCostanti).aliquotaSeparata) / 100
 }
 
 /**
@@ -185,8 +199,10 @@ export interface RisultatoRate {
  * Il contributo mensile effettivo = ivsMensile×fattore + maternitàMensile.
  */
 export function calcolaRateContributiFissi(regime: Regime, anno: number): RisultatoRate {
-  const { ivsAnnuale, maternitaMensile } = contributoFissoAnno(anno, regime.tipo)
-  const { rateContributiFissi } = datiAnno(anno).scadenze
+  const dati = datiFiscaliConFallback(anno)
+  const cf = regime.tipo === 'commercianti' ? dati.contributoFisso.commercianti : dati.contributoFisso.artigiani
+  const { ivsAnnuale, maternitaMensile } = cf
+  const { rateContributiFissi } = dati.scadenze
   const label = labelTipo(regime.tipo)
 
   const ivsMensile = ivsAnnuale / 12
@@ -241,7 +257,9 @@ const TRIMESTRI_MESI: number[][] = [[1, 2, 3], [4, 5, 6], [7, 8, 9], [10, 11, 12
  */
 export function rateFissePerTrimestre(regime: Regime, anno: number): [number, number, number, number] {
   if (regime.tipo === 'separata') return [0, 0, 0, 0]
-  const { ivsAnnuale, maternitaMensile } = contributoFissoAnno(anno, regime.tipo)
+  const dati = datiFiscaliConFallback(anno)
+  const { ivsAnnuale, maternitaMensile } =
+    regime.tipo === 'commercianti' ? dati.contributoFisso.commercianti : dati.contributoFisso.artigiani
   const ivsMensileRidotto = applicaRiduzioneIVS(ivsAnnuale / 12, 0, regime.riduzioneContributi)
   const mensileEffettivo = ivsMensileRidotto + maternitaMensile
 

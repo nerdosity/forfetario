@@ -48,6 +48,10 @@ const GRIGIO_CHIARO = rgb(0.75, 0.75, 0.75)
 const euro = (v: number): string =>
   `${new Intl.NumberFormat('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v)} euro`
 
+/** Rende il testo compatibile con la codifica WinAnsi (vedi dichiarazionePdf). */
+const pdfSafe = (t: string): string =>
+  t.replace(/−/g, '-').replace(/[–—]/g, '-').replace(/[‘’]/g, "'").replace(/[“”]/g, '"')
+
 /** Campo F24 "rateazione/regione/prov./mese rif.": NNRR (rata su totale). */
 const campoRateazione = (numero: number, totale: number): string =>
   `${String(numero).padStart(2, '0')}${String(totale).padStart(2, '0')}`
@@ -114,9 +118,11 @@ function disegnaRiepilogo(
   let y = 780
 
   const testo = (t: string, x: number, size: number, font: PDFFont, color = NERO) =>
-    pagina.drawText(t, { x, y, size, font, color })
-  const aDestra = (t: string, xFine: number, size: number, font: PDFFont) =>
-    pagina.drawText(t, { x: xFine - font.widthOfTextAtSize(t, size), y, size, font, color: NERO })
+    pagina.drawText(pdfSafe(t), { x, y, size, font, color })
+  const aDestra = (t: string, xFine: number, size: number, font: PDFFont) => {
+    const s = pdfSafe(t)
+    pagina.drawText(s, { x: xFine - font.widthOfTextAtSize(s, size), y, size, font, color: NERO })
+  }
 
   testo('Piano di rateazione del versamento', margine, 16, helvBold, BLU)
   y -= 18
@@ -209,7 +215,7 @@ function disegnaDelega(
   const tributo = CODICE_TRIBUTO[tipoVersamento]
   const scrivi = (testo: string, x: number, y: number, size: number) => {
     if (testo.trim().length === 0) return
-    pagina.drawText(testo, { x, y, size, font: courier, color: NERO })
+    pagina.drawText(pdfSafe(testo), { x, y, size, font: courier, color: NERO })
   }
 
   // Filigrana FAC-SIMILE (come il software ufficiale per i modelli non controllati).

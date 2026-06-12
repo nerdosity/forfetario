@@ -16,7 +16,7 @@
  *   +1 prima del modulo finale: gestito da OFFSET_CC.)
  * - Check Digit finale (1 cifra): si considera la code-line da destra a sinistra
  *   escludendo il check digit, pesi 2,3,4,5,6,7,8,… crescenti; somma; resto
- *   della divisione per 11; se 0 o 1 il check è 0, altrimenti 11 − resto.
+ *   della divisione per 11; se 0 o 1 il check è 0, altrimenti 11 - resto.
  *
  * Validato al 100% su 832 codeline reali prelevate dallo strumento ufficiale
  * INPS, incluse matricole arbitrarie.
@@ -82,7 +82,7 @@ function controcodice(s32: string): number {
 /**
  * Check Digit finale (1 cifra), IBM base 11: code-line esclusa la cifra stessa,
  * da destra, pesi 2,3,4,5,6,7,8,… crescenti; somma; resto della divisione per
- * 11; se il resto è 0 o 1 il check è 0, altrimenti 11 − resto.
+ * 11; se il resto è 0 o 1 il check è 0, altrimenti 11 - resto.
  */
 function checkDigit(codeLineSenzaCheck: string): number {
   let somma = 0

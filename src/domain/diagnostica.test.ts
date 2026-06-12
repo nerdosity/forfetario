@@ -100,11 +100,11 @@ describe('diagnostica input reale utente', () => {
     expect(righe.length).toBeGreaterThan(0)
   })
 
-  it('il saldo eccedenza è documentato in dovuto − acconti DOVUTI (come INPS)', () => {
+  it('il saldo eccedenza è documentato in dovuto - acconti DOVUTI (come INPS)', () => {
     const saldo = r.scadenzeAnnoSuccessivo.find(
       (s) => s.categoria === 'Contributi eccedenza artigiani/commercianti' && s.voce?.startsWith('Saldo'),
     )!
-    // Il calcolatore ufficiale INPS calcola: saldo = eccedenza dovuta − acconti
+    // Il calcolatore ufficiale INPS calcola: saldo = eccedenza dovuta - acconti
     // DOVUTI (non quelli versati). Eccedenza 2025 = 2496,00 (reddito imponibile
     // arrotondato all'euro come INPS), acconti dovuti 1272,64 → saldo 1223,36.
     expect(saldo.componenti).toHaveLength(2)
@@ -136,12 +136,12 @@ describe('diagnostica input reale utente', () => {
       consigliato: saldo.importoConsigliato != null ? e2(saldo.importoConsigliato) : null,
       nota: saldo.notaConsigliato,
     }, null, 2))
-    // Dovuto ufficiale (come INPS): 1223,35 (eccedenza − acconti dovuti).
-    // Conguaglio = NETTO (versato − dovuto) su TUTTE le rate obbligatorie artComm
+    // Dovuto ufficiale (come INPS): 1223,35 (eccedenza - acconti dovuti).
+    // Conguaglio = NETTO (versato - dovuto) su TUTTE le rate obbligatorie artComm
     // collegate, tutte le competenze, in più e in meno:
     //   fissi-1: +389,66 · fissi-4-prec: +386,71 · ecc-saldo: +6,12
-    //   ecc-acconto-1: −259,05 · ecc-acconto-2: +130,79
-    //   netto = 654,23 → consigliato = 1223,35 − 654,23 = 569,12
+    //   ecc-acconto-1: -259,05 · ecc-acconto-2: +130,79
+    //   netto = 654,23 → consigliato = 1223,35 - 654,23 = 569,12
     // (coincide col "Bilancio pagamenti" della stessa gestione)
     expect(saldo.importoConsigliato).not.toBeNull()
     expect(saldo.importo).toBeCloseTo(1223.35, 1)
@@ -150,7 +150,7 @@ describe('diagnostica input reale utente', () => {
   })
 
   it('confronto diretto: saldo ecc 2025 vs 1° acconto ecc 2026', () => {
-    // Saldo ecc 2025 = eccedenza dovuta 2025 − acconti ecc versati nel 2025
+    // Saldo ecc 2025 = eccedenza dovuta 2025 - acconti ecc versati nel 2025
     const eccedenzaDovuta2025 = e2(r.totaleContributiEccedenzaArtComm)
     const accontiEccVersati = e2(r.accontiEccArtCommVersatiPerAnnoRif)
     const saldoEcc2025 = e2(r.saldoContributiEccArtCommAnnoCorrente)
@@ -164,7 +164,7 @@ describe('diagnostica input reale utente', () => {
       accontiEccVersatiNel2025: accontiEccVersati,
       saldoEcc2025_dovuto_a_giugno2026: saldoEcc2025,
       primoAccontoEcc2026_50pct: primoAccontoEcc2026,
-      nota: 'saldo = dovuto − acconti già versati; acconto = 50% del dovuto. Sono basi diverse.',
+      nota: 'saldo = dovuto - acconti già versati; acconto = 50% del dovuto. Sono basi diverse.',
     }, null, 2))
 
     expect(saldoEcc2025).toBeCloseTo(eccedenzaDovuta2025 - accontiEccVersati, 2)

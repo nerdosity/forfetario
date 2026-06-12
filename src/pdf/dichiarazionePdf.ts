@@ -16,6 +16,19 @@ const RIGA = rgb(0.85, 0.87, 0.9)
 const euro = (v: number): string =>
   `${new Intl.NumberFormat('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(v)} €`
 
+/**
+ * Rende il testo compatibile con la codifica WinAnsi dei font standard di
+ * pdf-lib: sostituisce i caratteri tipografici Unicode che WinAnsi non sa
+ * codificare (meno matematico -, trattini lunghi, virgolette curve…) con i
+ * corrispettivi ASCII. Senza questo, drawText/widthOfTextAtSize lanciano.
+ */
+const pdfSafe = (t: string): string =>
+  t
+    .replace(/−/g, '-') // meno matematico → trattino ASCII
+    .replace(/[–—]/g, '-') // trattini lunghi → trattino ASCII
+    .replace(/[‘’]/g, "'") // virgolette singole curve
+    .replace(/[“”]/g, '"') // virgolette doppie curve
+
 export async function generaPdfDichiarazione(righi: RighiDichiarazione): Promise<string> {
   const doc = await PDFDocument.create()
   doc.setTitle(`Righi dichiarazione ${righi.anno}`)
@@ -66,13 +79,14 @@ export async function generaPdfDichiarazione(righi: RighiDichiarazione): Promise
       pagina.drawText(c.colonna ? String(c.colonna) : '—', { x: X_COL, y, size: 9.5, font: helv, color: GRIGIO })
       // descrizione troncata per non sforare la colonna valore
       const maxW = FINE - X_DESC - 95
-      let desc = c.descrizione
+      const descPiena = pdfSafe(c.descrizione)
+      let desc = descPiena
       while (helv.widthOfTextAtSize(desc, 9) > maxW && desc.length > 4) desc = desc.slice(0, -2)
-      if (desc !== c.descrizione) desc = desc.slice(0, -1) + '…'
+      if (desc !== descPiena) desc = desc.slice(0, -1) + '…'
       pagina.drawText(desc, { x: X_DESC, y, size: 9, font: helv, color: NERO })
 
       const isNum = typeof c.valore === 'number'
-      const testo = isNum ? euro(c.valore as number) : String(c.valore)
+      const testo = isNum ? euro(c.valore as number) : pdfSafe(String(c.valore))
       const font = isNum ? helvBold : helv
       const color = isNum ? NERO : AMBRA
       pagina.drawText(testo, { x: FINE - font.widthOfTextAtSize(testo, 9.5), y, size: 9.5, font, color })
