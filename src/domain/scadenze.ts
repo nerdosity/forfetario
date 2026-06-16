@@ -113,14 +113,15 @@ export function versatoPerScadenza(scadenza: Scadenza, input: CalcoloInput): num
  */
 const TOLLERANZA_PAGAMENTO = 1.0
 
-/** Vero se la scadenza risulta saldata (versato ≥ dovuto, a meno dell'arrotondamento). */
+/** Vero se la scadenza risulta saldata (versato ≥ dovuto, a meno dell'arrotondamento).
+ * Se è presente un importoConsigliato (conguaglio), è sufficiente aver versato almeno quello. */
 export function scadenzaPagata(scadenza: Scadenza, input: CalcoloInput): boolean {
   const versato = versatoPerScadenza(scadenza, input)
-  return (
-    versato != null &&
-    versato >= scadenza.importo - TOLLERANZA_PAGAMENTO &&
-    scadenza.importo > 0.005
-  )
+  if (versato == null || scadenza.importo <= 0.005) return false
+  const soglia = scadenza.importoConsigliato != null
+    ? Math.min(scadenza.importoConsigliato, scadenza.importo)
+    : scadenza.importo
+  return versato >= soglia - TOLLERANZA_PAGAMENTO
 }
 
 /** Categoria di una scadenza ai fini del bilancio per gestione. */
