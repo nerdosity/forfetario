@@ -267,7 +267,7 @@ export function GestoreAnni({ onAnniChanged }: Props) {
             Scadenze
           </h3>
           <div>
-            <p className={`${theme.labelSmall} mb-1.5`}>Rate trimestrali contributi fissi</p>
+            <p className={`${theme.labelSmall} mb-1.5`}>Contributi INPS — rate trimestrali fissi</p>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               <Field label="1ª rata" small>
                 <DateInput value={form.rateContributiFissi[0]} onChange={setRata(0)} anno={form.anno} small />
@@ -284,33 +284,7 @@ export function GestoreAnni({ onAnniChanged }: Props) {
             </div>
           </div>
           <div>
-            <p className={`${theme.labelSmall} mb-1.5`}>Imposta sostitutiva</p>
-            <div className="grid gap-4 sm:grid-cols-3">
-              <Field label="Saldo imposte" info="Data del saldo dell'imposta sostitutiva dell'anno precedente.">
-                <DateInput
-                  value={form.saldoImposte}
-                  onChange={(v) => setForm((prev) => ({ ...prev, saldoImposte: v }))}
-                  anno={form.anno}
-                />
-              </Field>
-              <Field label="1° acconto imposte" info="Data del primo acconto imposta sostitutiva. Spesso coincide col saldo, ma non sempre.">
-                <DateInput
-                  value={form.primoAccontoImposte}
-                  onChange={(v) => setForm((prev) => ({ ...prev, primoAccontoImposte: v }))}
-                  anno={form.anno}
-                />
-              </Field>
-              <Field label="2° acconto imposte" info="Data del secondo acconto imposta sostitutiva.">
-                <DateInput
-                  value={form.secondoAccontoImposte}
-                  onChange={(v) => setForm((prev) => ({ ...prev, secondoAccontoImposte: v }))}
-                  anno={form.anno}
-                />
-              </Field>
-            </div>
-          </div>
-          <div>
-            <p className={`${theme.labelSmall} mb-1.5`}>Contributi INPS (GS ed eccedenza)</p>
+            <p className={`${theme.labelSmall} mb-1.5`}>Contributi INPS — saldo e acconti (GS ed eccedenza)</p>
             <div className="grid gap-4 sm:grid-cols-3">
               <Field label="Saldo contributi INPS" info="Data del saldo contributi INPS (GS ed eccedenza artigiani/commercianti). Di norma coincide col 1° acconto, ma può differire.">
                 <DateInput
@@ -330,6 +304,33 @@ export function GestoreAnni({ onAnniChanged }: Props) {
                 <DateInput
                   value={form.secondoAccontoContributi}
                   onChange={(v) => setForm((prev) => ({ ...prev, secondoAccontoContributi: v }))}
+                  anno={form.anno}
+                />
+              </Field>
+            </div>
+          </div>
+          <hr className="border-slate-200" />
+          <div>
+            <p className={`${theme.labelSmall} mb-1.5`}>Imposta sostitutiva</p>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <Field label="Saldo imposte" info="Data del saldo dell’imposta sostitutiva dell’anno precedente.">
+                <DateInput
+                  value={form.saldoImposte}
+                  onChange={(v) => setForm((prev) => ({ ...prev, saldoImposte: v }))}
+                  anno={form.anno}
+                />
+              </Field>
+              <Field label="1° acconto imposte" info="Data del primo acconto imposta sostitutiva. Spesso coincide col saldo, ma non sempre.">
+                <DateInput
+                  value={form.primoAccontoImposte}
+                  onChange={(v) => setForm((prev) => ({ ...prev, primoAccontoImposte: v }))}
+                  anno={form.anno}
+                />
+              </Field>
+              <Field label="2° acconto imposte" info="Data del secondo acconto imposta sostitutiva.">
+                <DateInput
+                  value={form.secondoAccontoImposte}
+                  onChange={(v) => setForm((prev) => ({ ...prev, secondoAccontoImposte: v }))}
                   anno={form.anno}
                 />
               </Field>
