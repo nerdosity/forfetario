@@ -8,7 +8,25 @@ import { Card } from '@/components/ui'
 import { formatEuro } from '@/domain/labels'
 import { theme, tableTheme } from '@/theme'
 import type { ModuloF24, RigaInpsF24, RigaErarioF24 } from '@/pdf/f24Pdf'
-import { scadenzaPagata } from '@/domain/scadenze'
+import { versatoPerScadenza } from '@/domain/scadenze'
+
+const MESI_IT: Record<string, number> = {
+  Gennaio: 0, Febbraio: 1, Marzo: 2, Aprile: 3, Maggio: 4, Giugno: 5,
+  Luglio: 6, Agosto: 7, Settembre: 8, Ottobre: 9, Novembre: 10, Dicembre: 11,
+}
+
+/** True se la data testuale "GG Mese AAAA" è passata da almeno 30 giorni. */
+function scadutaDa30Giorni(data: string): boolean {
+  const [gg, mese, aaaa] = data.split(' ')
+  const d = new Date(Number(aaaa), MESI_IT[mese] ?? 0, Number(gg))
+  return (Date.now() - d.getTime()) >= 30 * 86_400_000
+}
+
+/** True se risulta almeno un versamento collegato alla scadenza (a prescindere dall'importo). */
+function haVersamento(scad: Scadenza, input: CalcoloInput): boolean {
+  const v = versatoPerScadenza(scad, input)
+  return v != null && v > 0.005
+}
 
 interface Props {
   anno: number
@@ -169,19 +187,24 @@ export function F24Page({ anno, calcoli, input, anagrafica: anag, onVaiAiDati }:
             <TableBody className="divide-y divide-slate-100">
               {righeInps.map((r, i) => {
                 const scad = scadenzeContributi.find((s) => `${s.categoria}${s.voce ? ' · ' + s.voce : ''}` === r.descrizione)
-                const pagata = scad ? scadenzaPagata(scad, input) : false
+                const sbiadita = !!(scad && haVersamento(scad, input)) || (r.data ? scadutaDa30Giorni(r.data) : false)
                 return (
-                  <TableRow key={i} className={`bg-white${pagata ? ' opacity-50' : ''}`}>
-                    <TableCell className="py-2.5 pr-4 text-slate-700">
-                      <span className={pagata ? 'line-through' : ''}>{r.descrizione}</span>
-                      {r.data && <span className="block text-xs text-slate-400">entro il {r.data}</span>}
+                  <TableRow key={i} className="bg-white">
+                    <TableCell className={`py-2.5 pr-4 ${sbiadita ? 'text-slate-400 line-through' : 'text-slate-700'}`}>
+                      {r.descrizione}
+                      {r.data && <span className="block text-xs text-slate-300">entro il {r.data}</span>}
                     </TableCell>
-                    <TableCell className={`py-2.5 text-right tabular-nums whitespace-nowrap${pagata ? ' line-through' : ''}`}>{formatEuro(r.importo)}</TableCell>
+                    <TableCell className={`py-2.5 text-right tabular-nums whitespace-nowrap ${sbiadita ? 'text-slate-400 line-through' : ''}`}>{formatEuro(r.importo)}</TableCell>
                     <TableCell className="py-2.5">
                       <div className="flex w-full justify-center">
-                        <Button size="xs" color="light" disabled={!r.codeline || !scad} onClick={() => scad && apriF24Inps(r, scad)} title="Scarica modello F24">
+                        <button
+                          disabled={!r.codeline || !scad}
+                          onClick={() => scad && apriF24Inps(r, scad)}
+                          title="Scarica modello F24"
+                          className="inline-flex items-center justify-center rounded-md border border-blue-200 bg-blue-50 p-1.5 text-blue-600 transition-colors hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
                           <FileDown size={15} aria-hidden />
-                        </Button>
+                        </button>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -205,19 +228,23 @@ export function F24Page({ anno, calcoli, input, anagrafica: anag, onVaiAiDati }:
             </TableHead>
             <TableBody className="divide-y divide-slate-100">
               {scadenzeImposte.map((s, i) => {
-                const pagata = scadenzaPagata(s, input)
+                const sbiadita = haVersamento(s, input) || scadutaDa30Giorni(s.data)
                 return (
-                  <TableRow key={i} className={`bg-white${pagata ? ' opacity-50' : ''}`}>
-                    <TableCell className="py-2.5 pr-4 text-slate-700">
-                      <span className={pagata ? 'line-through' : ''}>{s.categoria}{s.voce ? ` · ${s.voce}` : ''}</span>
-                      {s.data && <span className="block text-xs text-slate-400">entro il {s.data}</span>}
+                  <TableRow key={i} className="bg-white">
+                    <TableCell className={`py-2.5 pr-4 ${sbiadita ? 'text-slate-400 line-through' : 'text-slate-700'}`}>
+                      {s.categoria}{s.voce ? ` · ${s.voce}` : ''}
+                      {s.data && <span className="block text-xs text-slate-300">entro il {s.data}</span>}
                     </TableCell>
-                    <TableCell className={`py-2.5 text-right tabular-nums whitespace-nowrap${pagata ? ' line-through' : ''}`}>{formatEuro(s.importo)}</TableCell>
+                    <TableCell className={`py-2.5 text-right tabular-nums whitespace-nowrap ${sbiadita ? 'text-slate-400 line-through' : ''}`}>{formatEuro(s.importo)}</TableCell>
                     <TableCell className="py-2.5">
                       <div className="flex w-full justify-center">
-                        <Button size="xs" color="light" onClick={() => apriF24Imposta(s)} title="Scarica modello F24">
+                        <button
+                          onClick={() => apriF24Imposta(s)}
+                          title="Scarica modello F24"
+                          className="inline-flex items-center justify-center rounded-md border border-blue-200 bg-blue-50 p-1.5 text-blue-600 transition-colors hover:bg-blue-100"
+                        >
                           <FileDown size={15} aria-hidden />
-                        </Button>
+                        </button>
                       </div>
                     </TableCell>
                   </TableRow>
