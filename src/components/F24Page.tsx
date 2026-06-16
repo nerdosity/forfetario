@@ -1,17 +1,19 @@
 import { useMemo } from 'react'
-import { FileDown, FileText, TriangleAlert, ArrowRight } from 'lucide-react'
+import { FileText, TriangleAlert, ArrowRight, FileDown } from 'lucide-react'
 import { Button, Table, TableBody, TableCell, TableHead, TableHeadCell, TableRow } from 'flowbite-react'
-import type { RisultatoCalcolo, Scadenza } from '@/domain/types'
+import type { CalcoloInput, RisultatoCalcolo, Scadenza } from '@/domain/types'
 import { righeCodelineDaScadenze, type RigaCodeline } from '@/domain/codelineInps'
 import type { AnagraficaContribuente } from '@/data/anagraficaStorage'
 import { Card } from '@/components/ui'
 import { formatEuro } from '@/domain/labels'
 import { theme, tableTheme } from '@/theme'
 import type { ModuloF24, RigaInpsF24, RigaErarioF24 } from '@/pdf/f24Pdf'
+import { scadenzaPagata } from '@/domain/scadenze'
 
 interface Props {
   anno: number
   calcoli: RisultatoCalcolo
+  input: CalcoloInput
   anagrafica: AnagraficaContribuente
   /** Porta l'utente alla sezione "Anagrafica e dati" per completare i campi. */
   onVaiAiDati: () => void
@@ -25,7 +27,7 @@ function periodoCompetenza(voce: string | undefined, annoDefault: number): { dal
 }
 
 /** Pagina F24: genera i modelli F24 (imposte + contributi INPS). */
-export function F24Page({ anno, calcoli, anagrafica: anag, onVaiAiDati }: Props) {
+export function F24Page({ anno, calcoli, input, anagrafica: anag, onVaiAiDati }: Props) {
   const matricolaValida = /^\d{8}$/.test(anag.matricolaInps)
   const soggettoValido = /^\d{2}$/.test(anag.codiceSoggettoInps)
   const sedeValida = /^\d{4}$/.test(anag.sedeInps)
@@ -57,8 +59,15 @@ export function F24Page({ anno, calcoli, anagrafica: anag, onVaiAiDati }: Props)
       periodoAl: al,
       importo: riga.importo,
     }
+    const mRata = scad.voce?.match(/(\d)ª rata/)
+    const mAcconto = scad.voce?.match(/(\d°) acconto/)
+    const etichettaInps = mRata
+      ? `${mRata[1]}ª RATA`
+      : mAcconto
+        ? `${mAcconto[1].toUpperCase()} ACCONTO`
+        : 'SALDO'
     const modulo: ModuloF24 = {
-      etichettaRata: scad.voce?.match(/(\d)ª rata/) ? `${scad.voce.match(/(\d)ª rata/)![1]}ª RATA` : 'SALDO/ACCONTO',
+      etichettaRata: etichettaInps,
       scadenza: riga.data,
       erario: [],
       inps: [inps],
@@ -80,13 +89,19 @@ export function F24Page({ anno, calcoli, anagrafica: anag, onVaiAiDati }: Props)
   const apriF24Imposta = async (scad: Scadenza) => {
     const scheda = window.open('', '_blank')
     const isSaldo = /saldo/i.test(scad.voce ?? '')
+    const mAccontoImp = scad.voce?.match(/(\d°) acconto/)
     const erario: RigaErarioF24 = {
       codiceTributo: isSaldo ? '1792' : '1790', // saldo / acconto forfettario
       annoRiferimento: anno,
       importo: scad.importo,
     }
+    const etichettaImp = isSaldo
+      ? 'SALDO'
+      : mAccontoImp
+        ? `${mAccontoImp[1].toUpperCase()} ACCONTO`
+        : 'ACCONTO'
     const modulo: ModuloF24 = {
-      etichettaRata: isSaldo ? 'SALDO' : 'ACCONTO',
+      etichettaRata: etichettaImp,
       scadenza: scad.data,
       erario: [erario],
       inps: [],
@@ -154,17 +169,18 @@ export function F24Page({ anno, calcoli, anagrafica: anag, onVaiAiDati }: Props)
             <TableBody className="divide-y divide-slate-100">
               {righeInps.map((r, i) => {
                 const scad = scadenzeContributi.find((s) => `${s.categoria}${s.voce ? ' · ' + s.voce : ''}` === r.descrizione)
+                const pagata = scad ? scadenzaPagata(scad, input) : false
                 return (
-                  <TableRow key={i} className="bg-white">
+                  <TableRow key={i} className={`bg-white${pagata ? ' opacity-50' : ''}`}>
                     <TableCell className="py-2.5 pr-4 text-slate-700">
-                      {r.descrizione}
+                      <span className={pagata ? 'line-through' : ''}>{r.descrizione}</span>
                       {r.data && <span className="block text-xs text-slate-400">entro il {r.data}</span>}
                     </TableCell>
-                    <TableCell className="py-2.5 text-right tabular-nums whitespace-nowrap">{formatEuro(r.importo)}</TableCell>
+                    <TableCell className={`py-2.5 text-right tabular-nums whitespace-nowrap${pagata ? ' line-through' : ''}`}>{formatEuro(r.importo)}</TableCell>
                     <TableCell className="py-2.5">
                       <div className="flex w-full justify-center">
-                        <Button size="xs" color="light" disabled={!r.codeline || !scad} onClick={() => scad && apriF24Inps(r, scad)}>
-                          <FileDown size={14} className="mr-1" aria-hidden /> Apri F24
+                        <Button size="xs" color="light" disabled={!r.codeline || !scad} onClick={() => scad && apriF24Inps(r, scad)} title="Scarica modello F24">
+                          <FileDown size={15} aria-hidden />
                         </Button>
                       </div>
                     </TableCell>
@@ -188,22 +204,25 @@ export function F24Page({ anno, calcoli, anagrafica: anag, onVaiAiDati }: Props)
               </TableRow>
             </TableHead>
             <TableBody className="divide-y divide-slate-100">
-              {scadenzeImposte.map((s, i) => (
-                <TableRow key={i} className="bg-white">
-                  <TableCell className="py-2.5 pr-4 text-slate-700">
-                    {s.categoria}{s.voce ? ` · ${s.voce}` : ''}
-                    {s.data && <span className="block text-xs text-slate-400">entro il {s.data}</span>}
-                  </TableCell>
-                  <TableCell className="py-2.5 text-right tabular-nums whitespace-nowrap">{formatEuro(s.importo)}</TableCell>
-                  <TableCell className="py-2.5">
-                    <div className="flex w-full justify-center">
-                      <Button size="xs" color="light" onClick={() => apriF24Imposta(s)}>
-                        <FileDown size={14} className="mr-1" aria-hidden /> Apri F24
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {scadenzeImposte.map((s, i) => {
+                const pagata = scadenzaPagata(s, input)
+                return (
+                  <TableRow key={i} className={`bg-white${pagata ? ' opacity-50' : ''}`}>
+                    <TableCell className="py-2.5 pr-4 text-slate-700">
+                      <span className={pagata ? 'line-through' : ''}>{s.categoria}{s.voce ? ` · ${s.voce}` : ''}</span>
+                      {s.data && <span className="block text-xs text-slate-400">entro il {s.data}</span>}
+                    </TableCell>
+                    <TableCell className={`py-2.5 text-right tabular-nums whitespace-nowrap${pagata ? ' line-through' : ''}`}>{formatEuro(s.importo)}</TableCell>
+                    <TableCell className="py-2.5">
+                      <div className="flex w-full justify-center">
+                        <Button size="xs" color="light" onClick={() => apriF24Imposta(s)} title="Scarica modello F24">
+                          <FileDown size={15} aria-hidden />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )
+              })}
             </TableBody>
           </Table>
         </Card>

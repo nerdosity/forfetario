@@ -11,12 +11,14 @@ export interface ContributoFisso {
 export interface ScadenzeAnno {
   /** 4 rate trimestrali dei contributi fissi (l'ultima cade l'anno successivo). */
   rateContributiFissi: [string, string, string, string]
-  /** Data del saldo imposte e contributi (di norma giugno). */
+  /** Data del saldo imposte (di norma 30 giugno). */
   saldoImposte: string
   /** Data del 1° acconto imposte (spesso coincide col saldo, ma non sempre). */
   primoAccontoImposte: string
   /** Data del 2° acconto imposte (di norma novembre). */
   secondoAccontoImposte: string
+  /** Data del saldo contributi INPS (GS ed eccedenza). Di norma coincide col primoAccontoContributi. */
+  saldoContributi: string
   /** Data del 1° acconto contributi INPS (può differire da quella delle imposte). */
   primoAccontoContributi: string
   /** Data del 2° acconto contributi INPS (può differire da quella delle imposte). */
@@ -114,7 +116,11 @@ export function validaAnno(anno: string, v: unknown): DatiAnno {
         scad.primoAccontoImposte ?? scad.saldoAccontoImposte,
       ),
       secondoAccontoImposte: dataValida(anno, 'scadenze.secondoAccontoImposte', scad.secondoAccontoImposte),
-      // Acconti contributi: se non specificati, ereditano le date degli acconti imposte.
+      // Saldo e acconti contributi: se non specificati, ereditano le date degli acconti imposte.
+      saldoContributi: dataValida(
+        anno, 'scadenze.saldoContributi',
+        scad.saldoContributi ?? scad.primoAccontoContributi ?? scad.primoAccontoImposte ?? scad.saldoAccontoImposte,
+      ),
       primoAccontoContributi: dataValida(
         anno, 'scadenze.primoAccontoContributi',
         scad.primoAccontoContributi ?? scad.primoAccontoImposte ?? scad.saldoAccontoImposte,

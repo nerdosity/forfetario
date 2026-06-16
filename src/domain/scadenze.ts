@@ -338,7 +338,7 @@ export function calcolaScadenze({
   // ─── Saldo contributi G.S. anno precedente (versato a giugno anno corrente) ──
   if (totaleContributiSeparataPrecedente > 0.005) {
     globali.push({
-      data: formattaScadenza(dCorr.saldoImposte, anno),
+      data: formattaScadenza(dCorr.saldoContributi, anno),
       descrizione: `Saldo contributi Gestione separata ${annoPrec}`,
       categoria: 'Contributi Gestione separata',
       voce: `Saldo · competenza ${annoPrec}`,
@@ -352,7 +352,7 @@ export function calcolaScadenze({
   // ─── Saldo contributi eccedenza Art/Comm anno precedente (giugno anno corr.) ──
   if (totaleContributiEccedenzaArtCommPrecedente > 0.005) {
     globali.push({
-      data: formattaScadenza(dCorr.saldoImposte, anno),
+      data: formattaScadenza(dCorr.saldoContributi, anno),
       descrizione: `Saldo contributi eccedenza artigiani/commercianti ${annoPrec}`,
       categoria: 'Contributi eccedenza artigiani/commercianti',
       voce: `Saldo · competenza ${annoPrec}`,
@@ -588,7 +588,7 @@ export function calcolaScadenze({
   const scadenzeGSSucc: Scadenza[] = []
   if (saldoContributiGS > 0) {
     scadenzeGSSucc.push({
-      data: formattaScadenza(dSucc.saldoImposte, annoSucc),
+      data: formattaScadenza(dSucc.saldoContributi, annoSucc),
       descrizione: `Saldo contributi Gestione separata ${anno}`,
       categoria: 'Contributi Gestione separata',
       voce: `Saldo · competenza ${anno}`,
@@ -642,7 +642,7 @@ export function calcolaScadenze({
   const scadenzeEccSucc: Scadenza[] = []
   if (saldoContributiEccArtComm > 0) {
     scadenzeEccSucc.push({
-      data: formattaScadenza(dSucc.saldoImposte, annoSucc),
+      data: formattaScadenza(dSucc.saldoContributi, annoSucc),
       descrizione: `Saldo contributi eccedenza artigiani/commercianti ${anno}`,
       categoria: 'Contributi eccedenza artigiani/commercianti',
       voce: `Saldo · competenza ${anno}`,

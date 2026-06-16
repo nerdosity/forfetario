@@ -35,6 +35,7 @@ interface FormAnno {
   saldoImposte: string
   primoAccontoImposte: string
   secondoAccontoImposte: string
+  saldoContributi: string
   primoAccontoContributi: string
   secondoAccontoContributi: string
 }
@@ -55,6 +56,7 @@ function formToDatiAnno(f: FormAnno): DatiAnno {
       saldoImposte: f.saldoImposte,
       primoAccontoImposte: f.primoAccontoImposte,
       secondoAccontoImposte: f.secondoAccontoImposte,
+      saldoContributi: f.saldoContributi,
       primoAccontoContributi: f.primoAccontoContributi,
       secondoAccontoContributi: f.secondoAccontoContributi,
     },
@@ -77,6 +79,7 @@ function datiAnnoToForm(anno: number, d: DatiAnno): FormAnno {
     saldoImposte: d.scadenze.saldoImposte,
     primoAccontoImposte: d.scadenze.primoAccontoImposte,
     secondoAccontoImposte: d.scadenze.secondoAccontoImposte,
+    saldoContributi: d.scadenze.saldoContributi,
     primoAccontoContributi: d.scadenze.primoAccontoContributi,
     secondoAccontoContributi: d.scadenze.secondoAccontoContributi,
   }
@@ -280,44 +283,57 @@ export function GestoreAnni({ onAnniChanged }: Props) {
               </Field>
             </div>
           </div>
-          <div className="grid gap-4 sm:grid-cols-3">
-            <Field label="Saldo imposte" info="Data del saldo imposte dell'anno precedente.">
-              <DateInput
-                value={form.saldoImposte}
-                onChange={(v) => setForm((prev) => ({ ...prev, saldoImposte: v }))}
-                anno={form.anno}
-              />
-            </Field>
-            <Field label="1° acconto imposte" info="Data del primo acconto. Spesso coincide col saldo, ma non sempre.">
-              <DateInput
-                value={form.primoAccontoImposte}
-                onChange={(v) => setForm((prev) => ({ ...prev, primoAccontoImposte: v }))}
-                anno={form.anno}
-              />
-            </Field>
-            <Field label="2° acconto imposte" info="Data del secondo acconto imposte.">
-              <DateInput
-                value={form.secondoAccontoImposte}
-                onChange={(v) => setForm((prev) => ({ ...prev, secondoAccontoImposte: v }))}
-                anno={form.anno}
-              />
-            </Field>
+          <div>
+            <p className={`${theme.labelSmall} mb-1.5`}>Imposta sostitutiva</p>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <Field label="Saldo imposte" info="Data del saldo dell'imposta sostitutiva dell'anno precedente.">
+                <DateInput
+                  value={form.saldoImposte}
+                  onChange={(v) => setForm((prev) => ({ ...prev, saldoImposte: v }))}
+                  anno={form.anno}
+                />
+              </Field>
+              <Field label="1° acconto imposte" info="Data del primo acconto imposta sostitutiva. Spesso coincide col saldo, ma non sempre.">
+                <DateInput
+                  value={form.primoAccontoImposte}
+                  onChange={(v) => setForm((prev) => ({ ...prev, primoAccontoImposte: v }))}
+                  anno={form.anno}
+                />
+              </Field>
+              <Field label="2° acconto imposte" info="Data del secondo acconto imposta sostitutiva.">
+                <DateInput
+                  value={form.secondoAccontoImposte}
+                  onChange={(v) => setForm((prev) => ({ ...prev, secondoAccontoImposte: v }))}
+                  anno={form.anno}
+                />
+              </Field>
+            </div>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="1° acconto contributi INPS" info="Data del primo acconto dei contributi INPS. Può differire da quella delle imposte.">
-              <DateInput
-                value={form.primoAccontoContributi}
-                onChange={(v) => setForm((prev) => ({ ...prev, primoAccontoContributi: v }))}
-                anno={form.anno}
-              />
-            </Field>
-            <Field label="2° acconto contributi INPS" info="Data del secondo acconto dei contributi INPS.">
-              <DateInput
-                value={form.secondoAccontoContributi}
-                onChange={(v) => setForm((prev) => ({ ...prev, secondoAccontoContributi: v }))}
-                anno={form.anno}
-              />
-            </Field>
+          <div>
+            <p className={`${theme.labelSmall} mb-1.5`}>Contributi INPS (GS ed eccedenza)</p>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <Field label="Saldo contributi INPS" info="Data del saldo contributi INPS (GS ed eccedenza artigiani/commercianti). Di norma coincide col 1° acconto, ma può differire.">
+                <DateInput
+                  value={form.saldoContributi}
+                  onChange={(v) => setForm((prev) => ({ ...prev, saldoContributi: v }))}
+                  anno={form.anno}
+                />
+              </Field>
+              <Field label="1° acconto contributi INPS" info="Data del primo acconto dei contributi INPS. Può differire da quella delle imposte.">
+                <DateInput
+                  value={form.primoAccontoContributi}
+                  onChange={(v) => setForm((prev) => ({ ...prev, primoAccontoContributi: v }))}
+                  anno={form.anno}
+                />
+              </Field>
+              <Field label="2° acconto contributi INPS" info="Data del secondo acconto dei contributi INPS.">
+                <DateInput
+                  value={form.secondoAccontoContributi}
+                  onChange={(v) => setForm((prev) => ({ ...prev, secondoAccontoContributi: v }))}
+                  anno={form.anno}
+                />
+              </Field>
+            </div>
           </div>
         </section>
 
