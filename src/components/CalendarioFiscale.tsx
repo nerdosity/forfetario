@@ -29,6 +29,39 @@ const MESE_NUM: Record<string, number> = {
   Luglio: 6, Agosto: 7, Settembre: 8, Ottobre: 9, Novembre: 10, Dicembre: 11,
 }
 
+const MESE_BREVE: Record<string, string> = {
+  Gennaio: 'GEN', Febbraio: 'FEB', Marzo: 'MAR', Aprile: 'APR', Maggio: 'MAG', Giugno: 'GIU',
+  Luglio: 'LUG', Agosto: 'AGO', Settembre: 'SET', Ottobre: 'OTT', Novembre: 'NOV', Dicembre: 'DIC',
+}
+
+/**
+ * Colori per tipo di scadenza: ambra=fissi, viola=eccedenza, teal=GS, indaco=imposte.
+ * Restituisce le classi Tailwind per bg, testo e bordo del bollino.
+ */
+function coloreCategoria(categoria: string | undefined, tenue: boolean): { bg: string; giorno: string; mese: string } {
+  if (tenue) return { bg: 'bg-slate-100', giorno: 'text-slate-400', mese: 'text-slate-400' }
+  if (!categoria) return { bg: 'bg-slate-100', giorno: 'text-slate-500', mese: 'text-slate-400' }
+  if (/fissi/i.test(categoria))     return { bg: 'bg-amber-50',   giorno: 'text-amber-700',  mese: 'text-amber-500' }
+  if (/eccedenza/i.test(categoria)) return { bg: 'bg-violet-50',  giorno: 'text-violet-700', mese: 'text-violet-500' }
+  if (/separata/i.test(categoria))  return { bg: 'bg-teal-50',    giorno: 'text-teal-700',   mese: 'text-teal-500' }
+  if (/imposta/i.test(categoria))   return { bg: 'bg-indigo-50',  giorno: 'text-indigo-700', mese: 'text-indigo-500' }
+  return { bg: 'bg-slate-100', giorno: 'text-slate-500', mese: 'text-slate-400' }
+}
+
+/** Bollino data calendario: giorno grande + mese anno piccolo. */
+function BollinoData({ data, categoria, tenue }: { data: string; categoria: string | undefined; tenue: boolean }) {
+  const [gg, mese, aaaa] = data.split(' ')
+  const c = coloreCategoria(categoria, tenue)
+  return (
+    <span className={`inline-flex flex-col items-center justify-center rounded-lg px-2.5 py-1 ${c.bg} min-w-[3rem]`}>
+      <span className={`text-lg font-bold leading-none tabular-nums ${c.giorno}`}>{gg}</span>
+      <span className={`text-[0.6rem] font-semibold uppercase leading-tight tracking-wide ${c.mese}`}>
+        {MESE_BREVE[mese] ?? mese} {aaaa}
+      </span>
+    </span>
+  )
+}
+
 type Stato = 'pagata' | 'scaduta' | 'in-scadenza' | 'prevista'
 
 const STATO_LABEL: Record<Stato, string> = {
@@ -219,8 +252,10 @@ function TabellaScadenze({ titolo, sottotitolo, scadenze, input, mostraBilancio,
                     <TableCell className={`text-right font-semibold tabular-nums ${diffClasse}`}>
                       {diffTesto}
                     </TableCell>
-                    <TableCell className={`whitespace-nowrap text-right tabular-nums ${tenue ? 'text-slate-400' : 'text-slate-600'}`}>
-                      {s.data}
+                    <TableCell className="text-right">
+                      <div className="flex justify-end">
+                        <BollinoData data={s.data} categoria={s.categoria} tenue={tenue} />
+                      </div>
                     </TableCell>
                   </TableRow>
                 )
