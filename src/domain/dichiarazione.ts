@@ -107,7 +107,7 @@ export function generaRighiDichiarazione(
           colonna: 1,
           descrizione: 'Codice attività (ATECO)',
           valore: 'da inserire',
-          nota: 'L\'app non memorizza il codice ATECO: riportarlo dal proprio.',
+          nota: 'L\'app non memorizza il codice ATECO. Dal modello 2026 va usato il codice della nuova classificazione ATECO 2025, non quello vecchio (il controllo lo segnala come "non in vigore").',
         },
         {
           rigo: 'LM22',
@@ -129,6 +129,20 @@ export function generaRighiDichiarazione(
           descrizione: 'Reddito (fatturato × coefficiente)',
           valore: eu(redditoLordo),
           nota: `${eu(regime.fatturato)} × ${regime.coefficiente}%`,
+        },
+        {
+          rigo: 'LM22',
+          colonna: 6,
+          descrizione: 'Lavoro autonomo o impresa',
+          valore: regime.tipo === 'separata' ? '2 (lavoro autonomo)' : '1 (impresa)',
+          nota: '1 = reddito d\'impresa (artigiani/commercianti), 2 = lavoro autonomo (professionisti in gestione separata). Da qui i controlli ricavano il reddito d\'impresa per la colonna 3 del quadro RR.',
+        },
+        {
+          rigo: 'LM21',
+          colonna: 1,
+          descrizione: 'Sussistenza requisiti di accesso al regime',
+          valore: 'sì (da barrare)',
+          nota: 'Attesta i requisiti di accesso e l\'assenza di cause di cessazione (art. 1, commi 54 e 71, L. 190/2014): va sempre barrata per applicare il forfettario.',
         },
         {
           rigo: 'LM21',
@@ -244,6 +258,12 @@ export function generaRighiDichiarazione(
         ? 'La parte di contributi che supera il reddito forfettario va nel quadro RP rigo RP26 con codice onere 76, deducibile dal reddito complessivo se hai altri redditi IRPEF.'
         : 'Nessun contributo eccede il reddito: tutto dedotto in LM35.',
     },
+    {
+      rigo: 'RS375–382',
+      descrizione: 'Obblighi informativi forfettari',
+      valore: 'da compilare',
+      nota: 'Compila gli elementi conoscitivi (RS375–RS381: mezzi di trasporto, costi carburante, telefonia, compensi a terzi…) se hai dati da comunicare; altrimenti barra la casella RS382 "assenza di dati". Uno dei due è obbligatorio.',
+    },
   ]
 
   return {
@@ -274,13 +294,15 @@ export function generaRighiDichiarazione(
  * nelle note dei crediti.
  */
 /**
- * Codice della colonna 7 "tipo riduzione" per riduzione. Il codice 'C' per la
- * riduzione 35% forfettari è verificato sul modello Redditi PF 2026 (anno
- * d'imposta 2025); null = codice non verificato, resta da inserire a mano.
+ * Codice della colonna 7 "tipo riduzione" (istruzioni Redditi PF 2026,
+ * fascicolo 2, quadro RR): A = 50% pensionati ultrasessantacinquenni,
+ * C = 35% forfettari, D = 35% forfettari con superamento dei 100.000 € in
+ * corso d'anno, E = 50% nuovi iscritti 2025 (art. 1 c. 186 L. 207/2024).
+ * La riduzione '50' dell'app non distingue A da E: resta da inserire (null).
  */
 const CODICE_TIPO_RIDUZIONE: Record<'35' | '50', string | null> = {
   '35': 'C',
-  '50': null, // riduzione 50% nuovi iscritti (art. 1 c. 186 L. 207/2024)
+  '50': null,
 }
 
 function generaQuadroRRArtComm(
@@ -416,7 +438,7 @@ function generaQuadroRRArtComm(
         colonna: 3,
         descrizione: 'Reddito d\'impresa',
         valore: eu(reddito),
-        nota: 'Per i forfettari la base contributiva è il reddito determinato nel quadro LM (rigo LM34) riferito a questa gestione.',
+        nota: 'Totale dei redditi d\'impresa dell\'anno: per i forfettari è il reddito del quadro LM (rigo LM34), da indicare anche se sotto il minimale. I controlli ufficiali lo ricavano dal quadro LM: compila prima quello, altrimenti il software si aspetta 0.',
       },
       {
         rigo,
@@ -436,8 +458,8 @@ function generaQuadroRRArtComm(
           descrizione: 'Tipo riduzione',
           valore: codice ?? 'da inserire',
           nota: codice
-            ? `Codice della riduzione ${riduzione}% forfettari (art. 1 c. 77–84 L. 190/2014), verificato sul modello Redditi 2026: controlla che coincida con le istruzioni della tua annualità.`
-            : `Riduzione ${riduzione}% attiva: riporta il codice previsto dalle istruzioni dell'anno (riduzione 50% nuovi iscritti, art. 1 c. 186 L. 207/2024).`,
+            ? `Codice della riduzione ${riduzione}% forfettari (art. 1 c. 77–84 L. 190/2014), dalle istruzioni ufficiali. Se in corso d'anno hai superato i 100.000 € di ricavi, il codice è D.`
+            : `Riduzione ${riduzione}% attiva: indica A se sei pensionato ultrasessantacinquenne (art. 59 c. 15 L. 449/97) o E se nuovo iscritto (art. 1 c. 186 L. 207/2024) — vedi istruzioni dell'anno.`,
         },
         {
           rigo,
@@ -492,7 +514,7 @@ function generaQuadroRRArtComm(
             colonna: 16,
             descrizione: 'Contributo a debito sul reddito minimale',
             valore: diff,
-            nota: 'Col. 11 + col. 12 − col. 14: da versare col saldo.',
+            nota: 'Formula ufficiale: col. 11 + 12 + 13 − 14 − 15 (qui 13 e 15 valgono zero). Da versare col saldo.',
           }
         : {
             rigo,
@@ -509,7 +531,7 @@ function generaQuadroRRArtComm(
         colonna: 20,
         descrizione: 'Credito del precedente anno',
         valore: creditoPrecMinimale,
-        nota: `Versato oltre il dovuto sulle rate fisse ${anno - 1} (dai tuoi versamenti). Vale se non l'hai chiesto a rimborso: se ne hai compensato una parte in F24 indicala in col. 21, il residuo va in col. 22.`,
+        nota: `Versato oltre il dovuto sulle rate fisse ${anno - 1} (dai tuoi versamenti). Ufficialmente la col. 20 riprende la col. 19 del quadro RR dell'anno scorso (credito destinato alla compensazione): verifica che coincida. Quanto già compensato in F24 va in col. 21, il residuo in col. 22.`,
       })
     }
 
@@ -544,10 +566,10 @@ function generaQuadroRRArtComm(
       campi.push(diff >= 0
         ? {
             rigo,
-            colonna: 28,
+            colonna: 29,
             descrizione: 'Contributo a debito sul reddito che eccede il minimale',
             valore: diff,
-            nota: 'Col. 25 − col. 27: da versare col saldo.',
+            nota: 'Formula ufficiale: col. 25 + 26 − 27 − 28 (qui 26 e 28 valgono zero). Da versare col saldo. Attenzione: la col. 28 è per contributi compensati con crediti previdenziali senza F24, non per il debito.',
           }
         : {
             rigo,
@@ -564,7 +586,7 @@ function generaQuadroRRArtComm(
         colonna: 34,
         descrizione: 'Credito del precedente anno',
         valore: creditoPrecEccedenza,
-        nota: `Versato oltre il dovuto sull'eccedenza ${anno - 1} (acconti + saldo, dai tuoi versamenti). Vale se non l'hai chiesto a rimborso: se ne hai compensato una parte in F24 indicala in col. 35, il residuo va in col. 36.`,
+        nota: `Versato oltre il dovuto sull'eccedenza ${anno - 1} (acconti + saldo, dai tuoi versamenti). Ufficialmente la col. 34 riprende la col. 33 del quadro RR dell'anno scorso (credito destinato alla compensazione): verifica che coincida. Quanto già compensato in F24 va in col. 35, il residuo in col. 36.`,
       })
     }
 

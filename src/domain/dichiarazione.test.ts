@@ -125,8 +125,9 @@ describe('quadro RR sezione I — artigiano 2025 con riduzione 35%', () => {
     expect(campo(campi, 27)?.valore).toBe(900)
   })
 
-  it('col 28: eccedenza a debito = dovuto − versato', () => {
-    expect(campo(campi, 28)?.valore).toBe(1973 - 900)
+  it('col 29: eccedenza a debito = dovuto − versato (la col 28 è per le compensazioni)', () => {
+    expect(campo(campi, 29)?.valore).toBe(1973 - 900)
+    expect(campo(campi, 28)).toBeUndefined()
     expect(campo(campi, 30)).toBeUndefined()
   })
 })
@@ -139,7 +140,7 @@ describe('quadro RR sezione I — casi particolari', () => {
     const righi = generaRighiDichiarazione(calcola(input), 2025, input)
     const campi = righi.quadroRRArtComm[0].campi
     expect(campo(campi, 30)?.valore).toBe(3000 - 1973)
-    expect(campo(campi, 28)).toBeUndefined()
+    expect(campo(campi, 29)).toBeUndefined()
   })
 
   it('modalità cifra unica → versati e debiti/crediti non ricavabili', () => {
@@ -149,7 +150,7 @@ describe('quadro RR sezione I — casi particolari', () => {
     expect(campo(campi, 14)?.valore).toBe('da inserire')
     expect(campo(campi, 27)?.valore).toBe('da inserire')
     expect(campo(campi, 16)).toBeUndefined()
-    expect(campo(campi, 28)).toBeUndefined()
+    expect(campo(campi, 29)).toBeUndefined()
   })
 
   it('minimale e IVS rapportati ai mesi per un periodo parziale', () => {
@@ -231,7 +232,7 @@ describe('quadro RR sezione I — campi anagrafici e di contorno', () => {
     const input = mkInput([artigiano2025])
     const righi = generaRighiDichiarazione(calcola(input), 2025, input)
     const campi = righi.quadroRRArtComm[0].campi
-    for (const colonna of [6, 13, 15, 18, 20, 26, 31, 32, 34]) {
+    for (const colonna of [6, 13, 15, 18, 20, 26, 28, 31, 32, 34]) {
       expect(campo(campi, colonna)).toBeUndefined()
     }
   })
