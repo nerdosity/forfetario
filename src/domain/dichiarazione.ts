@@ -163,80 +163,91 @@ export function generaRighiDichiarazione(
   })
 
   // ── Riepilogo LM (somma su tutti i moduli) e liquidazione ───────────────
+  // Il modello lavora su importi arrotondati all'euro campo per campo: i righi
+  // derivati (LM36, LM39, LM46…) vanno calcolati sugli arrotondati, non sui
+  // valori interni al centesimo, altrimenti le differenze sballano di un euro.
   const redditoLordoTotale = regimi.reduce((s, r) => s + r.imponibileLordoRegime, 0)
-  const redditoNetto = Math.max(0, redditoLordoTotale - contributiDedotti)
-  const imposta = calcoli.totaleImposte
-  const accontiVersati = calcoli.accontiImposteEffettivamenteVersatiPerAnnoCorrente
-  const saldoDebito = calcoli.saldoImposteDaVersareAnnoCorrente
-  const saldoCredito = calcoli.creditoImposteAnnoCorrente
+  const lm34 = eu(redditoLordoTotale)
+  const lm35 = eu(contributiDedotti)
+  const lm36 = Math.max(0, lm34 - lm35)
+  // Aliquota media ponderata sui redditi (5% start-up / 15% ordinaria): con un
+  // solo regime coincide con la sua aliquota.
+  const aliquotaMedia = redditoLordoTotale > 0
+    ? regimi.reduce((s, r) => s + r.imponibileLordoRegime * r.aliquota, 0) / redditoLordoTotale
+    : 15
+  const lm39 = eu((lm36 * aliquotaMedia) / 100)
+  const lm44 = eu(calcoli.accontiImposteEffettivamenteVersatiPerAnnoCorrente)
+  const lm46 = Math.max(0, lm39 - lm44)
+  const lm47 = Math.max(0, lm44 - lm39)
+  const etichettaAliquota = aliquotaMedia % 1 === 0 ? String(aliquotaMedia) : aliquotaMedia.toFixed(2).replace('.', ',')
 
   // Contributi dedotti effettivamente: non possono superare il reddito lordo (LM35 ≤ LM34)
-  const contributiDeducibiliEffettivi = Math.min(contributiDedotti, redditoLordoTotale)
+  const contributiDeducibiliEffettivi = Math.min(lm35, lm34)
 
   const riepilogoLM: CampoDichiarazione[] = [
     {
       rigo: 'LM34',
       colonna: 3,
       descrizione: 'Reddito lordo (somma dei redditi dei moduli)',
-      valore: eu(redditoLordoTotale),
+      valore: lm34,
       nota: 'Somma dei righi LM22 col. 5 di tutte le attività.',
     },
     {
       rigo: 'LM35',
       colonna: 1,
       descrizione: 'Contributi previdenziali e assistenziali versati',
-      valore: eu(contributiDedotti),
+      valore: lm35,
       nota: 'Contributi INPS pagati nell\'anno (deducibili). Vedi anche quadro RS.',
     },
     {
       rigo: 'LM36',
       colonna: 1,
       descrizione: 'Reddito netto (LM34 - LM35)',
-      valore: eu(redditoNetto),
-      nota: contributiDedotti > redditoLordoTotale
-        ? `Contributi dedotti limitati a ${eu(redditoLordoTotale)} (non superano il reddito lordo); l'eccedenza ${eu(contributiDedotti - redditoLordoTotale)} va nel quadro RS.`
-        : `${eu(redditoLordoTotale)} - ${eu(contributiDeducibiliEffettivi)}`,
+      valore: lm36,
+      nota: lm35 > lm34
+        ? `Contributi dedotti limitati a ${lm34} (non superano il reddito lordo); l'eccedenza ${lm35 - lm34} va nel quadro RS.`
+        : `${lm34} - ${contributiDeducibiliEffettivi} (calcolo sugli importi arrotondati, come nel modello).`,
     },
     {
       rigo: 'LM38',
       colonna: 1,
       descrizione: 'Reddito imponibile (al netto delle perdite)',
-      valore: eu(redditoNetto),
+      valore: lm36,
       nota: 'L\'app non gestisce perdite pregresse: coincide con LM36.',
     },
     {
       rigo: 'LM39',
       colonna: 2,
       descrizione: 'Imposta sostitutiva',
-      valore: eu(imposta),
-      nota: 'Imposta sostitutiva dovuta sul reddito imponibile.',
+      valore: lm39,
+      nota: `${lm36} × ${etichettaAliquota}%, sugli importi arrotondati del modello.`,
     },
     {
       rigo: 'LM42',
       colonna: 1,
       descrizione: 'Totale imposta sostitutiva',
-      valore: eu(imposta),
+      valore: lm39,
       nota: 'Coincide con LM39 in assenza di altri redditi LM.',
     },
     {
       rigo: 'LM44',
       colonna: 1,
       descrizione: 'Acconti versati',
-      valore: eu(accontiVersati),
+      valore: lm44,
       nota: '1° + 2° acconto imposta sostitutiva versati per l\'anno.',
     },
     {
       rigo: 'LM46',
       colonna: 1,
       descrizione: 'Imposta a debito (saldo)',
-      valore: eu(saldoDebito),
+      valore: lm46,
       nota: 'LM42 - acconti, se positivo. Da versare a saldo.',
     },
     {
       rigo: 'LM47',
       colonna: 1,
       descrizione: 'Imposta a credito',
-      valore: eu(saldoCredito),
+      valore: lm47,
       nota: 'Acconti - LM42, se positivo. A credito.',
     },
   ]
@@ -248,19 +259,19 @@ export function generaRighiDichiarazione(
   // hanno altri redditi IRPEF. NB: questo NON è il caso dei contributi versati
   // in più del dovuto (es. acconti sul minimale poi ridotti al 35%), che sono
   // un credito INPS gestito nel cassetto previdenziale, fuori dalla dichiarazione.
-  const contributiSenzaCapienza = Math.max(0, contributiDedotti - redditoLordoTotale)
+  const contributiSenzaCapienza = Math.max(0, lm35 - lm34)
   const quadroRS: CampoDichiarazione[] = [
     {
       rigo: 'LM35',
       colonna: 1,
       descrizione: 'Contributi previdenziali versati e dedotti',
-      valore: eu(contributiDeducibiliEffettivi),
+      valore: contributiDeducibiliEffettivi,
       nota: 'Contributi INPS versati nell\'anno, dedotti dal reddito forfettario (max = reddito lordo).',
     },
     {
       rigo: 'RP26',
       descrizione: 'Contributi senza capienza nel forfettario (cod. 76)',
-      valore: eu(contributiSenzaCapienza),
+      valore: contributiSenzaCapienza,
       nota: contributiSenzaCapienza > 0
         ? 'La parte di contributi che supera il reddito forfettario va nel quadro RP rigo RP26 con codice onere 76, deducibile dal reddito complessivo se hai altri redditi IRPEF.'
         : 'Nessun contributo eccede il reddito: tutto dedotto in LM35.',

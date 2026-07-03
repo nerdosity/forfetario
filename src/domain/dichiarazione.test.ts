@@ -252,6 +252,28 @@ describe('quadro RR sezione I — campi anagrafici e di contorno', () => {
   })
 })
 
+describe('riepilogo LM — aritmetica sugli importi arrotondati del modello', () => {
+  // Caso reale: 51.574 × 67% = 34.554,58 e contributi 7.491,30. Il modello
+  // arrotonda campo per campo (34.555 − 7.491 = 27.064); il calcolo sui valori
+  // al centesimo darebbe 27.063 e un'imposta più bassa di un euro.
+  it('LM36, LM39 e LM46 derivano dai valori arrotondati, non dai centesimi', () => {
+    const regime: Regime = { ...artigiano2025, coefficiente: 67, fatturato: 51574 }
+    const input = mkInput([regime])
+    input.anni[2025].modalitaContributi = 'totale'
+    input.anni[2025].contributiVersatiTotale = 7491.3
+    input.anni[2025].impostaAcconto1Versato = 1533.57
+    input.anni[2025].impostaAcconto2Versato = 1533.57
+    const righi = generaRighiDichiarazione(calcola(input), 2025, input)
+    const rigo = (nome: string) => righi.riepilogoLM.find((c) => c.rigo === nome)
+    expect(rigo('LM34')?.valore).toBe(34555)
+    expect(rigo('LM35')?.valore).toBe(7491)
+    expect(rigo('LM36')?.valore).toBe(34555 - 7491) // 27.064, non 27.063
+    expect(rigo('LM39')?.valore).toBe(Math.round(27064 * 0.15)) // 4.060
+    expect(rigo('LM44')?.valore).toBe(3067)
+    expect(rigo('LM46')?.valore).toBe(4060 - 3067) // 993
+  })
+})
+
 // ---------------------------------------------------------------------------
 // Sezione II — gestione separata
 // ---------------------------------------------------------------------------
