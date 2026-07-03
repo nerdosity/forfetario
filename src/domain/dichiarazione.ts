@@ -299,7 +299,7 @@ function generaQuadroRRArtComm(
     const meseAl = Math.max(...periodi.map((r) => r.meseFine))
     const reddito = periodi.reduce((s, r) => s + r.imponibileLordoRegime, 0)
 
-    const { ivsAnnuale, maternitaMensile } = contributoFissoAnno(anno, gestione)
+    const { maternitaMensile } = contributoFissoAnno(anno, gestione)
     const maternita = maternitaMensile * mesi
     const fissi = periodi.reduce((s, r) => s + r.contributiFissiRegime, 0)
     const ivsMinimale = fissi - maternita
