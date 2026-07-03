@@ -173,6 +173,79 @@ describe('quadro RR sezione I — casi particolari', () => {
   })
 })
 
+describe('quadro RR sezione I — campi anagrafici e di contorno', () => {
+  const anagrafica = {
+    codiceFiscale: 'FDLGNN81S05B936O',
+    cognome: '', nome: '', sesso: '' as const,
+    dataNascita: '', comuneNascita: '', provinciaNascita: '',
+    matricolaInps: '10130045',
+    codiceSoggettoInps: '10',
+    sedeInps: '7009',
+  }
+
+  it('col 2: codice INPS ricostruito dalla codeline (verificato su dato reale)', () => {
+    const input = mkInput([artigiano2025])
+    const righi = generaRighiDichiarazione(calcola(input), 2025, input, anagrafica)
+    const campi = righi.quadroRRArtComm[0].campi
+    expect(campo(campi, 2)?.valore).toBe('10130045251106615')
+    // colonna 1 esiste sia in RR1 (codice azienda) sia in RR2 (codice fiscale)
+    expect(campi.find((c) => c.rigo === 'RR2' && c.colonna === 1)?.valore).toBe('FDLGNN81S05B936O')
+    expect(campi.find((c) => c.rigo === 'RR1')?.valore).toBe('10130045 + 2 caratteri di controllo')
+  })
+
+  it('senza anagrafica il codice INPS resta da inserire', () => {
+    const input = mkInput([artigiano2025])
+    const righi = generaRighiDichiarazione(calcola(input), 2025, input)
+    expect(campo(righi.quadroRRArtComm[0].campi, 2)?.valore).toBe('da inserire')
+  })
+
+  it('col 7: codice C per la riduzione 35% e periodo riduzione in col 8', () => {
+    const input = mkInput([artigiano2025])
+    const righi = generaRighiDichiarazione(calcola(input), 2025, input)
+    const campi = righi.quadroRRArtComm[0].campi
+    expect(campo(campi, 7)?.valore).toBe('C')
+    expect(campo(campi, 8)?.valore).toBe('da 1 a 12')
+  })
+
+  it('riduzione 50%: codice non verificato, da inserire', () => {
+    const con50: Regime = { ...artigiano2025, riduzioneContributi: '50' }
+    const input = mkInput([con50])
+    const righi = generaRighiDichiarazione(calcola(input), 2025, input)
+    expect(campo(righi.quadroRRArtComm[0].campi, 7)?.valore).toBe('da inserire')
+  })
+
+  it('senza riduzione: nessuna colonna 7/8', () => {
+    const senza: Regime = { ...artigiano2025, riduzioneContributi: 'nessuna' }
+    const input = mkInput([senza])
+    const righi = generaRighiDichiarazione(calcola(input), 2025, input)
+    const campi = righi.quadroRRArtComm[0].campi
+    expect(campo(campi, 7)).toBeUndefined()
+    expect(campo(campi, 8)).toBeUndefined()
+  })
+
+  it('campi di contorno: quote associative e crediti pregressi presenti', () => {
+    const input = mkInput([artigiano2025])
+    const righi = generaRighiDichiarazione(calcola(input), 2025, input)
+    const campi = righi.quadroRRArtComm[0].campi
+    expect(campo(campi, 13)?.valore).toBe(0)
+    expect(campo(campi, 15)?.valore).toBe(0)
+    expect(campo(campi, 20)?.valore).toBe('da inserire')
+    expect(campo(campi, 26)?.valore).toBe(0)
+    expect(campo(campi, 31)?.valore).toBe(0)
+    expect(campo(campi, 34)?.valore).toBe('da inserire')
+  })
+
+  it('con un credito compare la riga di scelta rimborso/compensazione', () => {
+    const input = mkInput([artigiano2025], {
+      versamenti2025: [v('ecc-acconto-1', 1500), v('ecc-acconto-2', 1500)],
+    })
+    const righi = generaRighiDichiarazione(calcola(input), 2025, input)
+    const campi = righi.quadroRRArtComm[0].campi
+    expect(campo(campi, 32)?.valore).toBe('a tua scelta')
+    expect(campo(campi, 18)).toBeUndefined() // sul minimale nessun credito
+  })
+})
+
 // ---------------------------------------------------------------------------
 // Sezione II — gestione separata
 // ---------------------------------------------------------------------------

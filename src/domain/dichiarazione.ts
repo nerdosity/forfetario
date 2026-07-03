@@ -1,5 +1,7 @@
 import type { CalcoloInput, DatiAnno, RisultatoCalcolo, TipoVersamento } from '@/domain/types'
 import { datiAnno as datiFiscaliAnno, contributoFissoAnno } from '@/data/taxData'
+import type { AnagraficaContribuente } from '@/data/anagraficaStorage'
+import { generaCodeline } from '@/domain/codelineInps'
 
 /**
  * Righi della dichiarazione Redditi PF — quadro LM (regime forfettario,
@@ -89,6 +91,7 @@ export function generaRighiDichiarazione(
   calcoli: RisultatoCalcolo,
   anno: number,
   input: CalcoloInput,
+  anagrafica?: AnagraficaContribuente,
 ): RighiDichiarazione {
   const regimi = calcoli.dettagliRegimiCalcolati
   const contributiDedotti = calcoli.contributiVersatiAnnoImpostaPerDeducibilita
@@ -248,7 +251,7 @@ export function generaRighiDichiarazione(
     moduliLM,
     riepilogoLM,
     quadroRS,
-    quadroRRArtComm: generaQuadroRRArtComm(calcoli, anno, input),
+    quadroRRArtComm: generaQuadroRRArtComm(calcoli, anno, input, anagrafica),
     quadroRRSeparata: generaQuadroRRSeparata(calcoli, anno, input),
     haCampiDaCompletare: true, // l'ATECO è sempre da inserire
   }
@@ -267,10 +270,21 @@ export function generaRighiDichiarazione(
  * dopo. I crediti pregressi e le compensazioni (col. 15, 19–22, 31–36) non
  * sono tracciati dall'app e restano da completare a mano.
  */
+/**
+ * Codice della colonna 7 "tipo riduzione" per riduzione. Il codice 'C' per la
+ * riduzione 35% forfettari è verificato sul modello Redditi PF 2026 (anno
+ * d'imposta 2025); null = codice non verificato, resta da inserire a mano.
+ */
+const CODICE_TIPO_RIDUZIONE: Record<'35' | '50', string | null> = {
+  '35': 'C',
+  '50': null, // riduzione 50% nuovi iscritti (art. 1 c. 186 L. 207/2024)
+}
+
 function generaQuadroRRArtComm(
   calcoli: RisultatoCalcolo,
   anno: number,
   input: CalcoloInput,
+  anagrafica?: AnagraficaContribuente,
 ): SezioneRRGestione[] {
   const gestioni = (['artigiani', 'commercianti'] as const).filter((g) =>
     calcoli.dettagliRegimiCalcolati.some((r) => r.tipo === g),
@@ -311,7 +325,9 @@ function generaQuadroRRArtComm(
       0,
     )
     const eccedenzaDovuta = periodi.reduce((s, r) => s + r.contributiEccedenzaRegime, 0)
-    const riduzione = periodi.find((r) => r.riduzioneContributi !== 'nessuna')?.riduzioneContributi
+    const riduzione = periodi
+      .map((r) => r.riduzioneContributi)
+      .find((x): x is '35' | '50' => x !== 'nessuna')
 
     const notaVersatiMancanti = piuGestioni
       ? 'Anno con entrambe le gestioni: i versamenti inseriti non distinguono artigiani da commercianti, ripartiscili a mano.'
@@ -323,13 +339,62 @@ function generaQuadroRRArtComm(
     const versatiEccedenza =
       accontiEcc === null ? null : accontiEcc + (versatiDaDettaglio(datiN1, ['ecc-saldo']) ?? 0)
 
+    // Codice INPS della posizione (17 cifre): stessa struttura della codeline
+    // F24 con rata 6 (a percentuale) e importo 0 — verificato su dato reale.
+    const codiceInps = anagrafica && /^\d{8}$/.test(anagrafica.matricolaInps)
+      ? generaCodeline({
+          matricola: anagrafica.matricolaInps,
+          anno,
+          codiceSoggetto: anagrafica.codiceSoggettoInps,
+          rata: 6,
+          importoEuro: 0,
+          sap: anagrafica.sedeInps || undefined,
+        })
+      : null
+
     const campi: CampoDichiarazione[] = [
+      {
+        rigo: 'RR1',
+        colonna: 1,
+        descrizione: 'Codice azienda INPS',
+        valore: anagrafica?.matricolaInps
+          ? `${anagrafica.matricolaInps} + 2 caratteri di controllo`
+          : 'da inserire',
+        nota: 'Matricola azienda (8 cifre) seguita dai 2 caratteri di controllo: dal cassetto previdenziale INPS.',
+      },
+      {
+        rigo,
+        descrizione: 'Tipologia iscritto',
+        valore: anagrafica?.codiceSoggettoInps === '10' ? '1 (titolare)' : 'da inserire',
+        nota: '1 = titolare; 2, 3… = coadiuvanti/coadiutori (vedi istruzioni).',
+      },
+      {
+        rigo,
+        colonna: 1,
+        descrizione: 'Codice fiscale',
+        valore: anagrafica?.codiceFiscale || 'da inserire',
+      },
       {
         rigo,
         colonna: 2,
-        descrizione: 'Codice INPS della posizione (e tipologia iscritto)',
-        valore: 'da inserire',
-        nota: 'Matricola azienda, codice posizione e tipologia iscritto: dal cassetto previdenziale INPS (spesso precompilati).',
+        descrizione: 'Codice INPS',
+        valore: codiceInps ?? 'da inserire',
+        nota: codiceInps
+          ? 'Ricostruito con l\'algoritmo ufficiale della codeline (circolare INPS 123/1998) da matricola, anno, soggetto e sede: confrontalo col dato del cassetto previdenziale.'
+          : 'Codice a 17 cifre della posizione: dal cassetto previdenziale (compila matricola e sede in anagrafica per calcolarlo).',
+      },
+      {
+        rigo,
+        colonna: 3,
+        descrizione: 'Reddito d\'impresa',
+        valore: eu(reddito),
+        nota: 'Per i forfettari la base contributiva è il reddito determinato nel quadro LM (rigo LM34) riferito a questa gestione.',
+      },
+      {
+        rigo,
+        descrizione: 'Quota coadiutore e CPB (col. 3A–3C, casella 3D)',
+        valore: 'non gestiti',
+        nota: 'L\'app non gestisce coadiutori né concordato preventivo biennale: lascia vuoto salvo tue adesioni.',
       },
       {
         rigo,
@@ -340,21 +405,33 @@ function generaQuadroRRArtComm(
       },
       {
         rigo,
-        colonna: 3,
-        descrizione: 'Reddito d\'impresa',
-        valore: eu(reddito),
-        nota: 'Per i forfettari la base contributiva è il reddito determinato nel quadro LM (rigo LM34) riferito a questa gestione.',
+        colonna: 6,
+        descrizione: 'Lavoratori privi di anzianità contributiva al 31/12/95',
+        valore: 'da verificare',
+        nota: 'Barra la casella solo se al 31/12/1995 non avevi anzianità contributiva (incide sul massimale): dipende dalla tua storia previdenziale.',
       },
     ]
 
     if (riduzione) {
-      campi.push({
-        rigo,
-        colonna: 7,
-        descrizione: 'Tipo riduzione (col. 7) e periodo riduzione (col. 8–9)',
-        valore: 'da inserire',
-        nota: `Riduzione ${riduzione}% attiva da ${meseDal} a ${meseAl}: riporta il codice previsto dalle istruzioni dell'anno (per il 35% forfettari, agevolazione art. 1 c. 77–84 L. 190/2014).`,
-      })
+      const codice = CODICE_TIPO_RIDUZIONE[riduzione]
+      campi.push(
+        {
+          rigo,
+          colonna: 7,
+          descrizione: 'Tipo riduzione',
+          valore: codice ?? 'da inserire',
+          nota: codice
+            ? `Codice della riduzione ${riduzione}% forfettari (art. 1 c. 77–84 L. 190/2014), verificato sul modello Redditi 2026: controlla che coincida con le istruzioni della tua annualità.`
+            : `Riduzione ${riduzione}% attiva: riporta il codice previsto dalle istruzioni dell'anno (riduzione 50% nuovi iscritti, art. 1 c. 186 L. 207/2024).`,
+        },
+        {
+          rigo,
+          colonna: 8,
+          descrizione: 'Periodo riduzione (col. 8–9)',
+          valore: `da ${meseDal} a ${meseAl}`,
+          nota: 'Mesi in cui la riduzione è stata attiva.',
+        },
+      )
     }
 
     campi.push(
@@ -383,12 +460,26 @@ function generaQuadroRRArtComm(
       },
       {
         rigo,
+        colonna: 13,
+        descrizione: 'Quote associative e oneri accessori',
+        valore: 0,
+        nota: 'Quote associative riscosse dall\'INPS con le rate fisse: l\'app non le traccia, correggi se le versi.',
+      },
+      {
+        rigo,
         colonna: 14,
         descrizione: 'Contributi versati sul minimale',
         valore: versatiMinimale === null ? 'da inserire' : eu(versatiMinimale),
         nota: versatiMinimale === null
           ? notaVersatiMancanti
           : `Rate fisse 1ª–3ª versate nel ${anno} + 4ª rata versata a febbraio ${anno + 1} (dai versamenti inseriti in quell'anno).`,
+      },
+      {
+        rigo,
+        colonna: 15,
+        descrizione: 'Contributi compensati con crediti previdenziali senza F24',
+        valore: 0,
+        nota: 'Compila solo se hai coperto rate con crediti previdenziali senza passare dal modello F24.',
       },
     )
 
@@ -407,9 +498,26 @@ function generaQuadroRRArtComm(
             colonna: 17,
             descrizione: 'Contributo a credito sul reddito minimale',
             valore: -diff,
-            nota: 'Col. 14 − col. 11 − col. 12: chiedilo a rimborso (col. 18), compensalo in F24 (col. 19) o lascialo in autoconguaglio.',
+            nota: 'Col. 14 − col. 11 − col. 12.',
           })
+      if (diff < 0) {
+        campi.push({
+          rigo,
+          colonna: 18,
+          descrizione: 'Destinazione del credito sul minimale (col. 18/19)',
+          valore: 'a tua scelta',
+          nota: 'Rimborso (col. 18), compensazione in F24 (col. 19) o nessuna delle due per lasciarlo in autoconguaglio INPS.',
+        })
+      }
     }
+
+    campi.push({
+      rigo,
+      colonna: 20,
+      descrizione: 'Credito del precedente anno (col. 20–22)',
+      valore: 'da inserire',
+      nota: 'Credito sul minimale del quadro RR dell\'anno scorso non chiesto a rimborso (col. 20), quanto ne hai compensato in F24 (col. 21) e residuo in autoconguaglio (col. 22). L\'app non traccia i crediti pregressi.',
+    })
 
     campi.push(
       {
@@ -425,6 +533,13 @@ function generaQuadroRRArtComm(
         descrizione: 'Contributo IVS dovuto sul reddito che eccede il minimale',
         valore: eu(eccedenzaDovuta),
         nota: `Aliquota della gestione sull'eccedenza${riduzione ? `, con riduzione ${riduzione}%` : ''} (seconda fascia +1% oltre soglia).`,
+      },
+      {
+        rigo,
+        colonna: 26,
+        descrizione: 'Contributo maternità (solo affittacamere)',
+        valore: 0,
+        nota: 'Riguarda solo le attività di affittacamere.',
       },
       {
         rigo,
@@ -452,9 +567,35 @@ function generaQuadroRRArtComm(
             colonna: 30,
             descrizione: 'Contributo a credito sul reddito che eccede il minimale',
             valore: -diff,
-            nota: 'Col. 27 − col. 25: acconti versati oltre il dovuto. Chiedilo a rimborso (col. 32), compensalo in F24 (col. 33) o lascialo in autoconguaglio.',
+            nota: 'Col. 27 − col. 25: acconti versati oltre il dovuto.',
           })
+      if (diff < 0) {
+        campi.push({
+          rigo,
+          colonna: 32,
+          descrizione: 'Destinazione del credito sull\'eccedenza (col. 32/33)',
+          valore: 'a tua scelta',
+          nota: 'Rimborso (col. 32), compensazione in F24 (col. 33) o nessuna delle due per lasciarlo in autoconguaglio INPS.',
+        })
+      }
     }
+
+    campi.push(
+      {
+        rigo,
+        colonna: 31,
+        descrizione: 'Eccedenza di versamento a saldo',
+        valore: 0,
+        nota: 'Versamenti a saldo oltre il dovuto (es. arrotondamenti o errori): l\'app non li traccia, correggi se ne hai.',
+      },
+      {
+        rigo,
+        colonna: 34,
+        descrizione: 'Credito del precedente anno sull\'eccedenza (col. 34–36)',
+        valore: 'da inserire',
+        nota: 'Credito sull\'eccedenza del quadro RR dell\'anno scorso non chiesto a rimborso (col. 34), quanto ne hai compensato in F24 (col. 35) e residuo in autoconguaglio (col. 36). L\'app non traccia i crediti pregressi.',
+      },
+    )
 
     return { rigo, gestione, campi }
   })

@@ -1,6 +1,7 @@
 import { FileSpreadsheet, ExternalLink } from 'lucide-react'
 import { Button, Table, TableBody, TableCell, TableHead, TableHeadCell, TableRow } from 'flowbite-react'
 import type { CalcoloInput, RisultatoCalcolo } from '@/domain/types'
+import type { AnagraficaContribuente } from '@/data/anagraficaStorage'
 import { generaRighiDichiarazione, type CampoDichiarazione } from '@/domain/dichiarazione'
 import { Card, Tooltip } from '@/components/ui'
 import { formatEuro } from '@/domain/labels'
@@ -10,6 +11,7 @@ interface Props {
   anno: number
   calcoli: RisultatoCalcolo
   input: CalcoloInput
+  anagrafica: AnagraficaContribuente
 }
 
 /** Mostra un valore di campo: euro se numero, testo (es. "da inserire") altrimenti. */
@@ -66,8 +68,8 @@ function TabellaRighi({ titolo, righi }: { titolo: string; righi: CampoDichiaraz
  * da riportare nei Redditi PF. Apre il PDF promemoria in una nuova scheda.
  */
 
-export function Dichiarazione({ anno, calcoli, input }: Props) {
-  const righi = generaRighiDichiarazione(calcoli, anno, input)
+export function Dichiarazione({ anno, calcoli, input, anagrafica }: Props) {
+  const righi = generaRighiDichiarazione(calcoli, anno, input, anagrafica)
 
   const apriPdf = async () => {
     const scheda = window.open('', '_blank')
