@@ -269,7 +269,7 @@ export function generaRighiDichiarazione(
       rigo: 'RS375–382',
       descrizione: 'Obblighi informativi forfettari',
       valore: 'da compilare',
-      nota: 'Compila gli elementi conoscitivi (RS375–RS381: mezzi di trasporto, costi carburante, telefonia, compensi a terzi…) se hai dati da comunicare; altrimenti barra la casella RS382 "assenza di dati". Uno dei due è obbligatorio.',
+      nota: 'Obbligatorio uno dei due: gli elementi conoscitivi se hai dati, altrimenti la casella RS382 "assenza di dati". Per le imprese: RS375 numero veicoli, RS376 costi merci e servizi, RS377 canoni e noleggi, RS378 carburante. Per il lavoro autonomo: RS381 consumi (telefonia, energia, carburanti). Dati solo informativi: non incidono su imposte o contributi.',
     },
   ]
 
