@@ -105,9 +105,9 @@ export function generaRighiDichiarazione(
         {
           rigo: 'LM22',
           colonna: 1,
-          descrizione: 'Codice attività (ATECO)',
+          descrizione: 'Codice attività (ATECO 2007)',
           valore: 'da inserire',
-          nota: 'L\'app non memorizza il codice ATECO. Dal modello 2026 va usato il codice della nuova classificazione ATECO 2025, non quello vecchio (il controllo lo segnala come "non in vigore").',
+          nota: 'Qui va il codice della vecchia classificazione ATECO 2007: i coefficienti di redditività restano agganciati a quella finché non vengono approvati i nuovi (art. 1 D.Lgs. 81/2025). Il codice ATECO 2025 va invece in LM21 col. 4.',
         },
         {
           rigo: 'LM22',
@@ -143,6 +143,13 @@ export function generaRighiDichiarazione(
           descrizione: 'Sussistenza requisiti di accesso al regime',
           valore: 'sì (da barrare)',
           nota: 'Attesta i requisiti di accesso e l\'assenza di cause di cessazione (art. 1, commi 54 e 71, L. 190/2014): va sempre barrata per applicare il forfettario.',
+        },
+        {
+          rigo: 'LM21',
+          colonna: 4,
+          descrizione: 'Codice ATECO 2025',
+          valore: 'da inserire',
+          nota: 'Codice dell\'attività nella nuova classificazione ATECO 2025, in vigore dal 2025 (tabella sul sito AdE). Da non confondere con LM22 col. 1, che resta in ATECO 2007.',
         },
         {
           rigo: 'LM21',
