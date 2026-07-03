@@ -2,9 +2,10 @@ import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
 import type { CampoDichiarazione, RighiDichiarazione } from '@/domain/dichiarazione'
 
 /**
- * PDF promemoria dei righi della dichiarazione (quadro LM forfettario + RS
- * contributi). Tabellare e sobrio; si apre in una nuova scheda da cui salvare
- * o stampare. Promemoria di compilazione, non un modello presentabile.
+ * PDF promemoria dei righi della dichiarazione (quadro LM forfettario, RS
+ * contributi dedotti, RR contributi INPS). Tabellare e sobrio; si apre in una
+ * nuova scheda da cui salvare o stampare. Promemoria di compilazione, non un
+ * modello presentabile.
  */
 
 const BLU = rgb(29 / 255, 78 / 255, 216 / 255)
@@ -49,7 +50,7 @@ export async function generaPdfDichiarazione(righi: RighiDichiarazione): Promise
   // Intestazione
   pagina.drawText('Righi dichiarazione Redditi PF', { x: margine, y, size: 16, font: helvBold, color: BLU })
   y -= 18
-  pagina.drawText(`Quadro LM (regime forfettario) e quadro RS — anno d'imposta ${righi.anno}`, {
+  pagina.drawText(`Quadri LM (regime forfettario), RS e RR — anno d'imposta ${righi.anno}`, {
     x: margine, y, size: 10, font: helv, color: GRIGIO,
   })
   y -= 26
@@ -103,14 +104,21 @@ export async function generaPdfDichiarazione(righi: RighiDichiarazione): Promise
   })
   sezione('Quadro LM — liquidazione imposta', righi.riepilogoLM)
   sezione('Contributi previdenziali — deduzione', righi.quadroRS)
+  righi.quadroRRArtComm.forEach((s) => {
+    sezione(`Quadro RR sezione I — ${s.gestione} (${s.rigo})`, s.campi)
+  })
+  if (righi.quadroRRSeparata.length > 0) {
+    sezione('Quadro RR sezione II — gestione separata', righi.quadroRRSeparata)
+  }
 
   // Nota finale
-  nuovaPaginaSeServe(40)
+  nuovaPaginaSeServe(52)
   const note = [
     'I valori in colore ambra non sono ricavabili dai dati inseriti (es. il codice ATECO): vanno completati a mano.',
-    'Promemoria di compilazione basato sui controlli ufficiali dell\'Agenzia delle Entrate (ControlliRPF). Non',
-    'sostituisce la dichiarazione né i controlli del software ufficiale; non gestisce CPB, perdite pregresse,',
-    'crediti d\'imposta o aiuti di Stato.',
+    'Promemoria di compilazione basato sui controlli ufficiali dell\'Agenzia delle Entrate (ControlliRPF) e sulle',
+    'istruzioni INPS per il quadro RR. Non sostituisce la dichiarazione né i controlli del software ufficiale; non',
+    'gestisce CPB, perdite pregresse, crediti d\'imposta, aiuti di Stato né i crediti contributivi pregressi e le',
+    'compensazioni del quadro RR (col. 15, 19-22, 31-36).',
   ]
   for (const r of note) {
     pagina.drawText(r, { x: margine, y, size: 8, font: helv, color: GRIGIO })

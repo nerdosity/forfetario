@@ -221,7 +221,7 @@ export default function App() {
         )}
         {tab === 'saldi' && <SaldiCrediti anno={input.anno} calcoli={calcoli} />}
         {tab === 'dichiarazione' && hasDatiDichiarazione && (
-          <Dichiarazione anno={input.anno} calcoli={calcoli} />
+          <Dichiarazione anno={input.anno} calcoli={calcoli} input={input} />
         )}
         {tab === 'f24' && (
           <F24Page anno={input.anno} calcoli={calcoli} input={input} anagrafica={anagrafica} onVaiAiDati={() => setTab('dati')} />

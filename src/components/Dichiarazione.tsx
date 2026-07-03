@@ -1,6 +1,6 @@
 import { FileSpreadsheet, ExternalLink } from 'lucide-react'
 import { Button, Table, TableBody, TableCell, TableHead, TableHeadCell, TableRow } from 'flowbite-react'
-import type { RisultatoCalcolo } from '@/domain/types'
+import type { CalcoloInput, RisultatoCalcolo } from '@/domain/types'
 import { generaRighiDichiarazione, type CampoDichiarazione } from '@/domain/dichiarazione'
 import { Card, Tooltip } from '@/components/ui'
 import { formatEuro } from '@/domain/labels'
@@ -9,6 +9,7 @@ import { theme, tableTheme } from '@/theme'
 interface Props {
   anno: number
   calcoli: RisultatoCalcolo
+  input: CalcoloInput
 }
 
 /** Mostra un valore di campo: euro se numero, testo (es. "da inserire") altrimenti. */
@@ -60,13 +61,13 @@ function TabellaRighi({ titolo, righi }: { titolo: string; righi: CampoDichiaraz
 }
 
 /**
- * Pannello "Righi dichiarazione": traduce i calcoli nei campi del quadro LM
- * (forfettario) e RS (contributi) da riportare nei Redditi PF. Apre il PDF
- * promemoria in una nuova scheda.
+ * Pannello "Righi dichiarazione": traduce i calcoli nei campi dei quadri LM
+ * (forfettario), RS (contributi dedotti) e RR (contributi INPS dovuti/versati)
+ * da riportare nei Redditi PF. Apre il PDF promemoria in una nuova scheda.
  */
 
-export function Dichiarazione({ anno, calcoli }: Props) {
-  const righi = generaRighiDichiarazione(calcoli, anno)
+export function Dichiarazione({ anno, calcoli, input }: Props) {
+  const righi = generaRighiDichiarazione(calcoli, anno, input)
 
   const apriPdf = async () => {
     const scheda = window.open('', '_blank')
@@ -81,12 +82,12 @@ export function Dichiarazione({ anno, calcoli }: Props) {
       title="Righi dichiarazione"
       icon={FileSpreadsheet}
       iconIntent="info"
-      info="Traduzione dei calcoli nei campi del quadro LM (regime forfettario) e del quadro RS (contributi) da riportare nei Redditi PF. Promemoria di compilazione: non sostituisce la dichiarazione."
+      info="Traduzione dei calcoli nei campi dei quadri LM (regime forfettario), RS (contributi dedotti) e RR (contributi INPS) da riportare nei Redditi PF. Promemoria di compilazione: non sostituisce la dichiarazione."
     >
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <p className={theme.helpText}>
-            Quadro LM sezione II e quadro RS per l'anno d'imposta {anno}.
+            Quadro LM sezione II, quadro RS e quadro RR per l'anno d'imposta {anno}.
           </p>
           <Button size="sm" onClick={apriPdf}>
             <ExternalLink size={15} className="mr-2" aria-hidden />
@@ -105,11 +106,24 @@ export function Dichiarazione({ anno, calcoli }: Props) {
         <TabellaRighi titolo="Quadro LM — liquidazione imposta" righi={righi.riepilogoLM} />
         <TabellaRighi titolo="Contributi previdenziali — deduzione" righi={righi.quadroRS} />
 
+        {righi.quadroRRArtComm.map((s) => (
+          <TabellaRighi
+            key={s.gestione}
+            titolo={`Quadro RR sezione I — ${s.gestione} (${s.rigo})`}
+            righi={s.campi}
+          />
+        ))}
+        {righi.quadroRRSeparata.length > 0 && (
+          <TabellaRighi titolo="Quadro RR sezione II — gestione separata" righi={righi.quadroRRSeparata} />
+        )}
+
         {righi.haCampiDaCompletare && (
           <p className={theme.helpText}>
             I campi <span className="text-amber-600">in arancione</span> (es. il codice ATECO) vanno
-            riportati a mano: non sono ricavabili dai dati inseriti. Promemoria di compilazione, non
-            sostituisce la dichiarazione né il software ufficiale.
+            riportati a mano: non sono ricavabili dai dati inseriti. Nel quadro RR l'app non traccia
+            crediti contributivi pregressi né compensazioni (col. 15, 19–22, 31–36): se ne hai, vanno
+            aggiunti a mano. Promemoria di compilazione, non sostituisce la dichiarazione né il
+            software ufficiale.
           </p>
         )}
       </div>
