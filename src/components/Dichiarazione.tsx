@@ -122,10 +122,10 @@ export function Dichiarazione({ anno, calcoli, input, anagrafica }: Props) {
         {righi.haCampiDaCompletare && (
           <p className={theme.helpText}>
             I campi <span className="text-amber-600">in arancione</span> (es. il codice ATECO) vanno
-            riportati a mano: non sono ricavabili dai dati inseriti. Nel quadro RR l'app non traccia
-            crediti contributivi pregressi né compensazioni (col. 15, 19–22, 31–36): se ne hai, vanno
-            aggiunti a mano. Promemoria di compilazione, non sostituisce la dichiarazione né il
-            software ufficiale.
+            riportati a mano: non sono ricavabili dai dati inseriti. Nel quadro RR compaiono solo i
+            campi con un valore ricavabile: rimborsi chiesti e compensazioni F24 sono scelte tue e
+            vanno indicati a mano (le note dei crediti dicono in quali colonne). Promemoria di
+            compilazione, non sostituisce la dichiarazione né il software ufficiale.
           </p>
         )}
       </div>

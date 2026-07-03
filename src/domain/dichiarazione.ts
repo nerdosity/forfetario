@@ -267,8 +267,11 @@ export function generaRighiDichiarazione(
  * minimale + eccedenza); il versato dalla lista dettagliata dei versamenti,
  * per COMPETENZA: rate 1ª–3ª versate nell'anno + 4ª rata versata a febbraio
  * dell'anno dopo, acconti eccedenza versati nell'anno + saldo versato l'anno
- * dopo. I crediti pregressi e le compensazioni (col. 15, 19–22, 31–36) non
- * sono tracciati dall'app e restano da completare a mano.
+ * dopo. I crediti del precedente anno (col. 20, 34) sono stimati con lo stesso
+ * conto dovuto/versato sull'anno prima, assumendo nessun rimborso chiesto.
+ * Compaiono solo i campi con un valore ricavabile: rimborsi e compensazioni
+ * F24 (col. 18–19, 21–22, 32–33, 35–36) restano scelte dell'utente, indicate
+ * nelle note dei crediti.
  */
 /**
  * Codice della colonna 7 "tipo riduzione" per riduzione. Il codice 'C' per la
@@ -352,37 +355,62 @@ function generaQuadroRRArtComm(
         })
       : null
 
-    const campi: CampoDichiarazione[] = [
-      {
+    // Crediti dell'anno precedente (col. 20 e 34): stesso conto dovuto/versato
+    // fatto sull'anno prima, possibile se quell'anno aveva una sola gestione
+    // Art/Comm e versamenti in modalità dettaglio.
+    const datiNm1 = input.anni[anno - 1]
+    const periodiPrec = calcoli.datiAnnoPrecedente.dettagliRegimiCalcolati.filter((r) => r.tipo === gestione)
+    const gestioniPrec = new Set(
+      calcoli.datiAnnoPrecedente.dettagliRegimiCalcolati.filter((r) => r.tipo !== 'separata').map((r) => r.tipo),
+    )
+    let creditoPrecMinimale = 0
+    let creditoPrecEccedenza = 0
+    if (gestioniPrec.size === 1 && gestioniPrec.has(gestione)) {
+      const dovutoMinPrec = periodiPrec.reduce((s, r) => s + r.contributiFissiRegime, 0)
+      const dovutoEccPrec = periodiPrec.reduce((s, r) => s + r.contributiEccedenzaRegime, 0)
+      const rate123Prec = versatiDaDettaglio(datiNm1, ['fissi-1', 'fissi-2', 'fissi-3'])
+      const versatiMinPrec =
+        rate123Prec === null ? null : rate123Prec + (versatiDaDettaglio(datiN, ['fissi-4-prec']) ?? 0)
+      const accontiEccPrec = versatiDaDettaglio(datiNm1, ['ecc-acconto-1', 'ecc-acconto-2'])
+      const versatiEccPrec =
+        accontiEccPrec === null ? null : accontiEccPrec + (versatiDaDettaglio(datiN, ['ecc-saldo']) ?? 0)
+      if (versatiMinPrec !== null) creditoPrecMinimale = Math.max(0, eu(versatiMinPrec) - eu(dovutoMinPrec))
+      if (versatiEccPrec !== null) creditoPrecEccedenza = Math.max(0, eu(versatiEccPrec) - eu(dovutoEccPrec))
+    }
+
+    const campi: CampoDichiarazione[] = []
+
+    if (anagrafica?.matricolaInps) {
+      campi.push({
         rigo: 'RR1',
         colonna: 1,
         descrizione: 'Codice azienda INPS',
-        valore: anagrafica?.matricolaInps
-          ? `${anagrafica.matricolaInps} + 2 caratteri di controllo`
-          : 'da inserire',
-        nota: 'Matricola azienda (8 cifre) seguita dai 2 caratteri di controllo: dal cassetto previdenziale INPS.',
-      },
-      {
+        valore: `${anagrafica.matricolaInps} + 2 caratteri di controllo`,
+        nota: 'Matricola azienda (8 cifre) seguita dai 2 caratteri di controllo alfabetici: dal cassetto previdenziale INPS.',
+      })
+    }
+    if (anagrafica?.codiceSoggettoInps === '10') {
+      campi.push({
         rigo,
         descrizione: 'Tipologia iscritto',
-        valore: anagrafica?.codiceSoggettoInps === '10' ? '1 (titolare)' : 'da inserire',
-        nota: '1 = titolare; 2, 3… = coadiuvanti/coadiutori (vedi istruzioni).',
-      },
-      {
-        rigo,
-        colonna: 1,
-        descrizione: 'Codice fiscale',
-        valore: anagrafica?.codiceFiscale || 'da inserire',
-      },
-      {
+        valore: '1 (titolare)',
+        nota: 'Dedotta dal codice soggetto INPS 10 in anagrafica.',
+      })
+    }
+    if (anagrafica?.codiceFiscale) {
+      campi.push({ rigo, colonna: 1, descrizione: 'Codice fiscale', valore: anagrafica.codiceFiscale })
+    }
+    if (codiceInps) {
+      campi.push({
         rigo,
         colonna: 2,
         descrizione: 'Codice INPS',
-        valore: codiceInps ?? 'da inserire',
-        nota: codiceInps
-          ? 'Ricostruito con l\'algoritmo ufficiale della codeline (circolare INPS 123/1998) da matricola, anno, soggetto e sede: confrontalo col dato del cassetto previdenziale.'
-          : 'Codice a 17 cifre della posizione: dal cassetto previdenziale (compila matricola e sede in anagrafica per calcolarlo).',
-      },
+        valore: codiceInps,
+        nota: 'Ricostruito con l\'algoritmo ufficiale della codeline (circolare INPS 123/1998) da matricola, anno, soggetto e sede: confrontalo col dato del cassetto previdenziale.',
+      })
+    }
+
+    campi.push(
       {
         rigo,
         colonna: 3,
@@ -392,25 +420,12 @@ function generaQuadroRRArtComm(
       },
       {
         rigo,
-        descrizione: 'Quota coadiutore e CPB (col. 3A–3C, casella 3D)',
-        valore: 'non gestiti',
-        nota: 'L\'app non gestisce coadiutori né concordato preventivo biennale: lascia vuoto salvo tue adesioni.',
-      },
-      {
-        rigo,
         colonna: 4,
         descrizione: 'Periodo di imposizione contributiva (col. 4–5)',
         valore: `da ${meseDal} a ${meseAl}`,
         nota: 'Mesi di attività della gestione nell\'anno.',
       },
-      {
-        rigo,
-        colonna: 6,
-        descrizione: 'Lavoratori privi di anzianità contributiva al 31/12/95',
-        valore: 'da verificare',
-        nota: 'Barra la casella solo se al 31/12/1995 non avevi anzianità contributiva (incide sul massimale): dipende dalla tua storia previdenziale.',
-      },
-    ]
+    )
 
     if (riduzione) {
       const codice = CODICE_TIPO_RIDUZIONE[riduzione]
@@ -460,26 +475,12 @@ function generaQuadroRRArtComm(
       },
       {
         rigo,
-        colonna: 13,
-        descrizione: 'Quote associative e oneri accessori',
-        valore: 0,
-        nota: 'Quote associative riscosse dall\'INPS con le rate fisse: l\'app non le traccia, correggi se le versi.',
-      },
-      {
-        rigo,
         colonna: 14,
         descrizione: 'Contributi versati sul minimale',
         valore: versatiMinimale === null ? 'da inserire' : eu(versatiMinimale),
         nota: versatiMinimale === null
           ? notaVersatiMancanti
           : `Rate fisse 1ª–3ª versate nel ${anno} + 4ª rata versata a febbraio ${anno + 1} (dai versamenti inseriti in quell'anno).`,
-      },
-      {
-        rigo,
-        colonna: 15,
-        descrizione: 'Contributi compensati con crediti previdenziali senza F24',
-        valore: 0,
-        nota: 'Compila solo se hai coperto rate con crediti previdenziali senza passare dal modello F24.',
       },
     )
 
@@ -498,26 +499,19 @@ function generaQuadroRRArtComm(
             colonna: 17,
             descrizione: 'Contributo a credito sul reddito minimale',
             valore: -diff,
-            nota: 'Col. 14 − col. 11 − col. 12.',
+            nota: 'Col. 14 − col. 11 − col. 12. Decidi tu la destinazione: rimborso (col. 18), compensazione in F24 (col. 19) o nulla per lasciarlo in autoconguaglio INPS.',
           })
-      if (diff < 0) {
-        campi.push({
-          rigo,
-          colonna: 18,
-          descrizione: 'Destinazione del credito sul minimale (col. 18/19)',
-          valore: 'a tua scelta',
-          nota: 'Rimborso (col. 18), compensazione in F24 (col. 19) o nessuna delle due per lasciarlo in autoconguaglio INPS.',
-        })
-      }
     }
 
-    campi.push({
-      rigo,
-      colonna: 20,
-      descrizione: 'Credito del precedente anno (col. 20–22)',
-      valore: 'da inserire',
-      nota: 'Credito sul minimale del quadro RR dell\'anno scorso non chiesto a rimborso (col. 20), quanto ne hai compensato in F24 (col. 21) e residuo in autoconguaglio (col. 22). L\'app non traccia i crediti pregressi.',
-    })
+    if (creditoPrecMinimale > 0) {
+      campi.push({
+        rigo,
+        colonna: 20,
+        descrizione: 'Credito del precedente anno',
+        valore: creditoPrecMinimale,
+        nota: `Versato oltre il dovuto sulle rate fisse ${anno - 1} (dai tuoi versamenti). Vale se non l'hai chiesto a rimborso: se ne hai compensato una parte in F24 indicala in col. 21, il residuo va in col. 22.`,
+      })
+    }
 
     campi.push(
       {
@@ -533,13 +527,6 @@ function generaQuadroRRArtComm(
         descrizione: 'Contributo IVS dovuto sul reddito che eccede il minimale',
         valore: eu(eccedenzaDovuta),
         nota: `Aliquota della gestione sull'eccedenza${riduzione ? `, con riduzione ${riduzione}%` : ''} (seconda fascia +1% oltre soglia).`,
-      },
-      {
-        rigo,
-        colonna: 26,
-        descrizione: 'Contributo maternità (solo affittacamere)',
-        valore: 0,
-        nota: 'Riguarda solo le attività di affittacamere.',
       },
       {
         rigo,
@@ -567,35 +554,19 @@ function generaQuadroRRArtComm(
             colonna: 30,
             descrizione: 'Contributo a credito sul reddito che eccede il minimale',
             valore: -diff,
-            nota: 'Col. 27 − col. 25: acconti versati oltre il dovuto.',
+            nota: 'Col. 27 − col. 25: acconti versati oltre il dovuto. Decidi tu la destinazione: rimborso (col. 32), compensazione in F24 (col. 33) o nulla per lasciarlo in autoconguaglio INPS.',
           })
-      if (diff < 0) {
-        campi.push({
-          rigo,
-          colonna: 32,
-          descrizione: 'Destinazione del credito sull\'eccedenza (col. 32/33)',
-          valore: 'a tua scelta',
-          nota: 'Rimborso (col. 32), compensazione in F24 (col. 33) o nessuna delle due per lasciarlo in autoconguaglio INPS.',
-        })
-      }
     }
 
-    campi.push(
-      {
-        rigo,
-        colonna: 31,
-        descrizione: 'Eccedenza di versamento a saldo',
-        valore: 0,
-        nota: 'Versamenti a saldo oltre il dovuto (es. arrotondamenti o errori): l\'app non li traccia, correggi se ne hai.',
-      },
-      {
+    if (creditoPrecEccedenza > 0) {
+      campi.push({
         rigo,
         colonna: 34,
-        descrizione: 'Credito del precedente anno sull\'eccedenza (col. 34–36)',
-        valore: 'da inserire',
-        nota: 'Credito sull\'eccedenza del quadro RR dell\'anno scorso non chiesto a rimborso (col. 34), quanto ne hai compensato in F24 (col. 35) e residuo in autoconguaglio (col. 36). L\'app non traccia i crediti pregressi.',
-      },
-    )
+        descrizione: 'Credito del precedente anno',
+        valore: creditoPrecEccedenza,
+        nota: `Versato oltre il dovuto sull'eccedenza ${anno - 1} (acconti + saldo, dai tuoi versamenti). Vale se non l'hai chiesto a rimborso: se ne hai compensato una parte in F24 indicala in col. 35, il residuo va in col. 36.`,
+      })
+    }
 
     return { rigo, gestione, campi }
   })

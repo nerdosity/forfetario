@@ -52,15 +52,17 @@ function datiAnno(regimi: Regime[], versamenti: VersamentoContributo[] | null): 
 function mkInput(regimi: Regime[], opt: {
   versamenti2025?: VersamentoContributo[] | null
   versamenti2026?: VersamentoContributo[] | null
+  regimi2024?: Regime[]
+  versamenti2024?: VersamentoContributo[] | null
 } = {}): CalcoloInput {
-  return {
-    anno: 2025,
-    anni: {
-      2025: datiAnno(regimi, opt.versamenti2025 ?? null),
-      2026: datiAnno([], opt.versamenti2026 ?? null),
-    },
-    rateazioniImposta: {},
+  const anni: CalcoloInput['anni'] = {
+    2025: datiAnno(regimi, opt.versamenti2025 ?? null),
+    2026: datiAnno([], opt.versamenti2026 ?? null),
   }
+  if (opt.regimi2024 || opt.versamenti2024 !== undefined) {
+    anni[2024] = datiAnno(opt.regimi2024 ?? [], opt.versamenti2024 ?? null)
+  }
+  return { anno: 2025, anni, rateazioniImposta: {} }
 }
 
 const campo = (campi: CampoDichiarazione[], colonna: number): CampoDichiarazione | undefined =>
@@ -193,10 +195,12 @@ describe('quadro RR sezione I — campi anagrafici e di contorno', () => {
     expect(campi.find((c) => c.rigo === 'RR1')?.valore).toBe('10130045 + 2 caratteri di controllo')
   })
 
-  it('senza anagrafica il codice INPS resta da inserire', () => {
+  it('senza anagrafica le righe identificative non compaiono', () => {
     const input = mkInput([artigiano2025])
     const righi = generaRighiDichiarazione(calcola(input), 2025, input)
-    expect(campo(righi.quadroRRArtComm[0].campi, 2)?.valore).toBe('da inserire')
+    const campi = righi.quadroRRArtComm[0].campi
+    expect(campo(campi, 2)).toBeUndefined()
+    expect(campi.find((c) => c.rigo === 'RR1')).toBeUndefined()
   })
 
   it('col 7: codice C per la riduzione 35% e periodo riduzione in col 8', () => {
@@ -223,26 +227,27 @@ describe('quadro RR sezione I — campi anagrafici e di contorno', () => {
     expect(campo(campi, 8)).toBeUndefined()
   })
 
-  it('campi di contorno: quote associative e crediti pregressi presenti', () => {
+  it('nessuna riga segnaposto: compaiono solo campi con un valore', () => {
     const input = mkInput([artigiano2025])
     const righi = generaRighiDichiarazione(calcola(input), 2025, input)
     const campi = righi.quadroRRArtComm[0].campi
-    expect(campo(campi, 13)?.valore).toBe(0)
-    expect(campo(campi, 15)?.valore).toBe(0)
-    expect(campo(campi, 20)?.valore).toBe('da inserire')
-    expect(campo(campi, 26)?.valore).toBe(0)
-    expect(campo(campi, 31)?.valore).toBe(0)
-    expect(campo(campi, 34)?.valore).toBe('da inserire')
+    for (const colonna of [6, 13, 15, 18, 20, 26, 31, 32, 34]) {
+      expect(campo(campi, colonna)).toBeUndefined()
+    }
   })
 
-  it('con un credito compare la riga di scelta rimborso/compensazione', () => {
+  it('credito del precedente anno sul minimale calcolato dai versamenti 2024', () => {
     const input = mkInput([artigiano2025], {
-      versamenti2025: [v('ecc-acconto-1', 1500), v('ecc-acconto-2', 1500)],
+      regimi2024: [{ ...artigiano2025, id: 'prev' }],
+      // dovuto fissi 2024 = 4.419,60 × 0,65 + 7,44 = 2.880,18; versati 3.200
+      versamenti2024: [v('fissi-1', 800), v('fissi-2', 800), v('fissi-3', 800)],
+      versamenti2025: [v('fissi-4-prec', 800)],
     })
     const righi = generaRighiDichiarazione(calcola(input), 2025, input)
     const campi = righi.quadroRRArtComm[0].campi
-    expect(campo(campi, 32)?.valore).toBe('a tua scelta')
-    expect(campo(campi, 18)).toBeUndefined() // sul minimale nessun credito
+    expect(campo(campi, 20)?.valore).toBe(3200 - 2880)
+    // sull'eccedenza 2024 non è stato versato nulla: nessun credito pregresso
+    expect(campo(campi, 34)).toBeUndefined()
   })
 })
 

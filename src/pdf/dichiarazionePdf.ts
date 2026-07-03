@@ -115,10 +115,10 @@ export async function generaPdfDichiarazione(righi: RighiDichiarazione): Promise
   nuovaPaginaSeServe(52)
   const note = [
     'I valori in colore ambra non sono ricavabili dai dati inseriti (es. il codice ATECO): vanno completati a mano.',
-    'Promemoria di compilazione basato sui controlli ufficiali dell\'Agenzia delle Entrate (ControlliRPF) e sulle',
-    'istruzioni INPS per il quadro RR. Non sostituisce la dichiarazione né i controlli del software ufficiale; non',
-    'gestisce CPB, perdite pregresse, crediti d\'imposta, aiuti di Stato né i crediti contributivi pregressi e le',
-    'compensazioni del quadro RR (col. 15, 19-22, 31-36).',
+    'Nel quadro RR compaiono solo i campi con un valore ricavabile: rimborsi chiesti e compensazioni F24 sono',
+    'scelte del contribuente e vanno indicati a mano. Promemoria basato sui controlli ufficiali dell\'Agenzia delle',
+    'Entrate (ControlliRPF) e sulle istruzioni INPS per il quadro RR: non sostituisce la dichiarazione né il',
+    'software ufficiale; non gestisce CPB, perdite pregresse, crediti d\'imposta o aiuti di Stato.',
   ]
   for (const r of note) {
     pagina.drawText(r, { x: margine, y, size: 8, font: helv, color: GRIGIO })
