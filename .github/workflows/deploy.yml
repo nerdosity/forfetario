@@ -57,8 +57,44 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.deploy1.outputs.page_url || steps.deploy2.outputs.page_url || steps.deploy3.outputs.page_url || steps.deploy4.outputs.page_url }}
     steps:
-      - name: Deploy
-        id: deployment
+      # Il deploy su Pages a volte fallisce per errori interni di GitHub
+      # ("Deployment failed, try again later"), mai per il codice: build e
+      # typecheck sono già passati nel job precedente. Quindi si riprova con
+      # attesa crescente (1, 2, 4 minuti). Ogni tentativo dopo il primo parte
+      # solo se il precedente è fallito; il job fallisce solo se falliscono
+      # tutti e quattro.
+      - name: Deploy (tentativo 1)
+        id: deploy1
+        uses: actions/deploy-pages@v5
+        continue-on-error: true
+
+      - name: Attesa 1 minuto
+        if: steps.deploy1.outcome == 'failure'
+        run: sleep 60
+
+      - name: Deploy (tentativo 2)
+        id: deploy2
+        if: steps.deploy1.outcome == 'failure'
+        uses: actions/deploy-pages@v5
+        continue-on-error: true
+
+      - name: Attesa 2 minuti
+        if: steps.deploy2.outcome == 'failure'
+        run: sleep 120
+
+      - name: Deploy (tentativo 3)
+        id: deploy3
+        if: steps.deploy2.outcome == 'failure'
+        uses: actions/deploy-pages@v5
+        continue-on-error: true
+
+      - name: Attesa 4 minuti
+        if: steps.deploy3.outcome == 'failure'
+        run: sleep 240
+
+      - name: Deploy (tentativo 4)
+        id: deploy4
+        if: steps.deploy3.outcome == 'failure'
         uses: actions/deploy-pages@v5
