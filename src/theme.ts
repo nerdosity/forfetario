@@ -88,8 +88,11 @@ export const theme = {
 export const tableTheme = {
   // wrapper: overflow-x-auto + max-w-full così una tabella più larga della
   // colonna scorre DENTRO di sé, senza spingere la pagina (niente scroll
-  // orizzontale del body su mobile).
-  root: { shadow: 'hidden', wrapper: 'relative max-w-full overflow-x-auto' },
+  // orizzontale del body su mobile). overflow-y-hidden esplicito perché con
+  // overflow-x auto l'asse y diventerebbe anch'esso auto (spec CSS) e ogni
+  // sbordo verticale (es. la bolla di un tooltip su hover) farebbe comparire
+  // una barra di scorrimento verticale spuria.
+  root: { shadow: 'hidden', wrapper: 'relative max-w-full overflow-x-auto overflow-y-hidden' },
   body: { cell: { base: 'px-3 py-2.5 align-top' } },
   head: { cell: { base: 'bg-slate-50 px-3 py-2' } },
 } as const

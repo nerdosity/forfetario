@@ -23,6 +23,11 @@ interface TooltipProps {
  * Icona informativa (i) con bolla esplicativa. La bolla è in posizione ASSOLUTA
  * rispetto all'icona: compare in overlay senza occupare spazio nel flusso,
  * quindi non spinge mai giù il layout. Appare su hover e focus.
+ *
+ * La bolla è `hidden` (non solo trasparente) finché non è mostrata: un
+ * elemento con opacity-0 resta nel layout e allarga l'area di scroll dei
+ * contenitori con overflow (es. il wrapper delle tabelle), generando barre
+ * di scorrimento spurie.
  */
 export function Tooltip({ content, label, posizione = 'sopra', allinea = 'centro' }: TooltipProps) {
   const vert = posizione === 'sopra' ? 'bottom-full mb-2' : 'top-full mt-2'
@@ -44,10 +49,9 @@ export function Tooltip({ content, label, posizione = 'sopra', allinea = 'centro
       </button>
       <span
         role="tooltip"
-        className={`pointer-events-none absolute z-50 w-64 max-w-[80vw] rounded-md bg-slate-900
-          px-3 py-2 text-xs font-normal leading-relaxed text-white opacity-0 shadow-lg
-          transition-opacity duration-150 whitespace-pre-wrap
-          group-hover/tip:opacity-100 group-focus-within/tip:opacity-100 ${vert} ${oriz}`}
+        className={`pointer-events-none absolute z-50 hidden w-64 max-w-[80vw] rounded-md bg-slate-900
+          px-3 py-2 text-xs font-normal leading-relaxed text-white shadow-lg whitespace-pre-wrap
+          group-hover/tip:block group-focus-within/tip:block ${vert} ${oriz}`}
       >
         {content}
         {/* Freccetta verso l'icona */}
