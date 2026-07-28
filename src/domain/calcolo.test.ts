@@ -228,6 +228,74 @@ describe('calcola — acconti G.S. (regola ADE 80%, caso reale RPF 2023)', () =>
   })
 })
 
+describe('calcola — saldo contributi anno precedente nel calendario', () => {
+  // Bug segnalato: nella dichiarazione gli acconti venivano scalati dal saldo, ma
+  // nel calendario e negli F24 la riga "Saldo contributi G.S. N-1" mostrava il
+  // dovuto pieno. Con i redditi di N-2 noti, il saldo di N-1 deve essere netto.
+  const gs = (fatturato: number, id: string): Regime => ({
+    ...regimeSeparata, id, meseInizio: 1, giornoInizio: 1, fatturato,
+  })
+
+  /** Tre anni consecutivi con gestione separata attiva tutto l'anno. */
+  const inputTreAnni: CalcoloInput = {
+    anno: 2025,
+    anni: {
+      2025: {
+        regimi: [gs(36000, 'gs25')],
+        modalitaContributi: 'totale', contributiVersatiTotale: null, contributiVersati: [],
+        impostaSaldoVersato: null, impostaAcconto1Versato: null, impostaAcconto2Versato: null,
+      },
+      2024: {
+        regimi: [gs(36000, 'gs24')],
+        modalitaContributi: 'totale', contributiVersatiTotale: null, contributiVersati: [],
+        impostaSaldoVersato: null, impostaAcconto1Versato: null, impostaAcconto2Versato: null,
+      },
+      2023: {
+        regimi: [gs(30000, 'gs23')],
+        modalitaContributi: 'totale', contributiVersatiTotale: null, contributiVersati: [],
+        impostaSaldoVersato: null, impostaAcconto1Versato: null, impostaAcconto2Versato: null,
+      },
+    },
+    rateazioniImposta: {},
+  }
+
+  const saldoGS2024 = (r: ReturnType<typeof calcola>) =>
+    r.scadenzeAnnoCorrente.find((s) => s.chiaveRateazione === 'gs-saldo-2024')
+
+  it('il saldo G.S. 2024 nel calendario 2025 è al netto degli acconti dovuti per il 2024', () => {
+    const r = calcola(inputTreAnni)
+    const dovuto2024 = r.datiAnnoPrecedente.totaleContributiSeparata
+    // Acconti dovuti per il 2024 = 80% del dovuto 2023 (redditi 2023 con le
+    // aliquote 2023, gestione attiva a dicembre 2024). Il dovuto 2023 si ricava
+    // dal motore stesso selezionando l'anno 2024, così l'aliquota è quella giusta.
+    const dovuto2023 = calcola({ ...inputTreAnni, anno: 2024 }).datiAnnoPrecedente.totaleContributiSeparata
+    const attesa = dovuto2024 - 0.8 * dovuto2023
+
+    const s = saldoGS2024(r)
+    expect(s).toBeDefined()
+    expect(s!.importo).toBeCloseTo(attesa, 2)
+    // ...e NON il dovuto pieno (era questo il bug).
+    expect(s!.importo).toBeLessThan(dovuto2024 - 1)
+  })
+
+  it('le componenti del saldo 2024 mostrano dovuto e acconti', () => {
+    const s = saldoGS2024(calcola(inputTreAnni))!
+    expect(s.componenti).toHaveLength(2)
+    expect(s.componenti[0].tipo).toBe('Totale dovuto 2024')
+    expect(s.componenti[1].tipo).toBe('Acconti già versati nell\'anno')
+    expect(s.componenti[1].importo).toBeLessThan(0)
+    // La somma delle componenti ricostruisce l'importo della scadenza.
+    expect(s.componenti.reduce((t, c) => t + c.importo, 0)).toBeCloseTo(s.importo, 2)
+  })
+
+  it('senza dati dell\'anno N-2 il saldo N-1 resta il dovuto pieno (nessun acconto noto)', () => {
+    const r = calcola(mkInput({ anno: 2025 }))
+    const s = saldoGS2024(r)
+    expect(s).toBeDefined()
+    expect(s!.importo).toBeCloseTo(r.datiAnnoPrecedente.totaleContributiSeparata, 2)
+  })
+})
+
 describe('calcola — nuovo utente (stato vuoto, nessun dato)', () => {
   // Un utente che apre l'app per la prima volta ha la mappa anni vuota.
   const vuoto = (anno: number): CalcoloInput => ({ anno, anni: {}, rateazioniImposta: {} })

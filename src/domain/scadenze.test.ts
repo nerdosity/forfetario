@@ -216,6 +216,130 @@ describe('calcolaScadenze — rateazione imposta', () => {
   })
 })
 
+describe('calcolaScadenze — saldo contributi anno precedente al netto degli acconti', () => {
+  // Il saldo di N-1 si versa a giugno di N: deve essere il dovuto di N-1 MENO
+  // gli acconti dovuti per N-1, come già avviene per il saldo dell'anno corrente.
+  const base = {
+    anno: 2025,
+    regimiCorrente: [],
+    regimiPrecedente: [],
+    saldoImposteDaVersare: 0,
+    saldoContributiGS: 0,
+    saldoContributiEccArtComm: 0,
+    totaleImposteCorrente: 0,
+    totaleImpostePrecedente: 0,
+    accontiImposteVersatiPerAnnoPrecedente: 0,
+    totaleContributiSeparataPrecedente: 0,
+    totaleContributiEccedenzaArtCommPrecedente: 0,
+  }
+
+  const saldoGS = (s: Scadenza[]) => s.find((x) => x.chiaveRateazione === 'gs-saldo-2024')
+  const saldoEcc = (s: Scadenza[]) => s.find((x) => x.chiaveRateazione === 'ecc-saldo-2024')
+
+  it('G.S.: importo = dovuto 2024 − acconti dovuti per il 2024', () => {
+    const { scadenzeAnnoCorrente } = calcolaScadenze({
+      ...base,
+      totaleContributiSeparataPrecedente: 5000,
+      saldoContributiGSPrecedente: 1000,
+      accontiGSDovutiPerPrecedente: 4000,
+    })
+    const s = saldoGS(scadenzeAnnoCorrente)
+    expect(s).toBeDefined()
+    expect(s!.importo).toBeCloseTo(1000, 2)
+  })
+
+  it('G.S.: le componenti documentano dovuto e acconti dell\'anno di competenza', () => {
+    const { scadenzeAnnoCorrente } = calcolaScadenze({
+      ...base,
+      totaleContributiSeparataPrecedente: 5000,
+      saldoContributiGSPrecedente: 1000,
+      accontiGSDovutiPerPrecedente: 4000,
+    })
+    expect(saldoGS(scadenzeAnnoCorrente)!.componenti).toEqual([
+      { tipo: 'Totale dovuto 2024', importo: 5000 },
+      { tipo: 'Acconti già versati nell\'anno', importo: -4000 },
+    ])
+  })
+
+  it('G.S.: acconti ≥ dovuto → nessuna scadenza di saldo', () => {
+    const { scadenzeAnnoCorrente } = calcolaScadenze({
+      ...base,
+      totaleContributiSeparataPrecedente: 5000,
+      saldoContributiGSPrecedente: 0,
+      accontiGSDovutiPerPrecedente: 6000,
+    })
+    expect(saldoGS(scadenzeAnnoCorrente)).toBeUndefined()
+  })
+
+  it('G.S.: gli acconti dell\'anno corrente restano sul dovuto PIENO di N-1 (80%)', () => {
+    // Il netting riguarda solo il saldo: la base degli acconti (metodo ADE) è il
+    // contributo dovuto pieno del 2024, non il saldo netto.
+    const { scadenzeAnnoCorrente } = calcolaScadenze({
+      ...base,
+      regimiCorrente: [{
+        id: 'gs', tipo: 'separata', aliquota: 15, coefficiente: 67,
+        meseInizio: 1, giornoInizio: 1, meseFine: 12, giornoFine: 31,
+        fatturato: 30000, riduzioneContributi: 'nessuna',
+      }],
+      totaleContributiSeparataPrecedente: 5000,
+      saldoContributiGSPrecedente: 1000,
+      accontiGSDovutiPerPrecedente: 4000,
+    })
+    const acconti = scadenzeAnnoCorrente.filter((s) =>
+      (s.riferimenti ?? []).some((r) => r === 'gs-acconto-1' || r === 'gs-acconto-2'),
+    )
+    expect(acconti).toHaveLength(2)
+    // 80% di 5000 (dovuto pieno), non di 1000 (saldo netto).
+    expect(acconti.reduce((t, a) => t + a.importo, 0)).toBeCloseTo(4000, 2)
+  })
+
+  it('eccedenza Art/Comm: importo = dovuto 2024 − acconti dovuti, con componenti', () => {
+    const { scadenzeAnnoCorrente } = calcolaScadenze({
+      ...base,
+      totaleContributiEccedenzaArtCommPrecedente: 2496,
+      saldoContributiEccArtCommPrecedente: 1223.35,
+      accontiEccDovutiPerPrecedente: 1272.65,
+    })
+    const s = saldoEcc(scadenzeAnnoCorrente)
+    expect(s).toBeDefined()
+    expect(s!.importo).toBeCloseTo(1223.35, 2)
+    expect(s!.componenti).toEqual([
+      { tipo: 'Totale dovuto 2024', importo: 2496 },
+      { tipo: 'Acconti già versati nell\'anno', importo: -1272.65 },
+    ])
+  })
+
+  it('eccedenza Art/Comm: acconti ≥ dovuto → nessuna scadenza di saldo', () => {
+    const { scadenzeAnnoCorrente } = calcolaScadenze({
+      ...base,
+      totaleContributiEccedenzaArtCommPrecedente: 2000,
+      saldoContributiEccArtCommPrecedente: 0,
+      accontiEccDovutiPerPrecedente: 2500,
+    })
+    expect(saldoEcc(scadenzeAnnoCorrente)).toBeUndefined()
+  })
+
+  it('senza acconti il saldo resta il dovuto pieno, con la voce singola', () => {
+    const { scadenzeAnnoCorrente } = calcolaScadenze({
+      ...base,
+      totaleContributiSeparataPrecedente: 5000,
+      saldoContributiGSPrecedente: 5000,
+      accontiGSDovutiPerPrecedente: 0,
+    })
+    const s = saldoGS(scadenzeAnnoCorrente)!
+    expect(s.importo).toBeCloseTo(5000, 2)
+    expect(s.componenti).toEqual([{ tipo: 'Saldo contributi G.S. 2024', importo: 5000 }])
+  })
+
+  it('senza i nuovi parametri si ricade sul dovuto pieno (compatibilità)', () => {
+    const { scadenzeAnnoCorrente } = calcolaScadenze({
+      ...base,
+      totaleContributiSeparataPrecedente: 5000,
+    })
+    expect(saldoGS(scadenzeAnnoCorrente)!.importo).toBeCloseTo(5000, 2)
+  })
+})
+
 describe('calcolaScadenze — rateazione contributi Gestione separata', () => {
   const params = {
     anno: 2025,

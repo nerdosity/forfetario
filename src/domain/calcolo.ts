@@ -163,6 +163,37 @@ function calcolaDatiAnno(
   }
 }
 
+/** RisultatoAnno tutto a zero: anno assente dal database o senza regimi. */
+const annoVuoto = (): RisultatoAnno => ({
+  dettagliRegimiCalcolati: [],
+  totaleImponibileLordo: 0,
+  totaleContributiINPS: 0,
+  totaleContributiSeparata: 0,
+  totaleContributiFissiArtComm: 0,
+  totaleContributiEccedenzaArtComm: 0,
+  totaleImposte: 0,
+  totaleFatturato: 0,
+  imponibileNettoTotalePerImposte: 0,
+  rateFisse: [0, 0, 0, 0],
+})
+
+/**
+ * Come `calcolaDatiAnno`, ma senza lanciare se l'anno non è nel database
+ * fiscale (es. anni prima del primo disponibile): in quel caso restituisce
+ * tutti zero, così i saldi/acconti che vi si appoggiano valgono zero.
+ */
+function calcolaDatiAnnoSicuro(
+  regimi: Regime[],
+  anno: number,
+  contributiDeducibili = 0,
+): RisultatoAnno {
+  try {
+    return calcolaDatiAnno(regimi, anno, contributiDeducibili)
+  } catch {
+    return annoVuoto()
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Motore principale
 // ---------------------------------------------------------------------------
@@ -187,23 +218,7 @@ export function calcola(input: CalcoloInput): RisultatoCalcolo {
 
   // Anno precedente potrebbe non essere nel database (es. primo anno disponibile).
   // In quel caso si usano zero ovunque: nessun saldo/acconto basato sull'anno prima.
-  let datiPrecedente: ReturnType<typeof calcolaDatiAnno>
-  try {
-    datiPrecedente = calcolaDatiAnno(regimiPrecedente, anno - 1, deducibiliAnnoPrecedente)
-  } catch {
-    datiPrecedente = {
-      dettagliRegimiCalcolati: [],
-      totaleImponibileLordo: 0,
-      totaleContributiINPS: 0,
-      totaleContributiSeparata: 0,
-      totaleContributiFissiArtComm: 0,
-      totaleContributiEccedenzaArtComm: 0,
-      totaleImposte: 0,
-      totaleFatturato: 0,
-      imponibileNettoTotalePerImposte: 0,
-      rateFisse: [0, 0, 0, 0],
-    }
-  }
+  const datiPrecedente = calcolaDatiAnnoSicuro(regimiPrecedente, anno - 1, deducibiliAnnoPrecedente)
 
   // ─── Saldi anno corrente ──────────────────────────────────────────────────
   // Gli acconti imposta restano un campo dedicato (l'imposta non è un contributo);
@@ -220,10 +235,14 @@ export function calcola(input: CalcoloInput): RisultatoCalcolo {
   // corrente (regime attivo a dicembre): se la gestione è chiusa, niente acconti
   // dovuti (e quindi niente saldo). Quanto versato in più/meno è gestito a parte
   // come conguaglio (mostrato e suggerito), non incide sul saldo ufficiale.
-  const gsAttivaCorrente = regimiCorrente.some((r) => r.tipo === 'separata' && r.meseFine === 12)
-  const artCommAttivaCorrente = regimiCorrente.some(
-    (r) => (r.tipo === 'artigiani' || r.tipo === 'commercianti') && r.meseFine === 12,
-  )
+  const gestioneAttiva = (regimi: Regime[], tipo: 'separata' | 'artComm'): boolean =>
+    regimi.some((r) =>
+      r.meseFine === 12 &&
+      (tipo === 'separata' ? r.tipo === 'separata' : r.tipo === 'artigiani' || r.tipo === 'commercianti'),
+    )
+
+  const gsAttivaCorrente = gestioneAttiva(regimiCorrente, 'separata')
+  const artCommAttivaCorrente = gestioneAttiva(regimiCorrente, 'artComm')
   // Acconti G.S. dovuti = 80% dei contributi G.S. dovuti dell'anno precedente
   // (due rate del 40%), come da software ADE: verificato su dichiarazione reale
   // (dovuto 2022 = 5.220 → acconti 2023 = 2.088,02 × 2 = 80%).
@@ -232,6 +251,29 @@ export function calcola(input: CalcoloInput): RisultatoCalcolo {
 
   const saldoContributiGS = Math.max(0, datiCorrente.totaleContributiSeparata - accontiGSDovuti)
   const saldoContributiEccArtComm = Math.max(0, datiCorrente.totaleContributiEccedenzaArtComm - accontiEccDovuti)
+
+  // ─── Saldi contributi anno PRECEDENTE (si versano nell'anno corrente) ──────
+  // Stessa regola del saldo dell'anno corrente, traslata di un anno: dovuto di
+  // N-1 meno gli acconti DOVUTI per N-1 (base: redditi di N-2, costanti di N-1,
+  // solo se la gestione era ancora attiva a dicembre di N-1). Senza questo
+  // netting il calendario e gli F24 mostravano il dovuto PIENO, mentre la
+  // sezione dichiarazione scalava già gli acconti: le due viste divergevano.
+  const regimiDueAnniPrima = datiDellAnno(input, anno - 2).regimi
+  const accontiGSDovutiPerPrecedente = gestioneAttiva(regimiPrecedente, 'separata')
+    ? 0.8 * calcolaDatiAnnoSicuro(regimiDueAnniPrima, anno - 2).totaleContributiSeparata
+    : 0
+  const accontiEccDovutiPerPrecedente = gestioneAttiva(regimiPrecedente, 'artComm')
+    ? baseEccedenzaAcconto(regimiDueAnniPrima, anno - 1)
+    : 0
+
+  const saldoContributiGSPrecedente = Math.max(
+    0,
+    datiPrecedente.totaleContributiSeparata - accontiGSDovutiPerPrecedente,
+  )
+  const saldoContributiEccArtCommPrecedente = Math.max(
+    0,
+    datiPrecedente.totaleContributiEccedenzaArtComm - accontiEccDovutiPerPrecedente,
+  )
 
   // ─── Scadenze ─────────────────────────────────────────────────────────────
   const { scadenzeAnnoCorrente, scadenzeAnnoSuccessivo } = calcolaScadenze({
@@ -245,8 +287,16 @@ export function calcola(input: CalcoloInput): RisultatoCalcolo {
     totaleImpostePrecedente: datiPrecedente.totaleImposte,
     accontiImposteVersatiPerAnnoPrecedente:
       (datiAnnoPrec.impostaAcconto1Versato ?? 0) + (datiAnnoPrec.impostaAcconto2Versato ?? 0),
+    // Dovuti PIENI di N-1: restano la base degli acconti dell'anno corrente
+    // (metodo INPS/ADE), che NON si nettano degli acconti.
     totaleContributiSeparataPrecedente: datiPrecedente.totaleContributiSeparata,
     totaleContributiEccedenzaArtCommPrecedente: datiPrecedente.totaleContributiEccedenzaArtComm,
+    // Saldi di N-1 al NETTO degli acconti dovuti per N-1: è questo che si versa
+    // materialmente a giugno dell'anno corrente (calendario e F24).
+    saldoContributiGSPrecedente,
+    saldoContributiEccArtCommPrecedente,
+    accontiGSDovutiPerPrecedente,
+    accontiEccDovutiPerPrecedente,
     // Dettaglio per documentare i saldi (dovuto - acconti DOVUTI, come INPS).
     totaleContributiSeparataDovutoCorrente: datiCorrente.totaleContributiSeparata,
     accontiGSVersatiNelCorrente: accontiGSDovuti,

@@ -63,9 +63,22 @@ interface ParamsScadenze {
   // imposte anno precedente (base per gli acconti anno corrente)
   totaleImpostePrecedente: number
   accontiImposteVersatiPerAnnoPrecedente: number
-  // contributi dovuti anno precedente: si versano a saldo NELL'anno corrente
+  /**
+   * Contributi DOVUTI dell'anno precedente, importo pieno: base ufficiale degli
+   * acconti dell'anno corrente (metodo ADE/INPS), che non si netta degli acconti.
+   */
   totaleContributiSeparataPrecedente: number
   totaleContributiEccedenzaArtCommPrecedente: number
+  /**
+   * Saldi contributi dell'anno precedente al NETTO degli acconti dovuti per
+   * quell'anno: è l'importo che si versa davvero a giugno dell'anno corrente.
+   * Se assenti si ricade sul dovuto pieno (compatibilità con chiamate parziali).
+   */
+  saldoContributiGSPrecedente?: number
+  saldoContributiEccArtCommPrecedente?: number
+  /** Acconti dovuti per l'anno precedente, per documentare i saldi qui sopra. */
+  accontiGSDovutiPerPrecedente?: number
+  accontiEccDovutiPerPrecedente?: number
   /** Scelte di rateazione dei versamenti rateizzabili (imposte e contributi), per chiave. */
   rateazioniImposta?: Record<string, OpzioniRateazione>
 }
@@ -197,6 +210,10 @@ export function calcolaScadenze({
   accontiImposteVersatiPerAnnoPrecedente,
   totaleContributiSeparataPrecedente,
   totaleContributiEccedenzaArtCommPrecedente,
+  saldoContributiGSPrecedente,
+  saldoContributiEccArtCommPrecedente,
+  accontiGSDovutiPerPrecedente,
+  accontiEccDovutiPerPrecedente,
   totaleContributiSeparataDovutoCorrente,
   accontiGSVersatiNelCorrente,
   totaleContributiEccArtCommDovutoCorrente,
@@ -209,21 +226,24 @@ export function calcolaScadenze({
   const annoPrec = anno - 1
 
   /**
-   * Componenti che documentano un saldo a conguaglio: dovuto totale dell'anno
-   * meno gli acconti già versati durante l'anno. Se i dati di dettaglio non ci
-   * sono (o gli acconti sono nulli) si ricade su una voce singola.
+   * Componenti che documentano un saldo a conguaglio: dovuto totale dell'anno di
+   * COMPETENZA meno gli acconti già versati durante quell'anno. Se i dati di
+   * dettaglio non ci sono (o gli acconti sono nulli) si ricade su una voce
+   * singola. `annoCompetenza` distingue il saldo dell'anno corrente (che si versa
+   * l'anno dopo) da quello dell'anno precedente (che si versa quest'anno).
    */
   const componentiSaldo = (
     etichetta: string,
     saldo: number,
     dovuto: number | undefined,
     acconti: number | undefined,
+    annoCompetenza: number,
   ): ComponenteScadenza[] => {
     if (dovuto == null || acconti == null || acconti <= 0.005) {
       return [{ tipo: etichetta, importo: saldo }]
     }
     return [
-      { tipo: `Totale dovuto ${anno}`, importo: dovuto },
+      { tipo: `Totale dovuto ${annoCompetenza}`, importo: dovuto },
       { tipo: 'Acconti già versati nell\'anno', importo: -acconti },
     ]
   }
@@ -339,14 +359,24 @@ export function calcolaScadenze({
   }
 
   // ─── Saldo contributi G.S. anno precedente (versato a giugno anno corrente) ──
-  if (totaleContributiSeparataPrecedente > 0.005) {
+  // Importo NETTO: dovuto di N-1 meno gli acconti dovuti per N-1 (stessa regola
+  // del saldo dell'anno corrente). Se il netto è ≤ 0 gli acconti coprono già
+  // tutto e la scadenza non si emette.
+  const saldoGSPrec = saldoContributiGSPrecedente ?? totaleContributiSeparataPrecedente
+  if (saldoGSPrec > 0.005) {
     pushRateizzabile({
       data: formattaScadenza(dCorr.saldoContributi, anno),
       descrizione: `Saldo contributi Gestione separata ${annoPrec}`,
       categoria: 'Contributi Gestione separata',
       voce: `Saldo · competenza ${annoPrec}`,
-      importo: totaleContributiSeparataPrecedente,
-      componenti: [{ tipo: `Saldo contributi G.S. ${annoPrec}`, importo: totaleContributiSeparataPrecedente }],
+      importo: saldoGSPrec,
+      componenti: componentiSaldo(
+        `Saldo contributi G.S. ${annoPrec}`,
+        saldoGSPrec,
+        totaleContributiSeparataPrecedente,
+        accontiGSDovutiPerPrecedente,
+        annoPrec,
+      ),
       annoScadenza: anno,
       riferimenti: ['gs-saldo'],
       chiaveRateazione: `gs-saldo-${annoPrec}`,
@@ -354,14 +384,22 @@ export function calcolaScadenze({
   }
 
   // ─── Saldo contributi eccedenza Art/Comm anno precedente (giugno anno corr.) ──
-  if (totaleContributiEccedenzaArtCommPrecedente > 0.005) {
+  const saldoEccPrec =
+    saldoContributiEccArtCommPrecedente ?? totaleContributiEccedenzaArtCommPrecedente
+  if (saldoEccPrec > 0.005) {
     pushRateizzabile({
       data: formattaScadenza(dCorr.saldoContributi, anno),
       descrizione: `Saldo contributi eccedenza artigiani/commercianti ${annoPrec}`,
       categoria: 'Contributi eccedenza artigiani/commercianti',
       voce: `Saldo · competenza ${annoPrec}`,
-      importo: totaleContributiEccedenzaArtCommPrecedente,
-      componenti: [{ tipo: `Saldo contributi ecc. Art/Comm ${annoPrec}`, importo: totaleContributiEccedenzaArtCommPrecedente }],
+      importo: saldoEccPrec,
+      componenti: componentiSaldo(
+        `Saldo contributi ecc. Art/Comm ${annoPrec}`,
+        saldoEccPrec,
+        totaleContributiEccedenzaArtCommPrecedente,
+        accontiEccDovutiPerPrecedente,
+        annoPrec,
+      ),
       annoScadenza: anno,
       riferimenti: ['ecc-saldo'],
       chiaveRateazione: `ecc-saldo-${annoPrec}`,
@@ -605,6 +643,7 @@ export function calcolaScadenze({
         saldoContributiGS,
         totaleContributiSeparataDovutoCorrente,
         accontiGSVersatiNelCorrente,
+        anno,
       ),
       annoScadenza: annoSucc,
       riferimenti: ['gs-saldo'],
@@ -663,6 +702,7 @@ export function calcolaScadenze({
         saldoContributiEccArtComm,
         totaleContributiEccArtCommDovutoCorrente,
         accontiEccVersatiNelCorrente,
+        anno,
       ),
       annoScadenza: annoSucc,
       riferimenti: ['ecc-saldo'],
