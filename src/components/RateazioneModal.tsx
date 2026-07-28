@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react'
 import { ArrowLeft, ExternalLink, FileText } from 'lucide-react'
 import { Badge, Button, Label, Radio, Table, TableBody, TableCell, TableHead, TableHeadCell, TableRow, TextInput } from 'flowbite-react'
 import type { InizioRateazione, OpzioniRateazione, Scadenza } from '@/domain/types'
-import { calcolaPianoRateazione, numeroRateMax, rateazioneNeutra } from '@/domain/rateazione'
-import { formattaScadenza } from '@/domain/dates'
+import { calcolaPianoRateazione, numeroRateMax, piu30Giorni, rateazioneNeutra } from '@/domain/rateazione'
+import { formattaScadenza, mmggDaLeggibile } from '@/domain/dates'
+import type { GestioneRateazione } from '@/pdf/rateazionePdf'
 import { formatEuro } from '@/domain/labels'
 import { caricaAnagrafica, salvaAnagrafica, type AnagraficaContribuente } from '@/data/anagraficaStorage'
 import { Field, Modal, Select, Tooltip } from '@/components/ui'
@@ -24,23 +25,31 @@ const aliquotaTesto = (aliquota: number) =>
 
 /** Voce della scadenza senza l'eventuale suffisso di rata (per titoli e PDF). */
 const voceBase = (s: Scadenza): string =>
-  (s.voce ?? '').replace(/ · rata \d+ di \d+$/, '').replace(/ · differito al 30 luglio$/, '')
+  (s.voce ?? '').replace(/ · rata \d+ di \d+$/, '').replace(/ · differito (al 30 luglio|di 30 giorni)$/, '')
 
 /**
- * Ricava tipo di versamento e anno di competenza dalla chiave di rateazione
- * (es. "saldo-2025", "acconto1-2026"). Null se la chiave non è riconosciuta.
+ * Ricava gestione, tipo di versamento e anno di competenza dalla chiave di
+ * rateazione (es. "saldo-2025", "acconto1-2026", "gs-saldo-2025",
+ * "ecc-acconto1-2026"). Null se la chiave non è riconosciuta.
  */
-function parseChiave(chiave?: string): { tipo: 'saldo' | 'acconto1'; annoCompetenza: number } | null {
-  const m = chiave?.match(/^(saldo|acconto1)-(\d{4})$/)
-  return m ? { tipo: m[1] as 'saldo' | 'acconto1', annoCompetenza: Number(m[2]) } : null
+function parseChiave(
+  chiave?: string,
+): { gestione: GestioneRateazione; tipo: 'saldo' | 'acconto1'; annoCompetenza: number } | null {
+  const m = chiave?.match(/^(?:(gs|ecc)-)?(saldo|acconto1)-(\d{4})$/)
+  if (!m) return null
+  return {
+    gestione: (m[1] as 'gs' | 'ecc' | undefined) ?? 'imposta',
+    tipo: m[2] as 'saldo' | 'acconto1',
+    annoCompetenza: Number(m[3]),
+  }
 }
 
 /**
- * Popup di rateazione di un versamento d'imposta in due passi: scelta della
- * prima scadenza (giugno ordinaria o luglio con maggiorazione 0,4%) e del
- * numero di rate con anteprima del piano; poi, per scaricare il PDF con le
- * deleghe F24 in facsimile, i dati anagrafici del contribuente (facoltativi,
- * ricordati per le volte successive).
+ * Popup di rateazione di un versamento (imposta sostitutiva o contributi da
+ * quadro RR) in due passi: scelta della prima scadenza (ordinaria o differita
+ * di 30 giorni con maggiorazione 0,4%) e del numero di rate con anteprima del
+ * piano; poi, per scaricare il PDF con le deleghe F24 in facsimile, i dati
+ * anagrafici del contribuente (facoltativi, ricordati per le volte successive).
  */
 export function RateazioneModal({ scadenza, opzioniAttuali, onClose, onSave }: Props) {
   const [inizio, setInizio] = useState<InizioRateazione>(opzioniAttuali?.inizio ?? 'giugno')
@@ -60,8 +69,13 @@ export function RateazioneModal({ scadenza, opzioniAttuali, onClose, onSave }: P
 
   const anno = scadenza.annoScadenza
   const importoBase = scadenza.importoRateazioneBase ?? scadenza.importo
+  // Data della scadenza originaria: sulle righe-rata è quella salvata dalla
+  // espansione, altrimenti la data della scadenza stessa. Il piano parte da lì
+  // (per i contributi la prima scadenza può non essere il 30/06).
+  const dataBase = scadenza.dataRateazioneBase ?? scadenza.data
+  const mmggBase = mmggDaLeggibile(dataBase) ?? '06-30'
   const opzioni: OpzioniRateazione = { inizio, numeroRate }
-  const piano = calcolaPianoRateazione(importoBase, opzioni)
+  const piano = calcolaPianoRateazione(importoBase, opzioni, { mmgg: mmggBase, anno })
   const neutra = rateazioneNeutra(opzioni)
   const datiChiave = parseChiave(scadenza.chiaveRateazione)
 
@@ -81,6 +95,7 @@ export function RateazioneModal({ scadenza, opzioniAttuali, onClose, onSave }: P
     const { generaPdfRateazione } = await import('@/pdf/rateazionePdf')
     const url = await generaPdfRateazione({
       intestazione: `${scadenza.categoria ?? scadenza.descrizione} · ${voceBase(scadenza)} · ${formatEuro(importoBase)}`,
+      gestione: datiChiave.gestione,
       tipoVersamento: datiChiave.tipo,
       annoCompetenza: datiChiave.annoCompetenza,
       annoScadenza: anno,
@@ -159,7 +174,7 @@ export function RateazioneModal({ scadenza, opzioniAttuali, onClose, onSave }: P
                   onChange={() => setInizio('giugno')}
                 />
                 <Label htmlFor="rateazione-giugno" className="font-normal">
-                  {formattaScadenza('06-30', anno)} — ordinaria, fino a 7 rate
+                  {formattaScadenza(mmggBase, anno)} — ordinaria, fino a 7 rate
                 </Label>
               </div>
               <div className="flex items-center gap-2">
@@ -170,7 +185,7 @@ export function RateazioneModal({ scadenza, opzioniAttuali, onClose, onSave }: P
                   onChange={() => setInizio('luglio')}
                 />
                 <Label htmlFor="rateazione-luglio" className="font-normal">
-                  {formattaScadenza('07-30', anno)} — maggiorazione 0,4%, fino a 6 rate
+                  {formattaScadenza(piu30Giorni(mmggBase, anno), anno)} — maggiorazione 0,4%, fino a 6 rate
                 </Label>
               </div>
             </fieldset>

@@ -1,12 +1,12 @@
 import type { InizioRateazione, OpzioniRateazione, Scadenza } from '@/domain/types'
-import { formattaScadenza } from '@/domain/dates'
+import { formattaScadenza, giorniInMese, mmggDaLeggibile } from '@/domain/dates'
 
 /**
- * Rateazione dei versamenti d'imposta (saldo e 1° acconto), replicata dal
- * software ufficiale "Redditi PF" dell'Agenzia delle Entrate (F24PerRPF,
- * sogei.f24uniNN.utility.Costanti / FactoryF24DaUNI.rateazione):
- * - prima scadenza ordinaria (30/06) → fino a 7 rate; differita di 30 giorni
- *   (30/07) → fino a 6 rate, con maggiorazione dello 0,4% sull'intero importo;
+ * Rateazione dei versamenti di saldo e 1° acconto (imposte e contributi da
+ * quadro RR), replicata dal software ufficiale "Redditi PF" dell'Agenzia delle
+ * Entrate (F24PerRPF, sogei.f24uniNN.utility.Costanti / FactoryF24DaUNI.rateazione):
+ * - prima scadenza ordinaria (di norma 30/06) → fino a 7 rate; differita di
+ *   30 giorni → fino a 6 rate, con maggiorazione dello 0,4% sull'intero importo;
  * - rate successive alla prima entro il giorno 16 di ciascun mese (20 ad
  *   agosto), con interessi di rateazione del 4% annuo (0,33% al mese) applicati
  *   come percentuale fissa cumulata per rata;
@@ -15,7 +15,7 @@ import { formattaScadenza } from '@/domain/dates'
  * Le date sono quelle nominali: se festive slittano al primo giorno lavorativo.
  */
 
-/** Maggiorazione dovuta versando alla scadenza differita di luglio. */
+/** Maggiorazione dovuta versando alla scadenza differita di 30 giorni. */
 export const MAGGIORAZIONE_LUGLIO = 0.004
 
 /**
@@ -25,10 +25,36 @@ export const MAGGIORAZIONE_LUGLIO = 0.004
  */
 const SOGLIA_INTERESSI_CENTS = 103
 
-/** Date nominali "MM-GG" delle rate, prima scadenza inclusa. */
-const DATE_RATE: Record<InizioRateazione, string[]> = {
-  giugno: ['06-30', '07-16', '08-20', '09-16', '10-16', '11-16', '12-16'],
-  luglio: ['07-30', '08-20', '09-16', '10-16', '11-16', '12-16'],
+/** Date nominali "MM-GG" delle rate successive alla prima (il 16, 20 ad agosto). */
+const RATE_SUCCESSIVE = ['07-16', '08-20', '09-16', '10-16', '11-16', '12-16']
+
+/** Prima scadenza ordinaria di default: 30 giugno (versamenti d'imposta). */
+const PRIMA_DEFAULT: PrimaScadenza = { mmgg: '06-30', anno: 2025 }
+
+/** Prima scadenza reale del versamento da rateizzare (per i contributi può differire dal 30/06). */
+export interface PrimaScadenza {
+  mmgg: string
+  /** Anno solare della scadenza (serve per i giorni del mese nel differimento). */
+  anno: number
+}
+
+/** Sposta una data "MM-GG" avanti di 30 giorni (scadenza differita). */
+export function piu30Giorni(mmgg: string, anno: number): string {
+  const [mm, gg] = mmgg.split('-').map(Number)
+  let mese = mm
+  let giorno = gg + 30
+  while (giorno > giorniInMese(mese, anno)) {
+    giorno -= giorniInMese(mese, anno)
+    mese++
+  }
+  return `${String(mese).padStart(2, '0')}-${String(giorno).padStart(2, '0')}`
+}
+
+/** Date "MM-GG" delle rate: prima scadenza (ordinaria o differita) + rate del 16. */
+function dateRate(inizio: InizioRateazione, prima: PrimaScadenza): string[] {
+  const primaData = inizio === 'giugno' ? prima.mmgg : piu30Giorni(prima.mmgg, prima.anno)
+  // Confronto lessicografico: "MM-GG" zero-padded ordina come le date.
+  return [primaData, ...RATE_SUCCESSIVE.filter((d) => d > primaData)]
 }
 
 /** Interessi di rateazione cumulati per rata (tabella ufficiale, 0,33%/mese). */
@@ -39,7 +65,7 @@ const INTERESSI_RATE: Record<InizioRateazione, number[]> = {
 
 /** Numero massimo di rate consentito per la prima scadenza scelta. */
 export function numeroRateMax(inizio: InizioRateazione): number {
-  return DATE_RATE[inizio].length
+  return INTERESSI_RATE[inizio].length
 }
 
 /** Riconduce le opzioni a valori validi (rate intere, entro il massimo). */
@@ -87,9 +113,15 @@ export interface PianoRateazione {
  * software ufficiale: tutto in centesimi, quota = floor(totale/n) e resto
  * sulla prima rata, interessi arrotondati al centesimo per rata.
  */
-export function calcolaPianoRateazione(importo: number, opzioni: OpzioniRateazione): PianoRateazione {
+export function calcolaPianoRateazione(
+  importo: number,
+  opzioni: OpzioniRateazione,
+  prima: PrimaScadenza = PRIMA_DEFAULT,
+): PianoRateazione {
   const opz = normalizzaOpzioni(opzioni)
-  const { inizio, numeroRate } = opz
+  const { inizio } = opz
+  const date = dateRate(inizio, prima)
+  const numeroRate = Math.min(opz.numeroRate, date.length)
 
   const centesimi = Math.round(importo * 100)
   const maggiorazione = inizio === 'luglio' ? Math.round(centesimi * MAGGIORAZIONE_LUGLIO) : 0
@@ -109,7 +141,7 @@ export function calcolaPianoRateazione(importo: number, opzioni: OpzioniRateazio
     totaleInteressi += interessi
     rate.push({
       numero: i + 1,
-      dataMMGG: DATE_RATE[inizio][i],
+      dataMMGG: date[i],
       quota: quota / 100,
       aliquotaInteressi: aliquota,
       interessi: interessi / 100,
@@ -118,7 +150,7 @@ export function calcolaPianoRateazione(importo: number, opzioni: OpzioniRateazio
   }
 
   return {
-    opzioni: opz,
+    opzioni: { inizio, numeroRate },
     importoOriginario: centesimi / 100,
     maggiorazione: maggiorazione / 100,
     totaleInteressi: totaleInteressi / 100,
@@ -137,9 +169,12 @@ export function calcolaPianoRateazione(importo: number, opzioni: OpzioniRateazio
 export function espandiRateazione(scadenza: Scadenza, opzioni: OpzioniRateazione): Scadenza[] {
   if (rateazioneNeutra(opzioni)) return [scadenza]
 
-  const piano = calcolaPianoRateazione(scadenza.importo, opzioni)
-  const n = piano.opzioni.numeroRate
   const anno = scadenza.annoScadenza
+  // Il piano parte dalla data reale della scadenza (per i contributi può non
+  // essere il 30/06); se non riconoscibile si ricade sull'ordinaria.
+  const prima: PrimaScadenza = { mmgg: mmggDaLeggibile(scadenza.data) ?? '06-30', anno }
+  const piano = calcolaPianoRateazione(scadenza.importo, opzioni, prima)
+  const n = piano.opzioni.numeroRate
 
   return piano.rate.map((rata) => {
     const componenti = [
@@ -154,7 +189,7 @@ export function espandiRateazione(scadenza: Scadenza, opzioni: OpzioniRateazione
           }]
         : []),
     ]
-    const voceRata = n > 1 ? ` · rata ${rata.numero} di ${n}` : ' · differito al 30 luglio'
+    const voceRata = n > 1 ? ` · rata ${rata.numero} di ${n}` : ' · differito di 30 giorni'
     return {
       data: formattaScadenza(rata.dataMMGG, anno),
       descrizione: `${scadenza.descrizione}${voceRata}`,
@@ -166,6 +201,7 @@ export function espandiRateazione(scadenza: Scadenza, opzioni: OpzioniRateazione
       stimata: scadenza.stimata,
       chiaveRateazione: scadenza.chiaveRateazione,
       importoRateazioneBase: scadenza.importo,
+      dataRateazioneBase: scadenza.data,
       // Con più rate il collegamento ai versamenti inseriti perde significato.
       riferimenti: n === 1 ? scadenza.riferimenti : undefined,
     }

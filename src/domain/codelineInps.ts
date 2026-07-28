@@ -151,8 +151,8 @@ export interface ScadenzaContributo {
   data?: string
 }
 
-/** Causale INPS della riga (AF = fissi/minimale, AP = eccedente il minimale). */
-type CausaleInps = 'AF' | 'AP'
+/** Causale INPS della riga (AF = fissi/minimale, AP = eccedente il minimale, APR = eccedenza rateizzata). */
+type CausaleInps = 'AF' | 'AP' | 'APR'
 
 /** Una riga di versamento contributi con la sua codeline INPS. */
 export interface RigaCodeline {
@@ -196,7 +196,9 @@ export function righeCodelineDaScadenze(
     const rm = (s.voce ?? '').match(/(\d)ª rata/)
     // fissi: rata trimestrale 1-4; eccedenza (saldo/acconto a percentuale): rata 6
     const rata = isFissi ? (rm ? Number(rm[1]) : 0) : 6
-    const causale: CausaleInps = isFissi ? 'AF' : 'AP'
+    // Righe-rata di un piano di rateazione: causale con suffisso R.
+    const isRataPiano = / rata \d+ di \d+/.test(s.voce ?? '')
+    const causale: CausaleInps = isFissi ? 'AF' : isRataPiano ? 'APR' : 'AP'
 
     const params = { matricola, anno, codiceSoggetto, rata, sap, importoEuro: Math.trunc(s.importo) }
     righe.push({

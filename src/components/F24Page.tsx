@@ -72,30 +72,49 @@ export function F24Page({ anno, calcoli, input, anagrafica: anag, onVaiAiDati }:
     ? righeCodelineDaScadenze(scadenzeContributi, anag.matricolaInps, anag.codiceSoggettoInps, anag.sedeInps)
     : []
 
-  // Genera e apre il PDF di un singolo F24 INPS (una riga).
+  // Genera e apre il PDF di un singolo F24 INPS. Sulle righe-rata di un piano
+  // di rateazione gli interessi vanno esposti a parte con la causale API.
   const apriF24Inps = async (riga: RigaCodeline, scad: Scadenza) => {
     const scheda = window.open('', '_blank')
     const { dal, al } = periodoCompetenza(scad.voce, anno)
-    const inps: RigaInpsF24 = {
-      codiceSede: anag.sedeInps,
-      causale: riga.causale,
-      codeline: riga.codeline ?? '',
-      periodoDal: dal,
-      periodoAl: al,
-      importo: riga.importo,
-    }
+    const compQuota = scad.componenti.find((c) => /^Quota/.test(c.tipo))
+    const compInteressi = scad.componenti.find((c) => /^Interessi/.test(c.tipo))
+    const inps: RigaInpsF24[] = [
+      {
+        codiceSede: anag.sedeInps,
+        causale: riga.causale,
+        codeline: riga.codeline ?? '',
+        periodoDal: dal,
+        periodoAl: al,
+        importo: compQuota?.importo ?? riga.importo,
+      },
+      ...(compInteressi
+        ? [{
+            codiceSede: anag.sedeInps,
+            causale: 'API',
+            codeline: '',
+            periodoDal: dal,
+            periodoAl: al,
+            importo: compInteressi.importo,
+          }]
+        : []),
+    ]
     const mRata = scad.voce?.match(/(\d)ª rata/)
     const mAcconto = scad.voce?.match(/(\d°) acconto/)
-    const etichettaInps = mRata
+    const mRataPiano = scad.voce?.match(/rata (\d+) di (\d+)/)
+    const etichettaBase = mRata
       ? `${mRata[1]}ª RATA`
       : mAcconto
         ? `${mAcconto[1].toUpperCase()} ACCONTO`
         : 'SALDO'
+    const etichettaInps = mRataPiano
+      ? `${etichettaBase} · RATA ${mRataPiano[1]} DI ${mRataPiano[2]}`
+      : etichettaBase
     const modulo: ModuloF24 = {
       etichettaRata: etichettaInps,
       scadenza: riga.data,
       erario: [],
-      inps: [inps],
+      inps,
       anagrafica: anag,
     }
     const { generaPdfF24 } = await import('@/pdf/f24Pdf')
@@ -111,20 +130,38 @@ export function F24Page({ anno, calcoli, input, anagrafica: anag, onVaiAiDati }:
   const apriF24Gs = async (scad: Scadenza) => {
     const scheda = window.open('', '_blank')
     const { dal, al } = periodoCompetenza(scad.voce, anno)
-    const inps: RigaInpsF24 = {
-      codiceSede: anag.sedeInps,
-      causale: 'PXX',
-      codeline: '',
-      periodoDal: dal,
-      periodoAl: al,
-      importo: scad.importo,
-    }
+    // Righe-rata di un piano di rateazione: causale PXXR e interessi a parte
+    // con causale DPPI.
+    const mRataGs = scad.voce?.match(/rata (\d+) di (\d+)/)
+    const compQuota = scad.componenti.find((c) => /^Quota/.test(c.tipo))
+    const compInteressi = scad.componenti.find((c) => /^Interessi/.test(c.tipo))
+    const inps: RigaInpsF24[] = [
+      {
+        codiceSede: anag.sedeInps,
+        causale: mRataGs ? 'PXXR' : 'PXX',
+        codeline: '',
+        periodoDal: dal,
+        periodoAl: al,
+        importo: compQuota?.importo ?? scad.importo,
+      },
+      ...(compInteressi
+        ? [{
+            codiceSede: anag.sedeInps,
+            causale: 'DPPI',
+            codeline: '',
+            periodoDal: dal,
+            periodoAl: al,
+            importo: compInteressi.importo,
+          }]
+        : []),
+    ]
     const mAccontoGs = scad.voce?.match(/(\d°) acconto/)
+    const etichettaGsBase = mAccontoGs ? `${mAccontoGs[1].toUpperCase()} ACCONTO` : 'SALDO'
     const modulo: ModuloF24 = {
-      etichettaRata: mAccontoGs ? `${mAccontoGs[1].toUpperCase()} ACCONTO` : 'SALDO',
+      etichettaRata: mRataGs ? `${etichettaGsBase} · RATA ${mRataGs[1]} DI ${mRataGs[2]}` : etichettaGsBase,
       scadenza: scad.data,
       erario: [],
-      inps: [inps],
+      inps,
       anagrafica: anag,
     }
     const { generaPdfF24 } = await import('@/pdf/f24Pdf')
@@ -143,21 +180,39 @@ export function F24Page({ anno, calcoli, input, anagrafica: anag, onVaiAiDati }:
   const apriF24Imposta = async (scad: Scadenza) => {
     const scheda = window.open('', '_blank')
     const isSaldo = /saldo/i.test(scad.voce ?? '')
-    const mAccontoImp = scad.voce?.match(/(\d°) acconto/)
-    const erario: RigaErarioF24 = {
-      codiceTributo: isSaldo ? '1792' : '1790', // saldo / acconto forfettario
-      annoRiferimento: anno,
-      importo: scad.importo,
-    }
-    const etichettaImp = isSaldo
+    const mAccontoImp = scad.voce?.match(/(\d)° acconto/)
+    // Anno di riferimento = anno d'imposta PER CUI si versa (la competenza nella
+    // voce), non l'anno in cui si paga: saldo 2025 versato nel 2026 → 2025,
+    // 1° acconto 2026 versato a giugno 2026 → 2026.
+    const mComp = scad.voce?.match(/competenza (\d{4})/)
+    const annoRiferimento = mComp ? Number(mComp[1]) : anno
+    // Codici tributo: 1792 saldo, 1790 acconto prima rata, 1791 acconto seconda
+    // rata. Campo rateazione NNRR per le rate di un piano, 0101 altrimenti.
+    const codiceTributo = isSaldo ? '1792' : mAccontoImp?.[1] === '2' ? '1791' : '1790'
+    const mRataImp = scad.voce?.match(/rata (\d) di (\d)/)
+    const rateazione = mRataImp ? `0${mRataImp[1]}0${mRataImp[2]}` : '0101'
+    // Sulle righe-rata di un piano gli interessi vanno esposti a parte con il
+    // codice 1668 (come nel PDF del piano di rateazione), non sommati al tributo.
+    const compQuota = scad.componenti.find((c) => /^Quota/.test(c.tipo))
+    const compInteressi = scad.componenti.find((c) => /^Interessi/.test(c.tipo))
+    const erario: RigaErarioF24[] = [
+      { codiceTributo, rateazione, annoRiferimento, importo: compQuota?.importo ?? scad.importo },
+      ...(compInteressi
+        ? [{ codiceTributo: '1668', annoRiferimento, importo: compInteressi.importo }]
+        : []),
+    ]
+    const etichettaBase = isSaldo
       ? 'SALDO'
       : mAccontoImp
-        ? `${mAccontoImp[1].toUpperCase()} ACCONTO`
+        ? `${mAccontoImp[1]}° ACCONTO`
         : 'ACCONTO'
+    const etichettaImp = mRataImp
+      ? `${etichettaBase} · RATA ${mRataImp[1]} DI ${mRataImp[2]}`
+      : etichettaBase
     const modulo: ModuloF24 = {
       etichettaRata: etichettaImp,
       scadenza: scad.data,
-      erario: [erario],
+      erario,
       inps: [],
       anagrafica: anag,
     }

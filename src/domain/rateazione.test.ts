@@ -8,6 +8,7 @@ import {
   espandiRateazione,
 } from './rateazione'
 import type { Scadenza } from './types'
+import { mmggDaLeggibile } from './dates'
 
 // I valori attesi replicano il software ufficiale "Redditi PF" (Agenzia delle
 // Entrate, sogei.f24uniNN.utility.Costanti): calcoli in centesimi interi,
@@ -146,5 +147,66 @@ describe('espandiRateazione', () => {
     expect(out[0].data).toBe('30 Luglio 2026')
     expect(out[0].importo).toBeCloseTo(996.32, 2)
     expect(out[0].riferimenti).toEqual(['imposta-saldo'])
+  })
+
+  it('voce della rata unica differita termina con " · differito di 30 giorni"', () => {
+    const out = espandiRateazione(scadenza, { inizio: 'luglio', numeroRate: 1 })
+    expect(out[0].voce).toMatch(/ · differito di 30 giorni$/)
+  })
+})
+
+describe('calcolaPianoRateazione — prima scadenza reale diversa dal 30/06 (contributi)', () => {
+  it('inizio giugno: piano ancorato alla prima scadenza reale (16/06)', () => {
+    const piano = calcolaPianoRateazione(
+      1000,
+      { inizio: 'giugno', numeroRate: 7 },
+      { mmgg: '06-16', anno: 2026 },
+    )
+    expect(piano.rate.map((r) => r.dataMMGG)).toEqual([
+      '06-16', '07-16', '08-20', '09-16', '10-16', '11-16', '12-16',
+    ])
+  })
+
+  it('inizio luglio: prima rata slitta di 30 giorni dalla scadenza reale (16/06 → 16/07), max 6 rate', () => {
+    const piano = calcolaPianoRateazione(
+      1000,
+      { inizio: 'luglio', numeroRate: 7 },
+      { mmgg: '06-16', anno: 2026 },
+    )
+    expect(piano.opzioni.numeroRate).toBe(6)
+    expect(piano.rate.map((r) => r.dataMMGG)).toEqual([
+      '07-16', '08-20', '09-16', '10-16', '11-16', '12-16',
+    ])
+  })
+})
+
+describe('espandiRateazione — scadenza con prima data reale diversa dal 30/06', () => {
+  const scadenzaContributi: Scadenza = {
+    data: '16 Giugno 2027',
+    descrizione: 'Saldo contributi Gestione separata 2026',
+    categoria: 'Contributi Gestione separata',
+    voce: 'Saldo · competenza 2026',
+    importo: 1000,
+    componenti: [{ tipo: 'Saldo contributi G.S. 2026', importo: 1000 }],
+    annoScadenza: 2027,
+    riferimenti: ['gs-saldo'],
+    chiaveRateazione: 'gs-saldo-2026',
+  }
+
+  it('la prima rata resta il 16 giugno, la seconda il 16 luglio, con dataRateazioneBase su ogni riga', () => {
+    const out = espandiRateazione(scadenzaContributi, { inizio: 'giugno', numeroRate: 7 })
+    expect(out[0].data).toBe('16 Giugno 2027')
+    expect(out[1].data).toBe('16 Luglio 2027')
+    for (const r of out) expect(r.dataRateazioneBase).toBe('16 Giugno 2027')
+  })
+})
+
+describe('mmggDaLeggibile', () => {
+  it('30 Giugno 2026 → 06-30', () => expect(mmggDaLeggibile('30 Giugno 2026')).toBe('06-30'))
+  it('16 Giugno 2026 → 06-16', () => expect(mmggDaLeggibile('16 Giugno 2026')).toBe('06-16'))
+  it('input non valido → null', () => {
+    expect(mmggDaLeggibile('non una data')).toBeNull()
+    expect(mmggDaLeggibile('16 Giugnaio 2026')).toBeNull()
+    expect(mmggDaLeggibile('')).toBeNull()
   })
 })

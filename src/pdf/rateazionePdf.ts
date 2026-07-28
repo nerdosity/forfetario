@@ -3,6 +3,7 @@ import modelloF24Url from '@/assets/ModF24IMU2013.pdf'
 import type { PianoRateazione, RataPiano } from '@/domain/rateazione'
 import type { AnagraficaContribuente } from '@/data/anagraficaStorage'
 import { formattaScadenza } from '@/domain/dates'
+import { generaCodeline } from '@/domain/codelineInps'
 
 /**
  * PDF del piano di rateazione: una pagina di riepilogo e una delega F24 in
@@ -11,6 +12,11 @@ import { formattaScadenza } from '@/domain/dates'
  * overlay del programma originale: Courier-Bold alle coordinate dei campi di
  * StruttureF24 e scritta FAC-SIMILE in filigrana.
  *
+ * Per l'imposta sostitutiva compila la sezione erario (codici tributo 1792/1790
+ * più 1668 per gli interessi); per i contributi la sezione INPS, con le causali
+ * di rateazione (PXXR gestione separata, APR eccedenza artigiani/commercianti)
+ * e gli interessi esposti a parte (DPPI / API).
+ *
  * Restituisce un URL blob da aprire in una nuova scheda; da lì il visualizzatore
  * del browser permette di salvare o stampare.
  */
@@ -18,9 +24,13 @@ import { formattaScadenza } from '@/domain/dates'
 /** Tipo di versamento rateizzato, ricavato dalla chiave di rateazione. */
 type TipoVersamentoImposta = 'saldo' | 'acconto1'
 
+/** Gestione del versamento rateizzato: erario o contributi INPS. */
+export type GestioneRateazione = 'imposta' | 'gs' | 'ecc'
+
 export interface DatiPdfRateazione {
   /** Es. "Imposta sostitutiva · Saldo · competenza 2025". */
   intestazione: string
+  gestione: GestioneRateazione
   tipoVersamento: TipoVersamentoImposta
   /** Anno d'imposta cui si riferisce il versamento (campo "anno di riferimento"). */
   annoCompetenza: number
@@ -39,6 +49,12 @@ const CODICE_TRIBUTO: Record<TipoVersamentoImposta, { codice: string; descrizion
 
 /** Interessi da pagamento dilazionato dei tributi erariali. */
 const CODICE_INTERESSI = '1668'
+
+/** Causali INPS della quota (rateizzata o meno) e degli interessi, per gestione. */
+const CAUSALI_INPS: Record<'gs' | 'ecc', { quota: string; quotaRateizzata: string; interessi: string }> = {
+  gs: { quota: 'PXX', quotaRateizzata: 'PXXR', interessi: 'DPPI' },
+  ecc: { quota: 'AP', quotaRateizzata: 'APR', interessi: 'API' },
+}
 
 const BLU = rgb(29 / 255, 78 / 255, 216 / 255)
 const GRIGIO = rgb(71 / 255, 85 / 255, 105 / 255)
@@ -108,13 +124,12 @@ export async function generaPdfRateazione(dati: DatiPdfRateazione): Promise<stri
 
 function disegnaRiepilogo(
   pagina: PDFPage,
-  { intestazione, tipoVersamento, annoScadenza, piano }: DatiPdfRateazione,
+  { intestazione, gestione, tipoVersamento, annoScadenza, piano }: DatiPdfRateazione,
   helv: PDFFont,
   helvBold: PDFFont,
 ): void {
   const margine = 50
   const n = piano.opzioni.numeroRate
-  const tributo = CODICE_TRIBUTO[tipoVersamento]
   let y = 780
 
   const testo = (t: string, x: number, size: number, font: PDFFont, color = NERO) =>
@@ -185,9 +200,28 @@ function disegnaRiepilogo(
   aDestra(euro(piano.totale), FINE_TOT, 10, helvBold)
   y -= 30
 
+  const righeCodici =
+    gestione === 'imposta'
+      ? (() => {
+          const tributo = CODICE_TRIBUTO[tipoVersamento]
+          return [
+            `Codici tributo: ${tributo.codice} (${tributo.descrizione.toLowerCase()}); ${CODICE_INTERESSI} (interessi pagamento`,
+            'dilazionato imposte erariali), esposti in delega solo quando superano 1,03 euro per rata.',
+          ]
+        })()
+      : (() => {
+          const c = CAUSALI_INPS[gestione]
+          const etichetta =
+            gestione === 'gs'
+              ? 'contributi gestione separata professionisti'
+              : 'contributi eccedenti il minimale artigiani/commercianti'
+          return [
+            `Causali INPS: ${n > 1 ? c.quotaRateizzata : c.quota} (${etichetta}${n > 1 ? ', rateizzazione' : ''});`,
+            `${c.interessi} (interessi di rateazione), esposti in delega solo quando superano 1,03 euro per rata.`,
+          ]
+        })()
   const note = [
-    `Codici tributo: ${tributo.codice} (${tributo.descrizione.toLowerCase()}); ${CODICE_INTERESSI} (interessi pagamento`,
-    'dilazionato imposte erariali), esposti in delega solo quando superano 1,03 euro per rata.',
+    ...righeCodici,
     'Le pagine seguenti riportano una delega F24 in facsimile per ogni rata, compilata come dal software',
     'ufficiale. Le date sono nominali: se festive slittano al primo giorno lavorativo utile.',
     'Documento di supporto alla compilazione: non utilizzabile per il versamento.',
@@ -207,12 +241,11 @@ function disegnaRiepilogo(
 function disegnaDelega(
   pagina: PDFPage,
   rata: RataPiano,
-  { piano, tipoVersamento, annoCompetenza, annoScadenza, anagrafica }: DatiPdfRateazione,
+  { piano, gestione, tipoVersamento, annoCompetenza, annoScadenza, anagrafica }: DatiPdfRateazione,
   courier: PDFFont,
   times: PDFFont,
 ): void {
   const n = piano.opzioni.numeroRate
-  const tributo = CODICE_TRIBUTO[tipoVersamento]
   const scrivi = (testo: string, x: number, y: number, size: number) => {
     if (testo.trim().length === 0) return
     pagina.drawText(pdfSafe(testo), { x, y, size, font: courier, color: NERO })
@@ -235,24 +268,65 @@ function disegnaDelega(
   scrivi(anagrafica.comuneNascita.toUpperCase(), 272, 677, 12)
   scrivi(fmtSpaziato(anagrafica.provinciaNascita), 542, 677, 12)
 
-  // Sezione erario (record A, modello IMU 2013): riga i alle Y 593, 581, … (passo 12).
-  const righe: { codice: string; rateazione: string; importo: number }[] = [
-    { codice: tributo.codice, rateazione: campoRateazione(rata.numero, n), importo: rata.quota },
-  ]
-  if (rata.interessi > 0) {
-    righe.push({ codice: CODICE_INTERESSI, rateazione: '', importo: rata.interessi })
-  }
-  righe.forEach((riga, i) => {
-    const y = 593 - 12 * i
-    scrivi(riga.codice, 175, y, 9)
-    scrivi(riga.rateazione, 232, y, 9)
-    scrivi(String(annoCompetenza), 282, y, 9)
-    scrivi(fmtImporto(riga.importo), 313, y, 9)
-  })
+  if (gestione === 'imposta') {
+    // Sezione erario (record A, modello IMU 2013): riga i alle Y 593, 581, … (passo 12).
+    const tributo = CODICE_TRIBUTO[tipoVersamento]
+    const righe: { codice: string; rateazione: string; importo: number }[] = [
+      { codice: tributo.codice, rateazione: campoRateazione(rata.numero, n), importo: rata.quota },
+    ]
+    if (rata.interessi > 0) {
+      righe.push({ codice: CODICE_INTERESSI, rateazione: '', importo: rata.interessi })
+    }
+    righe.forEach((riga, i) => {
+      const y = 593 - 12 * i
+      scrivi(riga.codice, 175, y, 9)
+      scrivi(riga.rateazione, 232, y, 9)
+      scrivi(String(annoCompetenza), 282, y, 9)
+      scrivi(fmtImporto(riga.importo), 313, y, 9)
+    })
 
-  // Totale A, saldo sezione (con segno) e saldo finale della delega.
-  scrivi(fmtImporto(rata.importo), 313, 521, 9)
-  scrivi(fmtImporto(rata.importo), 486, 521, 9)
-  scrivi('+', 481, 521, 9)
+    // Totale A e saldo sezione (con segno).
+    scrivi(fmtImporto(rata.importo), 313, 521, 9)
+    scrivi(fmtImporto(rata.importo), 486, 521, 9)
+    scrivi('+', 481, 521, 9)
+  } else {
+    // Sezione INPS (record I): riga i alle Y 485, 473, … (passo 12). Quota con
+    // causale di rateazione, interessi a parte (DPPI/API). Periodo 01–12 della
+    // competenza; per l'eccedenza la codeline è quella "a percentuale" (rata 6,
+    // importo 0), calcolabile solo con matricola e codice soggetto validi.
+    const c = CAUSALI_INPS[gestione]
+    const codeline =
+      gestione === 'ecc'
+        ? generaCodeline({
+            matricola: anagrafica.matricolaInps,
+            anno: annoCompetenza,
+            codiceSoggetto: anagrafica.codiceSoggettoInps,
+            rata: 6,
+            sap: anagrafica.sedeInps,
+            importoEuro: 0,
+          }) ?? ''
+        : ''
+    const righe: { causale: string; codeline: string; importo: number }[] = [
+      { causale: n > 1 ? c.quotaRateizzata : c.quota, codeline, importo: rata.quota },
+    ]
+    if (rata.interessi > 0) {
+      righe.push({ causale: c.interessi, codeline: '', importo: rata.interessi })
+    }
+    righe.forEach((riga, i) => {
+      const y = 485 - 12 * i
+      scrivi(anagrafica.sedeInps, 24, y, 9)
+      scrivi(riga.causale, 60, y, 9)
+      scrivi(riga.codeline, 95, y, 9)
+      scrivi(`01 ${annoCompetenza}`, 223, y, 9)
+      scrivi(`12 ${annoCompetenza}`, 274, y, 9)
+      scrivi(fmtImporto(riga.importo), 313, y, 9)
+    })
+
+    // TOTALE C e SALDO (C-D) della sezione INPS.
+    scrivi(fmtImporto(rata.importo), 313, 437, 9)
+    scrivi(fmtImporto(rata.importo), 486, 437, 9)
+  }
+
+  // Saldo finale della delega.
   scrivi(fmtImporto(rata.importo), 486, 125, 9)
 }

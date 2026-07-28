@@ -87,9 +87,11 @@ export interface Scadenza {
    */
   riferimenti?: RiferimentoScadenza[]
   /**
-   * Presente solo sui versamenti d'imposta rateizzabili (saldo e 1° acconto).
+   * Presente solo sui versamenti rateizzabili: saldo e 1° acconto di imposta
+   * sostitutiva, contributi Gestione separata e contributi eccedenza Art/Comm.
    * È la chiave con cui la scelta di rateazione viene salvata in
-   * CalcoloInput.rateazioniImposta (es. "saldo-2025", "acconto1-2026").
+   * CalcoloInput.rateazioniImposta (es. "saldo-2025", "acconto1-2026",
+   * "gs-saldo-2025", "ecc-acconto1-2026").
    */
   chiaveRateazione?: string
   /**
@@ -97,6 +99,11 @@ export interface Scadenza {
    * versamento (prima di maggiorazione e interessi), per riconfigurare il piano.
    */
   importoRateazioneBase?: number
+  /**
+   * Sulle righe-rata generate da una rateazione: data leggibile della scadenza
+   * originaria (prima rata ordinaria), per ricostruire le date del piano.
+   */
+  dataRateazioneBase?: string
   /**
    * Importo "consigliato" da versare, diverso dal dovuto ufficiale: tiene conto
    * di un credito della stessa gestione INPS maturato l'anno prima (versamenti
@@ -238,9 +245,11 @@ export interface CalcoloInput {
   anni: Record<number, DatiAnno>
 
   /**
-   * Scelte di rateazione dei versamenti d'imposta, per chiave (vedi
-   * Scadenza.chiaveRateazione). Assente o {inizio:'giugno', numeroRate:1}
-   * equivale al versamento unico ordinario. Globale (non per anno).
+   * Scelte di rateazione dei versamenti rateizzabili (imposte e contributi),
+   * per chiave (vedi Scadenza.chiaveRateazione). Assente o
+   * {inizio:'giugno', numeroRate:1} equivale al versamento unico ordinario.
+   * Globale (non per anno). Il nome resta "Imposta" per compatibilità con i
+   * dati già salvati in localStorage.
    */
   rateazioniImposta: Record<string, OpzioniRateazione>
 

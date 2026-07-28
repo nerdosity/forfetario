@@ -215,3 +215,49 @@ describe('calcolaScadenze — rateazione imposta', () => {
     expect(saldo[0].importo).toBeCloseTo(996.32, 2)
   })
 })
+
+describe('calcolaScadenze — rateazione contributi Gestione separata', () => {
+  const params = {
+    anno: 2025,
+    regimiCorrente: [],
+    regimiPrecedente: [],
+    saldoImposteDaVersare: 0,
+    saldoContributiGS: 1000,
+    saldoContributiEccArtComm: 0,
+    totaleImposteCorrente: 0,
+    totaleContributiSeparataCorrente: 0,
+    totaleContributiEccedenzaArtCommCorrente: 0,
+    totaleImpostePrecedente: 0,
+    accontiImposteVersatiPerAnnoPrecedente: 0,
+    totaleContributiSeparataPrecedente: 0,
+    totaleContributiEccedenzaArtCommPrecedente: 0,
+  }
+
+  it('il saldo contributi G.S. dell\'anno successivo ha chiaveRateazione gs-saldo-{anno}', () => {
+    const { scadenzeAnnoSuccessivo } = calcolaScadenze(params)
+    const saldo = scadenzeAnnoSuccessivo.filter((s) => s.chiaveRateazione === 'gs-saldo-2025')
+    expect(saldo).toHaveLength(1)
+    expect(saldo[0].importo).toBeCloseTo(1000, 2)
+  })
+
+  it('con rateazione applicata: il saldo G.S. si espande in rate la cui somma ≈ importo + interessi', () => {
+    const { scadenzeAnnoSuccessivo } = calcolaScadenze({
+      ...params,
+      rateazioniImposta: { 'gs-saldo-2025': { inizio: 'giugno', numeroRate: 6 } },
+    })
+    const rate = scadenzeAnnoSuccessivo.filter((s) => s.chiaveRateazione === 'gs-saldo-2025')
+    expect(rate).toHaveLength(6)
+    const totale = rate.reduce((s, r) => s + r.importo, 0)
+    // Somma ≈ importo originario + interessi di rateazione (pochi punti percentuali).
+    expect(totale).toBeGreaterThan(1000)
+    expect(totale).toBeLessThan(1050)
+  })
+
+  it('il 2° acconto G.S. non ha chiaveRateazione (non è rateizzabile)', () => {
+    const { scadenzeAnnoSuccessivo } = calcolaScadenze(params)
+    const acconto2 = scadenzeAnnoSuccessivo.filter((s) =>
+      (s.riferimenti ?? []).includes('gs-acconto-2'),
+    )
+    for (const s of acconto2) expect(s.chiaveRateazione).toBeUndefined()
+  })
+})

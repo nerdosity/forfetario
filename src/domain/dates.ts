@@ -76,3 +76,12 @@ export function formattaScadenza(mmGiorno: string, anno: number): string {
   const [mm, gg] = mmGiorno.split('-').map(Number)
   return `${gg} ${NOMI_MESI_ESTESI[mm - 1]} ${anno}`
 }
+
+/** Converte una data leggibile "GG Mese AAAA" in "MM-GG". Null se non riconosciuta. */
+export function mmggDaLeggibile(data: string): string | null {
+  const m = data.trim().match(/^(\d{1,2})\s+([A-Za-zàèéìòù]+)\s+\d{4}$/)
+  if (!m) return null
+  const idx = NOMI_MESI_ESTESI.findIndex((n) => n.toLowerCase() === m[2].toLowerCase())
+  if (idx < 0) return null
+  return `${String(idx + 1).padStart(2, '0')}-${m[1].padStart(2, '0')}`
+}
