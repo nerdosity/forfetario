@@ -6,6 +6,7 @@ import {
   rateazioneNeutra,
   calcolaPianoRateazione,
   espandiRateazione,
+  modalitaDaChiave,
 } from './rateazione'
 import type { Scadenza } from './types'
 import { mmggDaLeggibile } from './dates'
@@ -198,6 +199,129 @@ describe('espandiRateazione — scadenza con prima data reale diversa dal 30/06'
     expect(out[0].data).toBe('16 Giugno 2027')
     expect(out[1].data).toBe('16 Luglio 2027')
     for (const r of out) expect(r.dataRateazioneBase).toBe('16 Giugno 2027')
+  })
+})
+
+describe('calcolaPianoRateazione — modalità INPS', () => {
+  // Per i contributi (causali DPPI/API) non vale la soglia di 1,03 € del codice
+  // erariale 1668 e la maggiorazione 0,4% resta fuori dalla quota.
+
+  it('interessi dovuti dalla 2ª rata anche sotto 1,03 €', () => {
+    // 1000 € in 6 rate da giugno: quota 16666 cent, resto 4 sulla 1ª rata;
+    // rata 2 → round(16666 × 0,0018) = 30 centesimi, esposti comunque.
+    const piano = calcolaPianoRateazione(
+      1000,
+      { inizio: 'giugno', numeroRate: 6 },
+      { mmgg: '06-30', anno: 2026 },
+      'inps',
+    )
+    expect(piano.rate.map((r) => r.interessi)).toEqual([0, 0.3, 0.85, 1.4, 1.95, 2.5])
+    expect(piano.maggiorazione).toBe(0)
+    expect(piano.totaleInteressi).toBeCloseTo(7, 2)
+    expect(piano.totale).toBeCloseTo(1007, 2)
+  })
+
+  it('le stesse rate in modalità erario azzerano gli interessi sotto soglia', () => {
+    const erario = calcolaPianoRateazione(
+      1000,
+      { inizio: 'giugno', numeroRate: 6 },
+      { mmgg: '06-30', anno: 2026 },
+    )
+    expect(erario.rate.map((r) => r.interessi)).toEqual([0, 0, 0, 1.4, 1.95, 2.5])
+  })
+
+  it('inizio luglio: quota pura, maggiorazione solo sulla 1ª rata', () => {
+    // 1000 €: maggiorazione 0,4% = 400 centesimi, esposta a parte (non nella quota).
+    const piano = calcolaPianoRateazione(
+      1000,
+      { inizio: 'luglio', numeroRate: 6 },
+      { mmgg: '06-30', anno: 2026 },
+      'inps',
+    )
+    expect(piano.maggiorazione).toBeCloseTo(4, 2)
+    // Le quote ricompongono l'importo originario, senza maggiorazione dentro.
+    const sommaQuote = piano.rate.reduce((s, r) => s + r.quota, 0)
+    expect(sommaQuote).toBeCloseTo(1000, 2)
+    expect(piano.rate[0].quota).toBeCloseTo(166.7, 2)
+    expect(piano.rate[0].maggiorazione).toBeCloseTo(4, 2)
+    for (const rata of piano.rate.slice(1)) expect(rata.maggiorazione).toBeUndefined()
+    // Prima rata: quota + maggiorazione (interessi nulli sulla prima).
+    expect(piano.rate[0].importo).toBeCloseTo(170.7, 2)
+    expect(piano.rate[1].importo).toBeCloseTo(166.96, 2)
+    // Totale coerente: importo + maggiorazione + interessi.
+    expect(piano.totaleInteressi).toBeCloseTo(7, 2)
+    expect(piano.totale).toBeCloseTo(1011, 2)
+    const sommaRate = piano.rate.reduce((s, r) => s + r.importo, 0)
+    expect(sommaRate).toBeCloseTo(1011, 2)
+  })
+})
+
+describe('espandiRateazione — chiavi dei contributi INPS', () => {
+  const scadenzaGs: Scadenza = {
+    data: '30 Giugno 2026',
+    descrizione: 'Saldo contributi Gestione separata 2025',
+    categoria: 'Contributi Gestione separata',
+    voce: 'Saldo · competenza 2025',
+    importo: 1000,
+    componenti: [{ tipo: 'Saldo contributi G.S. 2025', importo: 1000 }],
+    annoScadenza: 2026,
+    riferimenti: ['gs-saldo'],
+    chiaveRateazione: 'gs-saldo-2025',
+  }
+
+  it('espone gli interessi anche piccoli, con la loro componente', () => {
+    const out = espandiRateazione(scadenzaGs, { inizio: 'giugno', numeroRate: 6 })
+    expect(out[0].componenti.map((c) => c.tipo)).toEqual(['Quota'])
+    // 0,30 € sulla 2ª rata: sotto 1,03 €, ma per l'INPS sempre dovuti.
+    expect(out[1].componenti).toEqual([
+      { tipo: 'Quota', importo: 166.66 },
+      { tipo: 'Interessi rateazione 0,18%', importo: 0.3 },
+    ])
+  })
+
+  it('inizio luglio: maggiorazione 0,4% come componente della 1ª rata', () => {
+    const out = espandiRateazione(scadenzaGs, { inizio: 'luglio', numeroRate: 6 })
+    expect(out[0].componenti).toEqual([
+      { tipo: 'Quota', importo: 166.7 },
+      { tipo: 'Maggiorazione 0,4%', importo: 4 },
+    ])
+    expect(out[0].importo).toBeCloseTo(170.7, 2)
+    // Nessuna rata successiva porta maggiorazione.
+    for (const r of out.slice(1)) {
+      expect(r.componenti.some((c) => /^Maggiorazione/.test(c.tipo))).toBe(false)
+    }
+    const totale = out.reduce((s, r) => s + r.importo, 0)
+    expect(totale).toBeCloseTo(1011, 2)
+  })
+
+  it('rata unica differita: quota pura più maggiorazione a parte', () => {
+    const out = espandiRateazione(scadenzaGs, { inizio: 'luglio', numeroRate: 1 })
+    expect(out).toHaveLength(1)
+    expect(out[0].componenti).toEqual([
+      { tipo: 'Quota', importo: 1000 },
+      { tipo: 'Maggiorazione 0,4%', importo: 4 },
+    ])
+    expect(out[0].importo).toBeCloseTo(1004, 2)
+  })
+
+  it('le chiavi d\'imposta restano in modalità erario (maggiorazione nella quota)', () => {
+    const impostaLuglio = espandiRateazione(
+      { ...scadenzaGs, chiaveRateazione: 'saldo-2025' },
+      { inizio: 'luglio', numeroRate: 1 },
+    )
+    expect(impostaLuglio[0].componenti).toEqual([
+      { tipo: 'Quota (incl. maggiorazione 0,4%)', importo: 1004 },
+    ])
+  })
+})
+
+describe('modalitaDaChiave', () => {
+  it('le chiavi gs-/ecc- sono INPS, le altre erario', () => {
+    expect(modalitaDaChiave('gs-saldo-2025')).toBe('inps')
+    expect(modalitaDaChiave('ecc-acconto1-2026')).toBe('inps')
+    expect(modalitaDaChiave('saldo-2025')).toBe('erario')
+    expect(modalitaDaChiave('acconto1-2026')).toBe('erario')
+    expect(modalitaDaChiave(undefined)).toBe('erario')
   })
 })
 

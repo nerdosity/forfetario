@@ -75,9 +75,12 @@ export function RateazioneModal({ scadenza, opzioniAttuali, onClose, onSave }: P
   const dataBase = scadenza.dataRateazioneBase ?? scadenza.data
   const mmggBase = mmggDaLeggibile(dataBase) ?? '06-30'
   const opzioni: OpzioniRateazione = { inizio, numeroRate }
-  const piano = calcolaPianoRateazione(importoBase, opzioni, { mmgg: mmggBase, anno })
-  const neutra = rateazioneNeutra(opzioni)
   const datiChiave = parseChiave(scadenza.chiaveRateazione)
+  // I contributi INPS seguono regole proprie: nessuna soglia sugli interessi e
+  // maggiorazione 0,4% esposta a parte.
+  const modalita = datiChiave && datiChiave.gestione !== 'imposta' ? 'inps' : 'erario'
+  const piano = calcolaPianoRateazione(importoBase, opzioni, { mmgg: mmggBase, anno }, modalita)
+  const neutra = rateazioneNeutra(opzioni)
 
   const aggiorna = (campo: keyof AnagraficaContribuente) => (valore: string) =>
     setAnagrafica((a) => ({ ...a, [campo]: valore }))
@@ -194,7 +197,7 @@ export function RateazioneModal({ scadenza, opzioniAttuali, onClose, onSave }: P
               <Label htmlFor="rateazione-numero" className={`${theme.labelSmall} flex items-center gap-1.5`}>
                 Numero di rate
                 <Tooltip
-                  content="Le rate successive alla prima scadono il giorno 16 di ciascun mese (il 20 ad agosto) e maturano interessi di rateazione del 4% annuo (0,33% al mese), come nel software ufficiale dell'Agenzia delle Entrate. Gli interessi di una rata non superiori a 1,03 € non sono dovuti: con importi piccoli le prime rate possono quindi risultare senza interessi. L'ultima rata cade entro il 16 dicembre."
+                  content="Le rate successive alla prima scadono il giorno 16 di ciascun mese (il 20 ad agosto) e maturano interessi di rateazione del 4% annuo (0,33% al mese), come nel software ufficiale dell'Agenzia delle Entrate. Per l'imposta sostitutiva gli interessi di una rata non superiori a 1,03 € non sono dovuti: con importi piccoli le prime rate possono quindi risultare senza interessi. Per i contributi INPS la soglia non si applica e gli interessi sono dovuti da ogni rata successiva alla prima. L'ultima rata cade entro il 16 dicembre."
                   label="Informazioni sul numero di rate"
                   posizione="sotto"
                   allinea="sinistra"
@@ -234,7 +237,11 @@ export function RateazioneModal({ scadenza, opzioniAttuali, onClose, onSave }: P
                       </TableCell>
                       <TableCell className="text-right tabular-nums">{formatEuro(rata.quota)}</TableCell>
                       <TableCell className="text-right tabular-nums text-slate-500">
-                        {rata.interessi > 0 ? `${formatEuro(rata.interessi)} (${aliquotaTesto(rata.aliquotaInteressi)})` : '—'}
+                        {rata.maggiorazione
+                          ? `${formatEuro(rata.interessi + rata.maggiorazione)} (interessi e maggiorazione)`
+                          : rata.interessi > 0
+                            ? `${formatEuro(rata.interessi)} (${aliquotaTesto(rata.aliquotaInteressi)})`
+                            : '—'}
                       </TableCell>
                       <TableCell className="text-right font-semibold tabular-nums">{formatEuro(rata.importo)}</TableCell>
                     </TableRow>

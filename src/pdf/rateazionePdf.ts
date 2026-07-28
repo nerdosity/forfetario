@@ -146,8 +146,8 @@ function disegnaRiepilogo(
 
   const opzioneTesto =
     piano.opzioni.inizio === 'giugno'
-      ? `prima scadenza ordinaria (${formattaScadenza('06-30', annoScadenza)})`
-      : `prima scadenza differita (${formattaScadenza('07-30', annoScadenza)}), maggiorazione 0,4%`
+      ? `prima scadenza ordinaria (${formattaScadenza(piano.rate[0].dataMMGG, annoScadenza)})`
+      : `prima scadenza differita (${formattaScadenza(piano.rate[0].dataMMGG, annoScadenza)}), maggiorazione 0,4%`
   const righe = [
     `Importo da rateizzare: ${euro(piano.importoOriginario)}`,
     ...(piano.maggiorazione > 0 ? [`Maggiorazione 0,4%: ${euro(piano.maggiorazione)}`] : []),
@@ -178,12 +178,17 @@ function disegnaRiepilogo(
   y -= 13
 
   for (const rata of piano.rate) {
+    // In modalità INPS la maggiorazione 0,4% non è nella quota: si somma agli
+    // interessi, come nella riga DPPI/API della delega.
+    const interessiRiga = rata.interessi + (rata.maggiorazione ?? 0)
     testo(n === 1 ? 'Unica' : `${rata.numero} di ${n}`, X_RATA, 10, helv)
     testo(formattaScadenza(rata.dataMMGG, annoScadenza), X_SCAD, 10, helv)
     aDestra(euro(rata.quota), FINE_QUOTA, 10, helv)
     aDestra(
-      rata.interessi > 0
-        ? `${euro(rata.interessi)} (${(rata.aliquotaInteressi * 100).toFixed(2).replace('.', ',')}%)`
+      interessiRiga > 0
+        ? rata.maggiorazione
+          ? `${euro(interessiRiga)} (interessi e magg.)`
+          : `${euro(rata.interessi)} (${(rata.aliquotaInteressi * 100).toFixed(2).replace('.', ',')}%)`
         : '—',
       FINE_INT,
       10,
@@ -194,9 +199,12 @@ function disegnaRiepilogo(
     pagina.drawLine({ start: { x: margine, y }, end: { x: FINE_TOT, y }, thickness: 0.4, color: GRIGIO_CHIARO })
     y -= 12
   }
+  // Somma delle colonne come sono state stampate riga per riga.
+  const totaleQuote = piano.rate.reduce((s, r) => s + r.quota, 0)
+  const totaleColonnaInteressi = piano.rate.reduce((s, r) => s + r.interessi + (r.maggiorazione ?? 0), 0)
   testo('Totale', X_RATA, 10, helvBold)
-  aDestra(euro(piano.importoOriginario + piano.maggiorazione), FINE_QUOTA, 10, helvBold)
-  aDestra(euro(piano.totaleInteressi), FINE_INT, 10, helvBold)
+  aDestra(euro(totaleQuote), FINE_QUOTA, 10, helvBold)
+  aDestra(euro(totaleColonnaInteressi), FINE_INT, 10, helvBold)
   aDestra(euro(piano.totale), FINE_TOT, 10, helvBold)
   y -= 30
 
@@ -217,7 +225,7 @@ function disegnaRiepilogo(
               : 'contributi eccedenti il minimale artigiani/commercianti'
           return [
             `Causali INPS: ${n > 1 ? c.quotaRateizzata : c.quota} (${etichetta}${n > 1 ? ', rateizzazione' : ''});`,
-            `${c.interessi} (interessi di rateazione), esposti in delega solo quando superano 1,03 euro per rata.`,
+            `${c.interessi} (interessi di rateazione ed eventuale maggiorazione 0,4% del versamento differito).`,
           ]
         })()
   const note = [
@@ -306,11 +314,14 @@ function disegnaDelega(
             importoEuro: 0,
           }) ?? ''
         : ''
+    // Interessi di rateazione e maggiorazione 0,4% del versamento differito
+    // stanno entrambi sulla riga interessi: per l'INPS non si inglobano nella quota.
+    const interessiInps = rata.interessi + (rata.maggiorazione ?? 0)
     const righe: { causale: string; codeline: string; importo: number }[] = [
       { causale: n > 1 ? c.quotaRateizzata : c.quota, codeline, importo: rata.quota },
     ]
-    if (rata.interessi > 0) {
-      righe.push({ causale: c.interessi, codeline: '', importo: rata.interessi })
+    if (interessiInps > 0) {
+      righe.push({ causale: c.interessi, codeline: '', importo: interessiInps })
     }
     righe.forEach((riga, i) => {
       const y = 485 - 12 * i

@@ -13,6 +13,13 @@ import { formattaScadenza, giorniInMese, mmggDaLeggibile } from '@/domain/dates'
  * - i calcoli avvengono in centesimi interi: quota = floor(totale/n) con il
  *   resto sulla prima rata, interessi e maggiorazione arrotondati al centesimo.
  * Le date sono quelle nominali: se festive slittano al primo giorno lavorativo.
+ *
+ * Per i contributi INPS (causali DPPI / API) valgono due regole diverse:
+ * - gli interessi di rateazione sono sempre dovuti dalla 2ª rata, anche se di
+ *   pochi centesimi (la soglia di 1,03 € è propria del codice erariale 1668);
+ * - la maggiorazione dello 0,4% del versamento differito non si ingloba nella
+ *   quota, ma si espone a parte con la causale interessi.
+ * Vedi il parametro `modalita` di calcolaPianoRateazione.
  */
 
 /** Maggiorazione dovuta versando alla scadenza differita di 30 giorni. */
@@ -21,9 +28,16 @@ export const MAGGIORAZIONE_LUGLIO = 0.004
 /**
  * Soglia (in centesimi) sotto la quale gli interessi di una rata non sono
  * dovuti: il software ufficiale non iscrive la riga interessi (codice 1668)
- * se l'importo non supera 1,03 € e lo azzera.
+ * se l'importo non supera 1,03 € e lo azzera. Vale solo per l'erario: per i
+ * contributi INPS gli interessi si espongono sempre (modalità 'inps').
  */
 const SOGLIA_INTERESSI_CENTS = 103
+
+/**
+ * Ente destinatario del versamento rateizzato, da cui dipendono soglia degli
+ * interessi e trattamento della maggiorazione 0,4%.
+ */
+export type ModalitaRateazione = 'erario' | 'inps'
 
 /** Date nominali "MM-GG" delle rate successive alla prima (il 16, 20 ad agosto). */
 const RATE_SUCCESSIVE = ['07-16', '08-20', '09-16', '10-16', '11-16', '12-16']
@@ -87,12 +101,20 @@ export interface RataPiano {
   numero: number
   /** Data nominale "MM-GG" (l'anno è quello della scadenza). */
   dataMMGG: string
-  /** Quota capitale, comprensiva della sua parte di maggiorazione. */
+  /**
+   * Quota capitale. In modalità 'erario' comprende la sua parte di
+   * maggiorazione; in modalità 'inps' è la sola quota del contributo.
+   */
   quota: number
   /** Aliquota interessi di rateazione applicata alla quota. */
   aliquotaInteressi: number
   interessi: number
-  /** Totale da versare per la rata (quota + interessi). */
+  /**
+   * Maggiorazione 0,4% esposta a parte sulla 1ª rata (solo modalità 'inps' con
+   * prima scadenza differita): per i contributi non si ingloba nella quota.
+   */
+  maggiorazione?: number
+  /** Totale da versare per la rata (quota + interessi + maggiorazione). */
   importo: number
 }
 
@@ -112,11 +134,17 @@ export interface PianoRateazione {
  * Calcola il piano di rateazione di un importo, con la stessa aritmetica del
  * software ufficiale: tutto in centesimi, quota = floor(totale/n) e resto
  * sulla prima rata, interessi arrotondati al centesimo per rata.
+ *
+ * `modalita` distingue i due enti: 'erario' ingloba la maggiorazione nelle
+ * quote e azzera gli interessi di rata sotto 1,03 €; 'inps' rateizza il solo
+ * importo del contributo, espone la maggiorazione a parte sulla prima rata e
+ * non applica alcuna soglia agli interessi.
  */
 export function calcolaPianoRateazione(
   importo: number,
   opzioni: OpzioniRateazione,
   prima: PrimaScadenza = PRIMA_DEFAULT,
+  modalita: ModalitaRateazione = 'erario',
 ): PianoRateazione {
   const opz = normalizzaOpzioni(opzioni)
   const { inizio } = opz
@@ -125,7 +153,9 @@ export function calcolaPianoRateazione(
 
   const centesimi = Math.round(importo * 100)
   const maggiorazione = inizio === 'luglio' ? Math.round(centesimi * MAGGIORAZIONE_LUGLIO) : 0
-  const daRateizzare = centesimi + maggiorazione
+  // Per l'erario la maggiorazione si ripartisce fra le quote; per l'INPS resta
+  // fuori dalla rateazione e si versa a parte con la causale interessi.
+  const daRateizzare = modalita === 'inps' ? centesimi : centesimi + maggiorazione
 
   const quotaBase = Math.floor(daRateizzare / numeroRate)
   const resto = daRateizzare - quotaBase * numeroRate
@@ -136,8 +166,11 @@ export function calcolaPianoRateazione(
     const quota = quotaBase + (i === 0 ? resto : 0)
     const aliquota = INTERESSI_RATE[inizio][i]
     const calcolati = Math.round(quota * aliquota)
-    // Sotto la soglia gli interessi della rata non sono dovuti (regola AdE).
-    const interessi = calcolati > SOGLIA_INTERESSI_CENTS ? calcolati : 0
+    // Sotto la soglia gli interessi della rata non sono dovuti (regola AdE),
+    // che però non vale per i contributi INPS.
+    const interessi =
+      modalita === 'inps' || calcolati > SOGLIA_INTERESSI_CENTS ? calcolati : 0
+    const maggiorazioneRata = modalita === 'inps' && i === 0 ? maggiorazione : 0
     totaleInteressi += interessi
     rate.push({
       numero: i + 1,
@@ -145,7 +178,8 @@ export function calcolaPianoRateazione(
       quota: quota / 100,
       aliquotaInteressi: aliquota,
       interessi: interessi / 100,
-      importo: (quota + interessi) / 100,
+      ...(maggiorazioneRata > 0 ? { maggiorazione: maggiorazioneRata / 100 } : {}),
+      importo: (quota + interessi + maggiorazioneRata) / 100,
     })
   }
 
@@ -154,9 +188,17 @@ export function calcolaPianoRateazione(
     importoOriginario: centesimi / 100,
     maggiorazione: maggiorazione / 100,
     totaleInteressi: totaleInteressi / 100,
-    totale: (daRateizzare + totaleInteressi) / 100,
+    totale: (centesimi + maggiorazione + totaleInteressi) / 100,
     rate,
   }
+}
+
+/**
+ * Modalità di rateazione dedotta dalla chiave: le chiavi dei contributi INPS
+ * ("gs-…", "ecc-…") seguono le regole INPS, tutte le altre quelle erariali.
+ */
+export function modalitaDaChiave(chiave?: string): ModalitaRateazione {
+  return chiave?.startsWith('gs-') || chiave?.startsWith('ecc-') ? 'inps' : 'erario'
 }
 
 /**
@@ -173,13 +215,18 @@ export function espandiRateazione(scadenza: Scadenza, opzioni: OpzioniRateazione
   // Il piano parte dalla data reale della scadenza (per i contributi può non
   // essere il 30/06); se non riconoscibile si ricade sull'ordinaria.
   const prima: PrimaScadenza = { mmgg: mmggDaLeggibile(scadenza.data) ?? '06-30', anno }
-  const piano = calcolaPianoRateazione(scadenza.importo, opzioni, prima)
+  const modalita = modalitaDaChiave(scadenza.chiaveRateazione)
+  const piano = calcolaPianoRateazione(scadenza.importo, opzioni, prima, modalita)
   const n = piano.opzioni.numeroRate
 
   return piano.rate.map((rata) => {
     const componenti = [
       {
-        tipo: piano.maggiorazione > 0 ? 'Quota (incl. maggiorazione 0,4%)' : 'Quota',
+        // Per l'INPS la maggiorazione è una voce a sé, non parte della quota.
+        tipo:
+          modalita === 'erario' && piano.maggiorazione > 0
+            ? 'Quota (incl. maggiorazione 0,4%)'
+            : 'Quota',
         importo: rata.quota,
       },
       ...(rata.interessi > 0
@@ -187,6 +234,9 @@ export function espandiRateazione(scadenza: Scadenza, opzioni: OpzioniRateazione
             tipo: `Interessi rateazione ${(rata.aliquotaInteressi * 100).toFixed(2).replace('.', ',')}%`,
             importo: rata.interessi,
           }]
+        : []),
+      ...(rata.maggiorazione
+        ? [{ tipo: 'Maggiorazione 0,4%', importo: rata.maggiorazione }]
         : []),
     ]
     const voceRata = n > 1 ? ` · rata ${rata.numero} di ${n}` : ' · differito di 30 giorni'

@@ -44,6 +44,42 @@ function periodoCompetenza(voce: string | undefined, annoDefault: number): { dal
   return { dal: `01/${a}`, al: `12/${a}` }
 }
 
+/** Anno di competenza letto dalla voce della scadenza (fallback: annoDefault). */
+function annoCompetenza(voce: string | undefined, annoDefault: number): number {
+  const m = (voce ?? '').match(/competenza (\d{4})/)
+  return m ? Number(m[1]) : annoDefault
+}
+
+const mmAaaa = (mese: number, anno: number) => `${String(mese).padStart(2, '0')}/${anno}`
+
+/**
+ * Periodo di riferimento della gestione separata. Gli acconti coprono l'intero
+ * anno; per il SALDO, se l'attività in gestione separata non ha coperto tutto
+ * l'anno di competenza, il periodo si restringe ai mesi effettivi.
+ */
+function periodoGestioneSeparata(
+  scad: Scadenza,
+  input: CalcoloInput,
+  annoDefault: number,
+): { dal: string; al: string } {
+  const competenza = annoCompetenza(scad.voce, annoDefault)
+  const base = { dal: mmAaaa(1, competenza), al: mmAaaa(12, competenza) }
+  if (!/^Saldo/.test(scad.voce ?? '')) return base
+  const periodi = (input.anni[competenza]?.regimi ?? []).filter((r) => r.tipo === 'separata')
+  if (periodi.length === 0) return base
+  const dal = Math.min(...periodi.map((r) => r.meseInizio))
+  const al = Math.max(...periodi.map((r) => r.meseFine))
+  if (!Number.isFinite(dal) || !Number.isFinite(al) || (dal === 1 && al === 12)) return base
+  return { dal: mmAaaa(dal, competenza), al: mmAaaa(al, competenza) }
+}
+
+/** Somma le componenti da esporre sulla riga interessi INPS (DPPI / API). */
+function sommaInteressi(scad: Scadenza): number {
+  return scad.componenti
+    .filter((c) => /^(Interessi|Maggiorazione)/.test(c.tipo))
+    .reduce((s, c) => s + c.importo, 0)
+}
+
 /** Pagina F24: genera i modelli F24 (imposte + contributi INPS). */
 export function F24Page({ anno, calcoli, input, anagrafica: anag, onVaiAiDati }: Props) {
   const matricolaValida = /^\d{8}$/.test(anag.matricolaInps)
@@ -78,7 +114,8 @@ export function F24Page({ anno, calcoli, input, anagrafica: anag, onVaiAiDati }:
     const scheda = window.open('', '_blank')
     const { dal, al } = periodoCompetenza(scad.voce, anno)
     const compQuota = scad.componenti.find((c) => /^Quota/.test(c.tipo))
-    const compInteressi = scad.componenti.find((c) => /^Interessi/.test(c.tipo))
+    // Interessi di rateazione e maggiorazione 0,4% vanno insieme sulla riga API.
+    const interessiApi = sommaInteressi(scad)
     const inps: RigaInpsF24[] = [
       {
         codiceSede: anag.sedeInps,
@@ -88,14 +125,14 @@ export function F24Page({ anno, calcoli, input, anagrafica: anag, onVaiAiDati }:
         periodoAl: al,
         importo: compQuota?.importo ?? riga.importo,
       },
-      ...(compInteressi
+      ...(interessiApi > 0
         ? [{
             codiceSede: anag.sedeInps,
             causale: 'API',
             codeline: '',
             periodoDal: dal,
             periodoAl: al,
-            importo: compInteressi.importo,
+            importo: interessiApi,
           }]
         : []),
     ]
@@ -129,12 +166,13 @@ export function F24Page({ anno, calcoli, input, anagrafica: anag, onVaiAiDati }:
   // (il versamento è riferito al codice fiscale del contribuente).
   const apriF24Gs = async (scad: Scadenza) => {
     const scheda = window.open('', '_blank')
-    const { dal, al } = periodoCompetenza(scad.voce, anno)
+    const { dal, al } = periodoGestioneSeparata(scad, input, anno)
     // Righe-rata di un piano di rateazione: causale PXXR e interessi a parte
     // con causale DPPI.
     const mRataGs = scad.voce?.match(/rata (\d+) di (\d+)/)
     const compQuota = scad.componenti.find((c) => /^Quota/.test(c.tipo))
-    const compInteressi = scad.componenti.find((c) => /^Interessi/.test(c.tipo))
+    // Interessi di rateazione e maggiorazione 0,4% vanno insieme sulla riga DPPI.
+    const interessiDppi = sommaInteressi(scad)
     const inps: RigaInpsF24[] = [
       {
         codiceSede: anag.sedeInps,
@@ -144,14 +182,14 @@ export function F24Page({ anno, calcoli, input, anagrafica: anag, onVaiAiDati }:
         periodoAl: al,
         importo: compQuota?.importo ?? scad.importo,
       },
-      ...(compInteressi
+      ...(interessiDppi > 0
         ? [{
             codiceSede: anag.sedeInps,
             causale: 'DPPI',
             codeline: '',
             periodoDal: dal,
             periodoAl: al,
-            importo: compInteressi.importo,
+            importo: interessiDppi,
           }]
         : []),
     ]
