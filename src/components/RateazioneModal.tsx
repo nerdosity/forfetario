@@ -179,7 +179,7 @@ export function RateazioneModal({ scadenza, opzioniAttuali, onClose, onSave }: P
               <Label htmlFor="rateazione-numero" className={`${theme.labelSmall} flex items-center gap-1.5`}>
                 Numero di rate
                 <Tooltip
-                  content="Le rate successive alla prima scadono il giorno 16 di ciascun mese (il 20 ad agosto) e maturano interessi di rateazione del 4% annuo (0,33% al mese), come nel software ufficiale dell'Agenzia delle Entrate. L'ultima rata cade entro il 16 dicembre."
+                  content="Le rate successive alla prima scadono il giorno 16 di ciascun mese (il 20 ad agosto) e maturano interessi di rateazione del 4% annuo (0,33% al mese), come nel software ufficiale dell'Agenzia delle Entrate. Gli interessi di una rata non superiori a 1,03 € non sono dovuti: con importi piccoli le prime rate possono quindi risultare senza interessi. L'ultima rata cade entro il 16 dicembre."
                   label="Informazioni sul numero di rate"
                   posizione="sotto"
                   allinea="sinistra"

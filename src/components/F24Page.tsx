@@ -55,10 +55,17 @@ export function F24Page({ anno, calcoli, input, anagrafica: anag, onVaiAiDati }:
   // Il minimo utile è il codice fiscale; cognome/nome completano l'intestazione.
   const haDatiPersona = anag.codiceFiscale.trim().length > 0
 
-  // Scadenze contributi (INPS) e relative codeline.
+  // Scadenze contributi artigiani/commercianti (con codeline) e relative codeline.
   const scadenzeContributi = useMemo(
     () => [...calcoli.scadenzeAnnoCorrente, ...calcoli.scadenzeAnnoSuccessivo]
       .filter((s) => /Contributi (fissi|eccedenza)/i.test(s.categoria ?? '') && s.importo > 0.005),
+    [calcoli],
+  )
+
+  // Scadenze contributi gestione separata (causale PXX, nessuna codeline).
+  const scadenzeGS = useMemo(
+    () => [...calcoli.scadenzeAnnoCorrente, ...calcoli.scadenzeAnnoSuccessivo]
+      .filter((s) => /Gestione separata/i.test(s.categoria ?? '') && s.importo > 0.005),
     [calcoli],
   )
   const righeInps: RigaCodeline[] = datiInpsCompleti
@@ -97,6 +104,35 @@ export function F24Page({ anno, calcoli, input, anagrafica: anag, onVaiAiDati }:
     else window.open(url, '_blank', 'noopener')
   }
 
+  // Genera e apre il PDF F24 di una scadenza gestione separata: sezione INPS
+  // con causale PXX (professionisti senza altra copertura previdenziale, aliquota
+  // piena — quella usata dai calcoli dell'app), campo matricola/codice INPS vuoto
+  // (il versamento è riferito al codice fiscale del contribuente).
+  const apriF24Gs = async (scad: Scadenza) => {
+    const scheda = window.open('', '_blank')
+    const { dal, al } = periodoCompetenza(scad.voce, anno)
+    const inps: RigaInpsF24 = {
+      codiceSede: anag.sedeInps,
+      causale: 'PXX',
+      codeline: '',
+      periodoDal: dal,
+      periodoAl: al,
+      importo: scad.importo,
+    }
+    const mAccontoGs = scad.voce?.match(/(\d°) acconto/)
+    const modulo: ModuloF24 = {
+      etichettaRata: mAccontoGs ? `${mAccontoGs[1].toUpperCase()} ACCONTO` : 'SALDO',
+      scadenza: scad.data,
+      erario: [],
+      inps: [inps],
+      anagrafica: anag,
+    }
+    const { generaPdfF24 } = await import('@/pdf/f24Pdf')
+    const url = await generaPdfF24([modulo], `F24 INPS ${scad.descrizione}`)
+    if (scheda) scheda.location.replace(url)
+    else window.open(url, '_blank', 'noopener')
+  }
+
   // Scadenze imposta sostitutiva (sezione erario).
   const scadenzeImposte = useMemo(
     () => [...calcoli.scadenzeAnnoCorrente, ...calcoli.scadenzeAnnoSuccessivo]
@@ -131,10 +167,19 @@ export function F24Page({ anno, calcoli, input, anagrafica: anag, onVaiAiDati }:
     else window.open(url, '_blank', 'noopener')
   }
 
-  // Dati utente mancanti per generare ciascun batch di F24.
+  // Dati utente mancanti per generare ciascun batch di F24. Gli avvisi INPS
+  // compaiono solo se esistono scadenze della gestione corrispondente.
   const mancano: string[] = []
   if (!haDatiPersona) mancano.push('il codice fiscale (per gli F24 dell’imposta sostitutiva)')
-  if (!datiInpsCompleti) mancano.push('sede, matricola e codice soggetto INPS (per gli F24 dei contributi)')
+  if (scadenzeContributi.length > 0 && !datiInpsCompleti) {
+    mancano.push('sede, matricola e codice soggetto INPS (per gli F24 dei contributi artigiani/commercianti)')
+  }
+  if (scadenzeGS.length > 0 && !sedeValida) {
+    mancano.push('il codice sede INPS (per gli F24 dei contributi gestione separata)')
+  }
+  const elencoMancanti = mancano.length <= 1
+    ? mancano[0]
+    : `${mancano.slice(0, -1).join(', ')} e ${mancano[mancano.length - 1]}`
 
   return (
     <div className="space-y-6">
@@ -146,9 +191,7 @@ export function F24Page({ anno, calcoli, input, anagrafica: anag, onVaiAiDati }:
             <div className="text-sm text-amber-800">
               <p className="font-medium">Mancano alcuni dati per compilare gli F24.</p>
               <p className="mt-0.5">
-                Inserisci {mancano.length === 1 ? mancano[0] : (
-                  <>{mancano[0]} e {mancano[1]}</>
-                )} nella sezione anagrafica.
+                Inserisci {elencoMancanti} nella sezione anagrafica.
               </p>
             </div>
           </div>
@@ -159,8 +202,9 @@ export function F24Page({ anno, calcoli, input, anagrafica: anag, onVaiAiDati }:
         </div>
       )}
 
-      {/* Contributi INPS */}
-      <Card title="Contributi INPS" icon={FileText} iconIntent="warning"
+      {/* Contributi artigiani/commercianti (nascosta se ci sono solo scadenze G.S.) */}
+      {(scadenzeContributi.length > 0 || scadenzeGS.length === 0) && (
+      <Card title="Contributi artigiani/commercianti" icon={FileText} iconIntent="warning"
         info="Modelli F24 per i contributi artigiani/commercianti, con codeline e causale precompilate.">
         {!datiInpsCompleti ? (
           <div className="flex flex-wrap items-center gap-3">
@@ -214,6 +258,48 @@ export function F24Page({ anno, calcoli, input, anagrafica: anag, onVaiAiDati }:
           </Table>
         )}
       </Card>
+      )}
+
+      {/* Contributi gestione separata */}
+      {scadenzeGS.length > 0 && (
+        <Card title="Contributi gestione separata" icon={FileText} iconIntent="warning"
+          info="Modelli F24 con causale PXX (professionisti senza altra copertura previdenziale, aliquota piena — quella usata dai calcoli). Se sei iscritto anche ad altra forma previdenziale o pensionato la causale è P10: correggila sul modello. Il campo matricola resta vuoto, il versamento è riferito al codice fiscale.">
+          <Table theme={tableTheme}>
+            <TableHead>
+              <TableRow>
+                <TableHeadCell>Contributo</TableHeadCell>
+                <TableHeadCell className="text-right">Importo</TableHeadCell>
+                <TableHeadCell className="text-center">F24</TableHeadCell>
+              </TableRow>
+            </TableHead>
+            <TableBody className="divide-y divide-slate-100">
+              {scadenzeGS.map((s, i) => {
+                const sbiadita = haVersamento(s, input) || scadutaDa30Giorni(s.data)
+                return (
+                  <TableRow key={i} className="bg-white">
+                    <TableCell className={`py-2.5 pr-4 ${sbiadita ? 'text-slate-400 line-through' : 'text-slate-700'}`}>
+                      {s.categoria}{s.voce ? ` · ${s.voce}` : ''}
+                      {s.data && <span className="block text-xs text-slate-300">entro il {s.data}</span>}
+                    </TableCell>
+                    <TableCell className={`py-2.5 text-right tabular-nums whitespace-nowrap ${sbiadita ? 'text-slate-400 line-through' : ''}`}>{formatEuro(s.importo)}</TableCell>
+                    <TableCell className="py-2.5">
+                      <div className="flex w-full justify-center">
+                        <button
+                          onClick={() => apriF24Gs(s)}
+                          title="Scarica modello F24"
+                          className="inline-flex items-center justify-center rounded-md border border-blue-200 bg-blue-50 p-1.5 text-blue-600 transition-colors hover:bg-blue-100"
+                        >
+                          <FileDown size={15} aria-hidden />
+                        </button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )
+              })}
+            </TableBody>
+          </Table>
+        </Card>
+      )}
 
       {/* Imposta sostitutiva */}
       {scadenzeImposte.length > 0 && (
