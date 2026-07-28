@@ -385,3 +385,183 @@ describe('calcolaScadenze — rateazione contributi Gestione separata', () => {
     for (const s of acconto2) expect(s.chiaveRateazione).toBeUndefined()
   })
 })
+
+// ---------------------------------------------------------------------------
+// Fallback sugli acconti VERSATI quando i dovuti non sono calcolabili
+// ---------------------------------------------------------------------------
+
+/** CalcoloInput con i soli versamenti di dettaglio di un anno solare. */
+function inputVersamenti(anno: number, versamenti: VersamentoContributo[]): CalcoloInput {
+  return {
+    anno,
+    anni: {
+      [anno]: {
+        regimi: [],
+        modalitaContributi: 'dettaglio',
+        contributiVersati: versamenti,
+        contributiVersatiTotale: null,
+        impostaSaldoVersato: null,
+        impostaAcconto1Versato: null,
+        impostaAcconto2Versato: null,
+      },
+    },
+    rateazioniImposta: {},
+  }
+}
+
+const NOTA_FALLBACK =
+  'Saldo calcolato sottraendo gli acconti versati inseriti: aggiungi i dati ' +
+  'dell\'anno precedente per il calcolo degli acconti con il metodo INPS.'
+
+describe('calcolaScadenze — fallback sugli acconti versati', () => {
+  const base = {
+    anno: 2025,
+    regimiCorrente: [],
+    regimiPrecedente: [],
+    saldoImposteDaVersare: 0,
+    saldoContributiGS: 0,
+    saldoContributiEccArtComm: 0,
+    totaleImposteCorrente: 0,
+    totaleImpostePrecedente: 0,
+    accontiImposteVersatiPerAnnoPrecedente: 0,
+    totaleContributiSeparataPrecedente: 0,
+    totaleContributiEccedenzaArtCommPrecedente: 0,
+  }
+
+  const saldoGS2025 = (s: Scadenza[]) => s.find((x) => x.chiaveRateazione === 'gs-saldo-2025')
+  const saldoEcc2025 = (s: Scadenza[]) => s.find((x) => x.chiaveRateazione === 'ecc-saldo-2025')
+
+  it('G.S. competenza 2025: senza dati 2024 il saldo si netta con gli acconti versati', () => {
+    // Scenario dell'utente: compilato solo il 2025, acconti pagati inseriti nel
+    // 2025. Senza il 2024 gli acconti DOVUTI valgono 0 → il saldo sarebbe pieno.
+    const { scadenzeAnnoSuccessivo } = calcolaScadenze({
+      ...base,
+      saldoContributiGS: 5000, // dovuto pieno: nessun acconto dovuto calcolabile
+      totaleContributiSeparataDovutoCorrente: 5000,
+      accontiGSVersatiNelCorrente: 0,
+      input: inputVersamenti(2025, [
+        { id: 'a', tipo: 'gs-acconto-1', descrizione: '', importo: 1500 },
+        { id: 'b', tipo: 'gs-acconto-2', descrizione: '', importo: 1500 },
+      ]),
+    })
+    const s = saldoGS2025(scadenzeAnnoSuccessivo)
+    expect(s).toBeDefined()
+    expect(s!.importo).toBeCloseTo(2000, 2) // 5000 - 3000 versati
+    expect(s!.componenti).toEqual([
+      { tipo: 'Totale dovuto 2025', importo: 5000 },
+      { tipo: 'Acconti già versati nell\'anno', importo: -3000 },
+    ])
+    expect(s!.nota).toBe(NOTA_FALLBACK)
+  })
+
+  it('eccedenza Art/Comm competenza 2025: stesso fallback sugli acconti versati', () => {
+    const { scadenzeAnnoSuccessivo } = calcolaScadenze({
+      ...base,
+      saldoContributiEccArtComm: 2496,
+      totaleContributiEccArtCommDovutoCorrente: 2496,
+      accontiEccVersatiNelCorrente: 0,
+      input: inputVersamenti(2025, [
+        { id: 'a', tipo: 'ecc-acconto-1', descrizione: '', importo: 636.32 },
+        { id: 'b', tipo: 'ecc-acconto-2', descrizione: '', importo: 636.33 },
+      ]),
+    })
+    const s = saldoEcc2025(scadenzeAnnoSuccessivo)
+    expect(s).toBeDefined()
+    expect(s!.importo).toBeCloseTo(1223.35, 2)
+    expect(s!.nota).toBe(NOTA_FALLBACK)
+  })
+
+  it('acconti versati ≥ dovuto → nessuna scadenza di saldo', () => {
+    const { scadenzeAnnoSuccessivo } = calcolaScadenze({
+      ...base,
+      saldoContributiGS: 3000,
+      totaleContributiSeparataDovutoCorrente: 3000,
+      accontiGSVersatiNelCorrente: 0,
+      input: inputVersamenti(2025, [
+        { id: 'a', tipo: 'gs-acconto-1', descrizione: '', importo: 3000 },
+      ]),
+    })
+    expect(saldoGS2025(scadenzeAnnoSuccessivo)).toBeUndefined()
+  })
+
+  it('controprova: con gli acconti DOVUTI calcolabili il fallback non scatta', () => {
+    // I versamenti reali (3000) non devono toccare il saldo: resta dovuto-dovuti.
+    const { scadenzeAnnoSuccessivo } = calcolaScadenze({
+      ...base,
+      saldoContributiGS: 1000,
+      totaleContributiSeparataDovutoCorrente: 5000,
+      accontiGSVersatiNelCorrente: 4000,
+      input: inputVersamenti(2025, [
+        { id: 'a', tipo: 'gs-acconto-1', descrizione: '', importo: 1500 },
+        { id: 'b', tipo: 'gs-acconto-2', descrizione: '', importo: 1500 },
+      ]),
+    })
+    const s = saldoGS2025(scadenzeAnnoSuccessivo)!
+    expect(s.importo).toBeCloseTo(1000, 2)
+    expect(s.componenti).toEqual([
+      { tipo: 'Totale dovuto 2025', importo: 5000 },
+      { tipo: 'Acconti già versati nell\'anno', importo: -4000 },
+    ])
+    expect(s.nota).toBeUndefined()
+  })
+
+  it('in modalità cifra unica il fallback non scatta (acconti non ricavabili)', () => {
+    const { scadenzeAnnoSuccessivo } = calcolaScadenze({
+      ...base,
+      saldoContributiGS: 5000,
+      totaleContributiSeparataDovutoCorrente: 5000,
+      accontiGSVersatiNelCorrente: 0,
+      input: {
+        anno: 2025,
+        anni: {
+          2025: {
+            regimi: [],
+            modalitaContributi: 'totale',
+            contributiVersati: [],
+            contributiVersatiTotale: 3000,
+            impostaSaldoVersato: null,
+            impostaAcconto1Versato: null,
+            impostaAcconto2Versato: null,
+          },
+        },
+        rateazioniImposta: {},
+      },
+    })
+    const s = saldoGS2025(scadenzeAnnoSuccessivo)!
+    expect(s.importo).toBeCloseTo(5000, 2)
+    expect(s.nota).toBeUndefined()
+  })
+
+  it('saldo competenza 2024 mostrato nel 2025: stesso fallback', () => {
+    const { scadenzeAnnoCorrente } = calcolaScadenze({
+      ...base,
+      totaleContributiSeparataPrecedente: 4000,
+      saldoContributiGSPrecedente: 4000,
+      accontiGSDovutiPerPrecedente: 0,
+      input: inputVersamenti(2024, [
+        { id: 'a', tipo: 'gs-acconto-1', descrizione: '', importo: 1000 },
+        { id: 'b', tipo: 'gs-acconto-2', descrizione: '', importo: 1000 },
+      ]),
+    })
+    const s = scadenzeAnnoCorrente.find((x) => x.chiaveRateazione === 'gs-saldo-2024')!
+    expect(s.importo).toBeCloseTo(2000, 2)
+    expect(s.nota).toBe(NOTA_FALLBACK)
+  })
+
+  it('la nota non collide con i pattern F24 (Quota / Interessi / Maggiorazione)', () => {
+    const { scadenzeAnnoSuccessivo } = calcolaScadenze({
+      ...base,
+      saldoContributiGS: 5000,
+      totaleContributiSeparataDovutoCorrente: 5000,
+      accontiGSVersatiNelCorrente: 0,
+      input: inputVersamenti(2025, [
+        { id: 'a', tipo: 'gs-acconto-1', descrizione: '', importo: 3000 },
+      ]),
+    })
+    const s = saldoGS2025(scadenzeAnnoSuccessivo)!
+    for (const c of s.componenti) {
+      expect(/^Quota/.test(c.tipo)).toBe(false)
+      expect(/^(Interessi|Maggiorazione)/.test(c.tipo)).toBe(false)
+    }
+  })
+})

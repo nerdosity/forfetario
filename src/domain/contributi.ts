@@ -34,18 +34,40 @@ export function contributiVersatiEffettivi(dati: DatiAnno): number {
 }
 
 /**
+ * Somma i versamenti dei tipi indicati dalla lista di dettaglio di un anno.
+ * Restituisce null se l'anno non è in modalità 'dettaglio' (o non esiste): dalla
+ * cifra unica non si ricava a quale voce si riferisce il versamento. La
+ * deducibilità non entra: qui conta solo il tipo della riga (un contributo non
+ * deducibile resta comunque un acconto versato su quella gestione).
+ *
+ * Lettura unica condivisa da quadro RR della dichiarazione, acconti reali del
+ * motore e fallback dei saldi contributi: tenere una sola fonte evita che le
+ * viste divergano sullo stesso dato.
+ */
+export function versatiDaDettaglio(
+  dati: DatiAnno | undefined,
+  tipi: TipoVersamento[],
+): number | null {
+  if (!dati || dati.modalitaContributi !== 'dettaglio') return null
+  return dati.contributiVersati
+    .filter((r) => tipi.includes(r.tipo))
+    .reduce((s, r) => s + (r.importo ?? 0), 0)
+}
+
+/** Tipi di versamento che rappresentano gli acconti di una categoria contributiva. */
+export const TIPI_ACCONTO: Record<'gs' | 'ecc', TipoVersamento[]> = {
+  gs: ['gs-acconto-1', 'gs-acconto-2'],
+  ecc: ['ecc-acconto-1', 'ecc-acconto-2'],
+}
+
+/**
  * Somma degli acconti versati per una categoria, estratti dalla lista di
  * dettaglio (solo in modalità 'dettaglio'). Ogni acconto ha due rate (giugno e
  * novembre): le sommiamo entrambe. In modalità 'cifra unica' non c'è dettaglio,
  * quindi 0.
  */
 export function accontoVersatoDaLista(dati: DatiAnno, categoria: 'gs' | 'ecc'): number {
-  if (dati.modalitaContributi !== 'dettaglio') return 0
-  const tipi: TipoVersamento[] =
-    categoria === 'gs' ? ['gs-acconto-1', 'gs-acconto-2'] : ['ecc-acconto-1', 'ecc-acconto-2']
-  return dati.contributiVersati
-    .filter((r) => tipi.includes(r.tipo))
-    .reduce((s, r) => s + (r.importo ?? 0), 0)
+  return versatiDaDettaglio(dati, TIPI_ACCONTO[categoria]) ?? 0
 }
 
 /** Reddito imponibile (fatturato × coefficiente) di un regime. */

@@ -204,6 +204,7 @@ function TabellaScadenze({ titolo, sottotitolo, scadenze, input, mostraBilancio,
                           />
                         )}
                         {dettaglio && <Tooltip content={dettaglio} label="Dettaglio componenti" />}
+                        {s.nota && <Tooltip content={s.nota} label="Come è calcolato l'importo" />}
                       </span>
                     </TableCell>
                     {hasRateazione && (

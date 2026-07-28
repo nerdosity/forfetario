@@ -337,3 +337,65 @@ describe('calcola — nuovo utente (stato vuoto, nessun dato)', () => {
     expect(conRegime.scadenzeAnnoSuccessivo.length).toBeGreaterThan(0)
   })
 })
+
+describe('coerenza calendario/dichiarazione senza dati storici', () => {
+  // Scenario reale segnalato: compilato SOLO il 2025 (gestione separata), con gli
+  // acconti pagati inseriti nella scheda 2025. Senza il 2024 la base degli acconti
+  // DOVUTI non è calcolabile: il saldo si netta con gli acconti VERSATI, così
+  // calendario/F24 e sezione dichiarazione mostrano lo stesso importo.
+  const input2025: CalcoloInput = {
+    anno: 2025,
+    anni: {
+      2025: {
+        regimi: [{ ...regimeSeparata, fatturato: 36000 }],
+        modalitaContributi: 'dettaglio',
+        contributiVersatiTotale: null,
+        contributiVersati: [
+          { id: 'a', tipo: 'gs-acconto-1', descrizione: '', importo: 1500 },
+          { id: 'b', tipo: 'gs-acconto-2', descrizione: '', importo: 1500 },
+        ],
+        impostaSaldoVersato: null,
+        impostaAcconto1Versato: null,
+        impostaAcconto2Versato: null,
+      },
+    },
+    rateazioniImposta: {},
+  }
+
+  it('il saldo G.S. di calendario coincide con dovuto − acconti versati', () => {
+    const r = calcola(input2025)
+    const saldo = r.scadenzeAnnoSuccessivo.find(
+      (s) => s.chiaveRateazione === 'gs-saldo-2025',
+    )
+    expect(saldo).toBeDefined()
+    // La dichiarazione (quadro RR) netta gli acconti realmente versati: 3000.
+    const attesoDichiarazione = r.totaleContributiSeparata - 3000
+    expect(saldo!.importo).toBeCloseTo(attesoDichiarazione, 2)
+    expect(saldo!.nota).toBeDefined()
+  })
+
+  it('con i dati 2024 presenti il fallback non scatta e la nota non compare', () => {
+    const conStorico: CalcoloInput = {
+      ...input2025,
+      anni: {
+        ...input2025.anni,
+        2024: {
+          regimi: [{ ...regimeSeparata, id: 'p', fatturato: 36000 }],
+          modalitaContributi: 'totale',
+          contributiVersatiTotale: null,
+          contributiVersati: [],
+          impostaSaldoVersato: null,
+          impostaAcconto1Versato: null,
+          impostaAcconto2Versato: null,
+        },
+      },
+    }
+    const r = calcola(conStorico)
+    const saldo = r.scadenzeAnnoSuccessivo.find(
+      (s) => s.chiaveRateazione === 'gs-saldo-2025',
+    )
+    // Acconti DOVUTI calcolabili (80% del dovuto 2024): regola ordinaria.
+    expect(r.accontiGSVersatiPerAnnoRif).toBeGreaterThan(0)
+    if (saldo) expect(saldo.nota).toBeUndefined()
+  })
+})

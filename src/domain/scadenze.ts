@@ -2,7 +2,7 @@ import type { CalcoloInput, ComponenteScadenza, OpzioniRateazione, Regime, Scade
 import { datiDellAnno } from '@/domain/types'
 import { datiAnno, anniDisponibili, type ScadenzeAnno } from '@/data/taxData'
 import { proiettaDatiAnno } from '@/data/proiezioneAnno'
-import { calcolaRateContributiFissi, applicaRiduzioneIVS, baseEccedenzaAcconto } from '@/domain/contributi'
+import { calcolaRateContributiFissi, applicaRiduzioneIVS, baseEccedenzaAcconto, versatiDaDettaglio, TIPI_ACCONTO } from '@/domain/contributi'
 import { espandiRateazione } from '@/domain/rateazione'
 import { formattaScadenza } from '@/domain/dates'
 import { labelTipo } from '@/domain/labels'
@@ -249,6 +249,50 @@ export function calcolaScadenze({
   }
 
   /**
+   * Nota mostrata SOLO quando il saldo è stato calcolato col fallback: senza i
+   * dati dell'anno precedente alla competenza gli acconti dovuti col metodo INPS
+   * non sono calcolabili, quindi si nettano gli acconti realmente versati.
+   */
+  const NOTA_FALLBACK_VERSATI =
+    'Saldo calcolato sottraendo gli acconti versati inseriti: aggiungi i dati ' +
+    'dell\'anno precedente per il calcolo degli acconti con il metodo INPS.'
+
+  /**
+   * Saldo contributi di una competenza, con fallback sugli acconti VERSATI.
+   *
+   * Regola ordinaria (INPS): saldo = dovuto − acconti DOVUTI (80% sulla base
+   * dell'anno precedente alla competenza). Quando quella base manca o è zero —
+   * tipicamente perché l'utente non ha compilato l'anno precedente — gli acconti
+   * dovuti non sono calcolabili e il saldo risulterebbe PIENO, in contrasto con
+   * la sezione dichiarazione che netta i versamenti realmente inseriti. In quel
+   * caso si ripiega sugli acconti versati letti dall'anno di COMPETENZA con la
+   * stessa funzione usata dalla dichiarazione (versatiDaDettaglio), e si dichiara
+   * la base usata nella nota.
+   *
+   * Quando gli acconti dovuti ci sono, nulla cambia rispetto al comportamento
+   * ordinario: nessun fallback, nessuna nota.
+   */
+  const saldoConFallback = (
+    saldoUfficiale: number,
+    dovuto: number | undefined,
+    accontiDovuti: number | undefined,
+    annoCompetenza: number,
+    categoria: 'gs' | 'ecc',
+  ): { importo: number; acconti: number | undefined; fallback: boolean } => {
+    const ordinario = { importo: saldoUfficiale, acconti: accontiDovuti, fallback: false }
+    // Acconti dovuti calcolabili → regola ordinaria, invariata.
+    if (accontiDovuti != null && accontiDovuti > 0.005) return ordinario
+    if (dovuto == null || !input) return ordinario
+
+    // Gli acconti si versano DURANTE l'anno di competenza: si leggono da lì, con
+    // la stessa lettura della dichiarazione (null = modalità cifra unica).
+    const versati = versatiDaDettaglio(input.anni[annoCompetenza], TIPI_ACCONTO[categoria])
+    if (versati == null || versati <= 0.005) return ordinario
+
+    return { importo: Math.max(0, dovuto - versati), acconti: versati, fallback: true }
+  }
+
+  /**
    * Applica a una scadenza di saldo contributi l'eventuale credito della stessa
    * gestione INPS maturato l'anno corrente. Imposta importoConsigliato (può
    * essere negativo = credito residuo) e una nota; lascia invariato l'importo
@@ -362,47 +406,60 @@ export function calcolaScadenze({
   // Importo NETTO: dovuto di N-1 meno gli acconti dovuti per N-1 (stessa regola
   // del saldo dell'anno corrente). Se il netto è ≤ 0 gli acconti coprono già
   // tutto e la scadenza non si emette.
-  const saldoGSPrec = saldoContributiGSPrecedente ?? totaleContributiSeparataPrecedente
-  if (saldoGSPrec > 0.005) {
+  const gsPrec = saldoConFallback(
+    saldoContributiGSPrecedente ?? totaleContributiSeparataPrecedente,
+    totaleContributiSeparataPrecedente,
+    accontiGSDovutiPerPrecedente,
+    annoPrec,
+    'gs',
+  )
+  if (gsPrec.importo > 0.005) {
     pushRateizzabile({
       data: formattaScadenza(dCorr.saldoContributi, anno),
       descrizione: `Saldo contributi Gestione separata ${annoPrec}`,
       categoria: 'Contributi Gestione separata',
       voce: `Saldo · competenza ${annoPrec}`,
-      importo: saldoGSPrec,
+      importo: gsPrec.importo,
       componenti: componentiSaldo(
         `Saldo contributi G.S. ${annoPrec}`,
-        saldoGSPrec,
+        gsPrec.importo,
         totaleContributiSeparataPrecedente,
-        accontiGSDovutiPerPrecedente,
+        gsPrec.acconti,
         annoPrec,
       ),
       annoScadenza: anno,
       riferimenti: ['gs-saldo'],
       chiaveRateazione: `gs-saldo-${annoPrec}`,
+      ...(gsPrec.fallback ? { nota: NOTA_FALLBACK_VERSATI } : {}),
     })
   }
 
   // ─── Saldo contributi eccedenza Art/Comm anno precedente (giugno anno corr.) ──
-  const saldoEccPrec =
-    saldoContributiEccArtCommPrecedente ?? totaleContributiEccedenzaArtCommPrecedente
-  if (saldoEccPrec > 0.005) {
+  const eccPrec = saldoConFallback(
+    saldoContributiEccArtCommPrecedente ?? totaleContributiEccedenzaArtCommPrecedente,
+    totaleContributiEccedenzaArtCommPrecedente,
+    accontiEccDovutiPerPrecedente,
+    annoPrec,
+    'ecc',
+  )
+  if (eccPrec.importo > 0.005) {
     pushRateizzabile({
       data: formattaScadenza(dCorr.saldoContributi, anno),
       descrizione: `Saldo contributi eccedenza artigiani/commercianti ${annoPrec}`,
       categoria: 'Contributi eccedenza artigiani/commercianti',
       voce: `Saldo · competenza ${annoPrec}`,
-      importo: saldoEccPrec,
+      importo: eccPrec.importo,
       componenti: componentiSaldo(
         `Saldo contributi ecc. Art/Comm ${annoPrec}`,
-        saldoEccPrec,
+        eccPrec.importo,
         totaleContributiEccedenzaArtCommPrecedente,
-        accontiEccDovutiPerPrecedente,
+        eccPrec.acconti,
         annoPrec,
       ),
       annoScadenza: anno,
       riferimenti: ['ecc-saldo'],
       chiaveRateazione: `ecc-saldo-${annoPrec}`,
+      ...(eccPrec.fallback ? { nota: NOTA_FALLBACK_VERSATI } : {}),
     })
   }
 
@@ -631,23 +688,31 @@ export function calcolaScadenze({
 
   // Scadenze sul reddito (G.S.) dell'anno successivo, in ordine: saldo → acconti.
   const scadenzeGSSucc: Scadenza[] = []
-  if (saldoContributiGS > 0) {
+  const gsCorr = saldoConFallback(
+    saldoContributiGS,
+    totaleContributiSeparataDovutoCorrente,
+    accontiGSVersatiNelCorrente,
+    anno,
+    'gs',
+  )
+  if (gsCorr.importo > 0.005) {
     scadenzeGSSucc.push({
       data: formattaScadenza(dSucc.saldoContributi, annoSucc),
       descrizione: `Saldo contributi Gestione separata ${anno}`,
       categoria: 'Contributi Gestione separata',
       voce: `Saldo · competenza ${anno}`,
-      importo: saldoContributiGS,
+      importo: gsCorr.importo,
       componenti: componentiSaldo(
         `Saldo contributi G.S. ${anno}`,
-        saldoContributiGS,
+        gsCorr.importo,
         totaleContributiSeparataDovutoCorrente,
-        accontiGSVersatiNelCorrente,
+        gsCorr.acconti,
         anno,
       ),
       annoScadenza: annoSucc,
       riferimenti: ['gs-saldo'],
       chiaveRateazione: `gs-saldo-${anno}`,
+      ...(gsCorr.fallback ? { nota: NOTA_FALLBACK_VERSATI } : {}),
     })
   }
   if (accontoGSAnnoSuccTot > 0) {
@@ -690,23 +755,31 @@ export function calcolaScadenze({
   // saldo competenza anno → 1° acconto → 2° acconto. Il conguaglio si applica
   // alla prima non ancora pagata.
   const scadenzeEccSucc: Scadenza[] = []
-  if (saldoContributiEccArtComm > 0) {
+  const eccCorr = saldoConFallback(
+    saldoContributiEccArtComm,
+    totaleContributiEccArtCommDovutoCorrente,
+    accontiEccVersatiNelCorrente,
+    anno,
+    'ecc',
+  )
+  if (eccCorr.importo > 0.005) {
     scadenzeEccSucc.push({
       data: formattaScadenza(dSucc.saldoContributi, annoSucc),
       descrizione: `Saldo contributi eccedenza artigiani/commercianti ${anno}`,
       categoria: 'Contributi eccedenza artigiani/commercianti',
       voce: `Saldo · competenza ${anno}`,
-      importo: saldoContributiEccArtComm,
+      importo: eccCorr.importo,
       componenti: componentiSaldo(
         `Saldo contributi ecc. Art/Comm ${anno}`,
-        saldoContributiEccArtComm,
+        eccCorr.importo,
         totaleContributiEccArtCommDovutoCorrente,
-        accontiEccVersatiNelCorrente,
+        eccCorr.acconti,
         anno,
       ),
       annoScadenza: annoSucc,
       riferimenti: ['ecc-saldo'],
       chiaveRateazione: `ecc-saldo-${anno}`,
+      ...(eccCorr.fallback ? { nota: NOTA_FALLBACK_VERSATI } : {}),
     })
   }
   if (accontoEccAnnoSuccTot > 0) {

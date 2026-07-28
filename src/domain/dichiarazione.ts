@@ -1,5 +1,6 @@
-import type { CalcoloInput, DatiAnno, RisultatoCalcolo, TipoVersamento } from '@/domain/types'
+import type { CalcoloInput, RisultatoCalcolo } from '@/domain/types'
 import { datiAnno as datiFiscaliAnno, contributoFissoAnno } from '@/data/taxData'
+import { versatiDaDettaglio, TIPI_ACCONTO } from '@/domain/contributi'
 import type { AnagraficaContribuente } from '@/data/anagraficaStorage'
 import { generaCodeline } from '@/domain/codelineInps'
 
@@ -67,18 +68,6 @@ export interface RighiDichiarazione {
 
 /** Arrotonda all'unità di euro, come richiesto dal modello dichiarativo. */
 const eu = (n: number): number => Math.round(n)
-
-/**
- * Somma i versamenti dei tipi indicati dalla lista di dettaglio di un anno.
- * Restituisce null se l'anno non è in modalità 'dettaglio' (o non esiste):
- * dalla cifra unica non si ricava lo spacco minimale/eccedenza del quadro RR.
- */
-function versatiDaDettaglio(dati: DatiAnno | undefined, tipi: TipoVersamento[]): number | null {
-  if (!dati || dati.modalitaContributi !== 'dettaglio') return null
-  return dati.contributiVersati
-    .filter((r) => tipi.includes(r.tipo))
-    .reduce((s, r) => s + (r.importo ?? 0), 0)
-}
 
 /**
  * Costruisce i righi della dichiarazione dai risultati del calcolo.
@@ -633,7 +622,7 @@ function generaQuadroRRSeparata(
 
   const aliquota = periodi[0].aliquotaContributi
   const dovuto = calcoli.totaleContributiSeparata
-  const acconti = versatiDaDettaglio(input.anni[anno], ['gs-acconto-1', 'gs-acconto-2'])
+  const acconti = versatiDaDettaglio(input.anni[anno], TIPI_ACCONTO.gs)
 
   const campi: CampoDichiarazione[] = [
     {

@@ -249,6 +249,8 @@ export function espandiRateazione(scadenza: Scadenza, opzioni: OpzioniRateazione
       componenti,
       annoScadenza: anno,
       stimata: scadenza.stimata,
+      // La nota metodologica sull'importo dovuto vale anche per le sue rate.
+      ...(scadenza.nota ? { nota: scadenza.nota } : {}),
       chiaveRateazione: scadenza.chiaveRateazione,
       importoRateazioneBase: scadenza.importo,
       dataRateazioneBase: scadenza.data,

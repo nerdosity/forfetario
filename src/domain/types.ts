@@ -113,6 +113,15 @@ export interface Scadenza {
   importoConsigliato?: number
   /** Nota che spiega come si ottiene importoConsigliato. */
   notaConsigliato?: string
+  /**
+   * Nota metodologica sull'importo DOVUTO: dichiara su quale base è stato
+   * calcolato quando non si è potuto seguire la regola ordinaria. Oggi la
+   * imposta il fallback dei saldi contributi, quando mancano i dati dell'anno
+   * precedente alla competenza e gli acconti dovuti col metodo INPS non sono
+   * calcolabili: il saldo si netta allora con gli acconti realmente versati.
+   * Diversa da notaConsigliato, che riguarda un importo alternativo da versare.
+   */
+  nota?: string
 }
 
 /**
