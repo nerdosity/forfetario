@@ -88,10 +88,32 @@ function statoScadenza(data: string): Stato {
   return giorniMancanti <= 30 ? 'in-scadenza' : 'prevista'
 }
 
-/** Mostra il dettaglio componenti solo se aggiunge informazione. */
+/**
+ * Riga di una componente del dettaglio. Le componenti NEGATIVE sono voci che si
+ * sottraggono dal dovuto (tipicamente gli acconti già versati): si rendono con
+ * il segno meno staccato e il valore assoluto, così si leggono come una
+ * detrazione e non come un importo negativo da versare.
+ */
+function rigaComponente(c: { tipo: string; importo: number }): string {
+  return c.importo < -0.005
+    ? `${c.tipo}: − ${formatEuro(-c.importo)}`
+    : `${c.tipo}: ${formatEuro(c.importo)}`
+}
+
+/**
+ * Mostra il dettaglio componenti solo se aggiunge informazione. Con più
+ * componenti si chiude con il totale, così il conto (dovuto − detrazioni) è
+ * verificabile a colpo d'occhio.
+ */
 function dettaglioUtile(s: Scadenza): string | null {
-  if (s.componenti.length > 1 || (s.componenti.length === 1 && Math.abs(s.componenti[0].importo - s.importo) > 0.005)) {
-    return s.componenti.map((c) => `${c.tipo}: ${formatEuro(c.importo)}`).join('\n')
+  if (s.componenti.length > 1) {
+    return [
+      ...s.componenti.map(rigaComponente),
+      `Totale da versare: ${formatEuro(s.importo)}`,
+    ].join('\n')
+  }
+  if (s.componenti.length === 1 && Math.abs(s.componenti[0].importo - s.importo) > 0.005) {
+    return rigaComponente(s.componenti[0])
   }
   return null
 }

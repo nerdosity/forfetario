@@ -399,3 +399,103 @@ describe('coerenza calendario/dichiarazione senza dati storici', () => {
     if (saldo) expect(saldo.nota).toBeUndefined()
   })
 })
+
+describe('scenario tester: versamenti solo nella scheda 2024, anno rif. 2025', () => {
+  // Segnalazione reale (gestione separata): l'utente compila SOLO il 2024 con il
+  // saldo G.S. 2023 e i due acconti G.S. 2024 (totale acconti 762,63 €), e non
+  // inserisce nulla nel 2025. Senza i dati 2023 gli acconti DOVUTI per il 2024
+  // non sono calcolabili → il saldo 2024 si netta con gli acconti VERSATI nel 2024.
+  const conVersamenti2024 = (fatturato: number): CalcoloInput => ({
+    anno: 2025,
+    anni: {
+      2024: {
+        regimi: [{ ...regimeSeparata, id: 'p24', fatturato }],
+        modalitaContributi: 'dettaglio',
+        contributiVersatiTotale: null,
+        contributiVersati: [
+          { id: 's', tipo: 'gs-saldo', descrizione: 'saldo G.S. 2023', importo: 500 },
+          { id: 'a1', tipo: 'gs-acconto-1', descrizione: '', importo: 381.31 },
+          { id: 'a2', tipo: 'gs-acconto-2', descrizione: '', importo: 381.32 },
+        ],
+        impostaSaldoVersato: null,
+        impostaAcconto1Versato: null,
+        impostaAcconto2Versato: null,
+      },
+      2025: {
+        regimi: [{ ...regimeSeparata, id: 'p25', fatturato }],
+        modalitaContributi: 'dettaglio',
+        contributiVersatiTotale: null,
+        contributiVersati: [],
+        impostaSaldoVersato: null,
+        impostaAcconto1Versato: null,
+        impostaAcconto2Versato: null,
+      },
+    },
+    rateazioniImposta: {},
+  })
+
+  const saldoGs2024 = (r: ReturnType<typeof calcola>) =>
+    r.scadenzeAnnoCorrente.find((s) => s.chiaveRateazione === 'gs-saldo-2024')
+
+  it('il saldo G.S. 2024 è netto degli acconti versati nel 2024, con la componente negativa', () => {
+    const r = calcola(conVersamenti2024(36000))
+    const saldo = saldoGs2024(r)
+    expect(saldo).toBeDefined()
+
+    const dovuto = r.datiAnnoPrecedente.totaleContributiSeparata
+    expect(saldo!.importo).toBeCloseTo(dovuto - 762.63, 2)
+
+    // Breakdown: dovuto pieno + acconti versati con importo NEGATIVO (detrazione).
+    const acconti = saldo!.componenti.find((c) => /Acconti già versati/.test(c.tipo))
+    expect(acconti).toBeDefined()
+    expect(acconti!.importo).toBeCloseTo(-762.63, 2)
+    expect(saldo!.componenti.find((c) => /Totale dovuto 2024/.test(c.tipo))!.importo).toBeCloseTo(dovuto, 2)
+    // Fallback dichiarato: senza i dati 2023 la base INPS non è calcolabile.
+    expect(saldo!.nota).toBeDefined()
+  })
+
+  it('se gli acconti versati coprono il dovuto il saldo non viene emesso (niente F24)', () => {
+    // Fatturato basso: dovuto G.S. 2024 < 762,63 € → netto ≤ 0.
+    const r = calcola(conVersamenti2024(3000))
+    expect(r.datiAnnoPrecedente.totaleContributiSeparata).toBeLessThan(762.63)
+    expect(saldoGs2024(r)).toBeUndefined()
+  })
+})
+
+describe('SaldiCrediti legge lo stesso saldo del calendario', () => {
+  // Regressione: con il fallback attivo la sezione "Saldi e crediti" mostrava il
+  // dovuto PIENO (acconti dovuti = 0) mentre calendario e F24 esponevano il netto.
+  // La sezione ora legge la scadenza di saldo, unica fonte del netting.
+  const soloAcconti2025: CalcoloInput = {
+    anno: 2025,
+    anni: {
+      2025: {
+        regimi: [{ ...regimeSeparata, fatturato: 36000 }],
+        modalitaContributi: 'dettaglio',
+        contributiVersatiTotale: null,
+        contributiVersati: [
+          { id: 'a1', tipo: 'gs-acconto-1', descrizione: '', importo: 381.31 },
+          { id: 'a2', tipo: 'gs-acconto-2', descrizione: '', importo: 381.32 },
+        ],
+        impostaSaldoVersato: null,
+        impostaAcconto1Versato: null,
+        impostaAcconto2Versato: null,
+      },
+    },
+    rateazioniImposta: {},
+  }
+
+  it('la scadenza di saldo competenza 2025 è netta e resta l\'unica fonte', () => {
+    const r = calcola(soloAcconti2025)
+    const saldo = r.scadenzeAnnoSuccessivo.find(
+      (s) => /Gestione separata/i.test(s.categoria ?? '') && s.voce === 'Saldo · competenza 2025',
+    )
+    expect(saldo).toBeDefined()
+    // Netto = dovuto - acconti versati; il campo grezzo resta il dovuto pieno.
+    expect(saldo!.importo).toBeCloseTo(r.totaleContributiSeparata - 762.63, 2)
+    expect(r.saldoContributiGSAnnoCorrente).toBeCloseTo(r.totaleContributiSeparata, 2)
+    // È proprio questa la divergenza che la UI deve evitare: 762,63 €.
+    expect(r.saldoContributiGSAnnoCorrente - saldo!.importo).toBeCloseTo(762.63, 2)
+    expect(saldo!.nota).toBeDefined()
+  })
+})
