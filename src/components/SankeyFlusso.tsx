@@ -1,5 +1,10 @@
-import { useMemo } from 'react'
-import { costruisciSankey, type IngressoSankey, type NodoSankey } from '@/domain/sankey'
+import { useMemo, useState } from 'react'
+import {
+  costruisciSankey,
+  type IngressoSankey,
+  type NastroSankey,
+  type NodoSankey,
+} from '@/domain/sankey'
 import { formatEuro, formatPercent } from '@/domain/labels'
 import { theme, flowColore } from '@/theme'
 
@@ -69,6 +74,10 @@ export function SankeyFlusso({
     ],
   )
 
+  // Cosa sta sotto il cursore (o ha il focus da tastiera): un nodo, un nastro,
+  // o niente. Stato locale, nessuna libreria di animazione.
+  const [evidenza, setEvidenza] = useState<Evidenza>(null)
+
   if (!grafico.haDati) {
     return (
       <div>
@@ -99,20 +108,43 @@ export function SankeyFlusso({
           className={theme.flowSvg}
           viewBox={`0 0 ${LARGHEZZA} ${ALTEZZA}`}
           preserveAspectRatio="xMidYMid meet"
-          role="img"
+          // `group` e non `img`: nodi e nastri sono elementi focalizzabili con
+          // etichetta propria, e `role="img"` li nasconderebbe alle tecnologie
+          // assistive presentando il disegno come un'immagine unica.
+          role="group"
           aria-label={descrizione}
         >
           <title>{descrizione}</title>
 
-          <g transform={`translate(${CORSIA_TESTO} 0)`}>
+          {/* Uscendo dall'area del disegno l'evidenziazione si azzera, anche se
+              il puntatore lascia l'SVG di scatto senza passare dagli elementi. */}
+          <g
+            transform={`translate(${CORSIA_TESTO} 0)`}
+            onMouseLeave={() => setEvidenza(null)}
+          >
             {/* I nastri stanno sotto i nodi: i bordi dei nodi li rifiniscono. */}
             {grafico.nastri.map((nastro) => (
               <path
                 key={nastro.id}
                 d={nastro.path}
-                className={flowColore[nastro.colore].nastro}
+                className={`${flowColore[nastro.colore].nastro} ${theme.flowInterattivo} ${
+                  attenua(evidenza, { tipo: 'nastro', nastro }) ? theme.flowAttenuato : theme.flowEvidenziato
+                }`}
                 fillOpacity={0.55}
-              />
+                tabIndex={0}
+                role="img"
+                aria-label={`${nastro.descrizione}: ${formatEuro(nastro.valore)}`}
+                onMouseEnter={() =>
+                  setEvidenza({ tipo: 'nastro', id: nastro.id, da: nastro.da, a: nastro.a })
+                }
+                onFocus={() =>
+                  setEvidenza({ tipo: 'nastro', id: nastro.id, da: nastro.da, a: nastro.a })
+                }
+                onBlur={() => setEvidenza(null)}
+              >
+                {/* Tooltip nativo SVG: voce e importo, utile anche per lo screen reader. */}
+                <title>{`${nastro.descrizione}: ${formatEuro(nastro.valore)}`}</title>
+              </path>
             ))}
 
             {grafico.nodi.map((nodo) => (
@@ -123,13 +155,24 @@ export function SankeyFlusso({
                 width={nodo.larghezza}
                 height={nodo.altezza}
                 rx={2}
-                className={flowColore[nodo.colore].nodo}
-              />
+                className={`${flowColore[nodo.colore].nodo} ${theme.flowInterattivo} ${
+                  attenua(evidenza, { tipo: 'nodo', nodo }) ? theme.flowAttenuato : theme.flowEvidenziato
+                }`}
+                tabIndex={0}
+                role="img"
+                aria-label={`${nodo.etichetta}: ${formatEuro(nodo.valore)} (${formatPercent(nodo.quota)})`}
+                onMouseEnter={() => setEvidenza({ tipo: 'nodo', id: nodo.id })}
+                onFocus={() => setEvidenza({ tipo: 'nodo', id: nodo.id })}
+                onBlur={() => setEvidenza(null)}
+              >
+                <title>{`${nodo.etichetta}: ${formatEuro(nodo.valore)} (${formatPercent(nodo.quota)})`}</title>
+              </rect>
             ))}
 
             {/* Etichette fuori dal nastro: nome sopra, importo e quota sotto.
                 Restano leggibili anche sui rami sottili perché il testo non è
-                mai dentro il nastro. */}
+                mai dentro il nastro. Non si attenuano MAI con l'evidenziazione:
+                l'informazione non dipende dall'effetto al passaggio del mouse. */}
             {grafico.nodi.map((nodo) => (
               <EtichettaNodo key={nodo.id} nodo={nodo} />
             ))}
@@ -145,8 +188,8 @@ export function SankeyFlusso({
             <li key={nodo.id} className={theme.flowLegendItem}>
               <span className={`${theme.flowLegendDot} ${flowColore[nodo.colore].dot}`} aria-hidden />
               <span>{nodo.etichetta}</span>
-              <span className="font-medium tabular-nums text-slate-800">{formatEuro(nodo.valore)}</span>
-              <span className="tabular-nums text-slate-400">{formatPercent(nodo.quota)}</span>
+              <span className={theme.flowLegendValore}>{formatEuro(nodo.valore)}</span>
+              <span className={theme.flowLegendQuota}>{formatPercent(nodo.quota)}</span>
             </li>
           ))}
       </ul>
@@ -174,15 +217,50 @@ function EtichettaNodo({ nodo }: { nodo: NodoSankey }) {
   const yValore = sopra ? nodo.y - 3 : nodo.y + nodo.altezza / 2 + 12
 
   return (
-    <g textAnchor={anchor} className={colore.testo}>
-      <text x={x} y={yNome} className="fill-current text-[11px] font-medium">
+    <g textAnchor={anchor} className={`${colore.testo} ${theme.flowEtichetta}`} aria-hidden>
+      <text x={x} y={yNome} className={theme.flowNome}>
         {nodo.etichetta}
       </text>
-      <text x={x} y={yValore} className="fill-current text-[11px] tabular-nums opacity-80">
+      <text x={x} y={yValore} className={theme.flowValore}>
         {formatEuro(nodo.valore)} · {formatPercent(nodo.quota)}
       </text>
     </g>
   )
+}
+
+/**
+ * Elemento attualmente sotto il cursore o con il focus da tastiera.
+ *
+ * Per un nastro si portano dietro anche i due capi (`da`/`a`): così `attenua`
+ * non deve ricavarli spezzando l'id, che è solo una chiave di rendering.
+ */
+export type Evidenza =
+  | { tipo: 'nodo'; id: string }
+  | { tipo: 'nastro'; id: string; da: string; a: string }
+  | null
+
+/**
+ * Decide se un elemento va attenuato.
+ *
+ * Con un nastro evidenziato restano pieni quel nastro e i due nodi che collega.
+ * Con un nodo evidenziato restano pieni il nodo stesso e tutti i nastri
+ * entranti e uscenti da esso: è il "percorso correlato". Senza evidenza nulla
+ * si attenua.
+ */
+export function attenua(
+  evidenza: Evidenza,
+  elemento: { tipo: 'nodo'; nodo: NodoSankey } | { tipo: 'nastro'; nastro: NastroSankey },
+): boolean {
+  if (!evidenza) return false
+
+  if (evidenza.tipo === 'nastro') {
+    if (elemento.tipo === 'nastro') return elemento.nastro.id !== evidenza.id
+    // Il nodo resta pieno se è un capo del nastro evidenziato.
+    return elemento.nodo.id !== evidenza.da && elemento.nodo.id !== evidenza.a
+  }
+
+  if (elemento.tipo === 'nodo') return elemento.nodo.id !== evidenza.id
+  return elemento.nastro.da !== evidenza.id && elemento.nastro.a !== evidenza.id
 }
 
 /** Descrizione testuale del flusso, usata come aria-label e <title>. */

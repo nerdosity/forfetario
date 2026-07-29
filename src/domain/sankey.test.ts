@@ -6,6 +6,8 @@ import {
   quotaSuFatturato,
   costruisciSankey,
   pathNastro,
+  contaIncroci,
+  incrociInevitabili,
   SOGLIA_RAMO,
   type IngressoSankey,
 } from './sankey'
@@ -366,6 +368,181 @@ describe('costruisciSankey — grafo', () => {
     const g = costruisciSankey(separata, { larghezza: 500, altezza: 240 })
     expect(g.larghezza).toBe(500)
     expect(g.altezza).toBe(240)
+  })
+})
+
+/**
+ * Dati reali osservati nel rendering: fatturato 51.574,00 con coefficiente 67%,
+ * artigiano con contributi fissi ed eccedenza. È il caso su cui il diagramma
+ * risultava illeggibile per via dei nastri incrociati.
+ */
+const realeArtigiano: IngressoSankey = {
+  fatturato: 51_574.0,
+  imponibileLordo: 34_554.58,
+  contributiINPS: 5_398.02,
+  imposte: 4_059.49,
+  contributiSeparata: 0,
+  contributiFissiArtComm: 2_902.02,
+  contributiEccedenzaArtComm: 2_496.0,
+}
+
+/** Opzioni con cui il componente costruisce il grafico (viewBox 760 × 340). */
+const COME_IL_COMPONENTE = { larghezza: 760 - 2 * 148, altezza: 340, margineEtichette: 0 }
+
+describe('contaIncroci', () => {
+  it('due nastri paralleli non si incrociano', () => {
+    const nastri = [
+      { id: 'a', da: 'x', a: 'p', valore: 1, colore: 'neutro' as const, path: '', y0: 0, y1: 0, colonnaDa: 0, colonnaA: 1, descrizione: '' },
+      { id: 'b', da: 'x', a: 'q', valore: 1, colore: 'neutro' as const, path: '', y0: 10, y1: 10, colonnaDa: 0, colonnaA: 1, descrizione: '' },
+    ]
+    expect(contaIncroci(nastri)).toBe(0)
+  })
+
+  it('due nastri con ordine verticale invertito si incrociano', () => {
+    const nastri = [
+      { id: 'a', da: 'x', a: 'p', valore: 1, colore: 'neutro' as const, path: '', y0: 0, y1: 10, colonnaDa: 0, colonnaA: 1, descrizione: '' },
+      { id: 'b', da: 'x', a: 'q', valore: 1, colore: 'neutro' as const, path: '', y0: 10, y1: 0, colonnaDa: 0, colonnaA: 1, descrizione: '' },
+    ]
+    expect(contaIncroci(nastri)).toBe(1)
+  })
+
+  it('nastri su span di colonne diversi non sono confrontabili', () => {
+    const nastri = [
+      { id: 'a', da: 'x', a: 'p', valore: 1, colore: 'neutro' as const, path: '', y0: 0, y1: 10, colonnaDa: 0, colonnaA: 1, descrizione: '' },
+      { id: 'b', da: 'p', a: 'z', valore: 1, colore: 'neutro' as const, path: '', y0: 10, y1: 0, colonnaDa: 1, colonnaA: 2, descrizione: '' },
+    ]
+    expect(contaIncroci(nastri)).toBe(0)
+  })
+})
+
+describe('incrociInevitabili', () => {
+  it('un albero (ogni destinazione ha una sola sorgente) non impone incroci', () => {
+    const nastri = [
+      { id: 'a', da: 'x', a: 'p', valore: 1, colore: 'neutro' as const, path: '', y0: 0, y1: 0, colonnaDa: 0, colonnaA: 1, descrizione: '' },
+      { id: 'b', da: 'x', a: 'q', valore: 1, colore: 'neutro' as const, path: '', y0: 1, y1: 1, colonnaDa: 0, colonnaA: 1, descrizione: '' },
+    ]
+    expect(incrociInevitabili(nastri)).toBe(0)
+  })
+
+  it('un bipartito completo 2x2 impone esattamente un incrocio', () => {
+    const nastri = ['x|p', 'x|q', 'y|p', 'y|q'].map((k, i) => {
+      const [da, a] = k.split('|')
+      return { id: k, da, a, valore: 1, colore: 'neutro' as const, path: '', y0: i, y1: i, colonnaDa: 0, colonnaA: 1, descrizione: '' }
+    })
+    expect(incrociInevitabili(nastri)).toBe(1)
+  })
+
+  it('il bipartito completo 2x3 della colonna 1→2 impone 3 incroci', () => {
+    const g = costruisciSankey(realeArtigiano, COME_IL_COMPONENTE)
+    const span = g.nastri.filter((n) => n.colonnaDa === 1 && n.colonnaA === 2)
+    expect(span).toHaveLength(6)
+    expect(incrociInevitabili(span)).toBe(3)
+  })
+})
+
+describe('layout anti-incrocio', () => {
+  // Il cuore della verifica: il layout non deve produrre NESSUN incrocio oltre
+  // a quelli strutturalmente imposti dal grafo. Si misura, non si valuta a occhio.
+  const casi: Array<[string, IngressoSankey]> = [
+    ['dati reali artigiano', realeArtigiano],
+    ['gestione separata', separata],
+    ['anno misto', misto],
+  ]
+
+  for (const [nome, ingresso] of casi) {
+    it(`${nome}: zero incroci evitabili`, () => {
+      const g = costruisciSankey(ingresso, COME_IL_COMPONENTE)
+      const evitabili = contaIncroci(g.nastri) - incrociInevitabili(g.nastri)
+      expect(evitabili).toBe(0)
+    })
+  }
+
+  it('dati reali: gli incroci totali sono esattamente i 3 inevitabili dello span 1→2', () => {
+    const g = costruisciSankey(realeArtigiano, COME_IL_COMPONENTE)
+    expect(contaIncroci(g.nastri)).toBe(3)
+    expect(incrociInevitabili(g.nastri)).toBe(3)
+  })
+
+  it('lo span dei contributi verso le gestioni non ha alcun incrocio', () => {
+    const g = costruisciSankey(realeArtigiano, COME_IL_COMPONENTE)
+    const span = g.nastri.filter((n) => n.colonnaDa === 2 && n.colonnaA === 3)
+    expect(span.length).toBeGreaterThan(0)
+    expect(contaIncroci(span)).toBe(0)
+  })
+
+  it('la colonna delle gestioni è allineata al bordo alto dei contributi', () => {
+    // Senza allineamento la sottocolonna resterebbe centrata e i suoi nastri
+    // scenderebbero in diagonale dal padre fino al centro del disegno.
+    const g = costruisciSankey(realeArtigiano, COME_IL_COMPONENTE)
+    const contributi = g.nodi.find((n) => n.id === 'contributi')!
+    const cima = Math.min(...g.nodi.filter((n) => n.colonna === 3).map((n) => n.y))
+    expect(cima).toBeCloseTo(contributi.y, 6)
+  })
+
+  it('il netto sta in cima alla colonna delle destinazioni', () => {
+    // È la scelta che accorcia i nastri: il ramo dominante resta orizzontale.
+    const g = costruisciSankey(realeArtigiano, COME_IL_COMPONENTE)
+    const destinazioni = g.nodi.filter((n) => n.colonna === 2).sort((a, b) => a.y - b.y)
+    expect(destinazioni[0].id).toBe('netto')
+  })
+
+  it('nessun nastro attraversa più di metà dell\'altezza del disegno', () => {
+    // Guardia contro il ritorno delle diagonali che tagliavano tutto il grafico:
+    // prima della correzione il salto peggiore superava 195 unità su 340.
+    const g = costruisciSankey(realeArtigiano, COME_IL_COMPONENTE)
+    for (const nastro of g.nastri) {
+      expect(Math.abs(nastro.y1 - nastro.y0)).toBeLessThan(340 / 2)
+    }
+  })
+
+  it('i nastri espongono i capi e la descrizione per il tooltip', () => {
+    const g = costruisciSankey(realeArtigiano, COME_IL_COMPONENTE)
+    const nastro = g.nastri.find((n) => n.da === 'contributi' && n.a === 'fissi')!
+    expect(nastro.descrizione).toBe('Contributi INPS → Art/Comm fissi')
+    expect(nastro.colonnaDa).toBe(2)
+    expect(nastro.colonnaA).toBe(3)
+  })
+
+  it('l\'impilamento è coerente sui due lati di ogni nodo', () => {
+    // Regola standard: su un nodo le uscite si ordinano per y della destinazione
+    // e gli ingressi per y della sorgente. Se vale, i nastri non si "scambiano"
+    // di posto lungo il bordo del nodo.
+    const g = costruisciSankey(misto, COME_IL_COMPONENTE)
+    const perId = new Map(g.nodi.map((n) => [n.id, n]))
+    for (const nodo of g.nodi) {
+      const uscenti = g.nastri.filter((n) => n.da === nodo.id).sort((a, b) => a.y0 - b.y0)
+      for (let i = 1; i < uscenti.length; i++) {
+        expect(perId.get(uscenti[i].a)!.y).toBeGreaterThanOrEqual(perId.get(uscenti[i - 1].a)!.y)
+      }
+      const entranti = g.nastri.filter((n) => n.a === nodo.id).sort((a, b) => a.y1 - b.y1)
+      for (let i = 1; i < entranti.length; i++) {
+        expect(perId.get(entranti[i].da)!.y).toBeGreaterThanOrEqual(perId.get(entranti[i - 1].da)!.y)
+      }
+    }
+  })
+
+  it('i nastri restano attaccati ai bordi dei nodi che collegano', () => {
+    // L'allineamento della colonna derivata non deve far sbordare gli attacchi.
+    for (const ingresso of [realeArtigiano, separata, misto]) {
+      const g = costruisciSankey(ingresso, COME_IL_COMPONENTE)
+      const perId = new Map(g.nodi.map((n) => [n.id, n]))
+      for (const nastro of g.nastri) {
+        const sorgente = perId.get(nastro.da)!
+        const destinazione = perId.get(nastro.a)!
+        const spessore = Math.max(1, nastro.valore * (sorgente.altezza / sorgente.valore))
+        expect(nastro.y0).toBeGreaterThanOrEqual(sorgente.y - 1e-6)
+        expect(nastro.y0 + spessore).toBeLessThanOrEqual(sorgente.y + sorgente.altezza + 1e-6)
+        expect(nastro.y1).toBeGreaterThanOrEqual(destinazione.y - 1e-6)
+      }
+    }
+  })
+
+  it('le gestioni allineate restano dentro il viewBox', () => {
+    const g = costruisciSankey(realeArtigiano, COME_IL_COMPONENTE)
+    for (const nodo of g.nodi) {
+      expect(nodo.y).toBeGreaterThanOrEqual(0)
+      expect(nodo.y + nodo.altezza).toBeLessThanOrEqual(340.001)
+    }
   })
 })
 

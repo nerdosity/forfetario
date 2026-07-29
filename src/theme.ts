@@ -91,6 +91,25 @@ export const theme = {
   flowLegend: 'mt-3 flex flex-wrap gap-x-4 gap-y-1.5 border-t border-slate-100 pt-3',
   flowLegendItem: 'flex items-center gap-1.5 text-xs text-slate-600',
   flowLegendDot: 'inline-flex h-2 w-2 shrink-0 rounded-full',
+  flowLegendValore: 'font-medium tabular-nums text-slate-800',
+  flowLegendQuota: 'tabular-nums text-slate-400',
+
+  // --- Evidenziazione al passaggio del mouse / focus da tastiera ---
+  // Si agisce SOLO su opacity: nessuna geometria cambia, quindi nessun reflow
+  // e nessun layout shift. `motion-reduce:transition-none` disattiva la
+  // transizione quando l'utente chiede meno animazioni (prefers-reduced-motion):
+  // l'evidenziazione resta, diventa istantanea.
+  flowInterattivo:
+    'cursor-pointer transition-opacity duration-200 ease-out outline-none motion-reduce:transition-none ' +
+    'focus-visible:opacity-100 [&:focus-visible]:[stroke:currentColor] [&:focus-visible]:[stroke-width:1.5]',
+  // Stati di evidenziazione: l'elemento correlato resta pieno, gli altri sbiadiscono.
+  flowAttenuato: 'opacity-25',
+  flowEvidenziato: 'opacity-100',
+  // Le etichette non si attenuano mai: il testo è sempre leggibile, così
+  // l'evidenziazione non è l'unico veicolo dell'informazione.
+  flowEtichetta: 'pointer-events-none',
+  flowNome: 'fill-current text-[11px] font-medium',
+  flowValore: 'fill-current text-[11px] tabular-nums opacity-80',
 } as const
 
 /**
