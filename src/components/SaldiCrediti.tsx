@@ -112,7 +112,7 @@ export function SaldiCrediti({ anno, calcoli }: Props) {
       title={`Saldi e crediti ${anno}`}
       icon={FileText}
       iconIntent="cost"
-      info={`Anno d'imposta ${anno}. Il saldo = dovuto del ${anno} meno gli acconti dovuti (metodo INPS). Saldo e 1° acconto del ${anno + 1} si versano a giugno ${anno + 1}.`}
+      info={`Anno d'imposta ${anno}, per COMPETENZA: quanto è dovuto per il ${anno} e quanto resta da versare. Il saldo = dovuto del ${anno} meno gli acconti dovuti (metodo INPS, calcolati sui redditi del ${anno - 1}), non meno quanto hai pagato di cassa nel ${anno}. Saldo e 1° acconto del ${anno + 1} si versano a giugno ${anno + 1}. La sezione "Righi dichiarazione" ragiona invece per CASSA — quanto hai pagato nel ${anno} — quindi le cifre dei contributi non coincidono: è corretto.`}
     >
       {/* Box totale in evidenza */}
       <div className="mb-5 flex items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 sm:px-5 sm:py-4">
@@ -125,6 +125,14 @@ export function SaldiCrediti({ anno, calcoli }: Props) {
 
       {righe.length > 0 ? (
         <div>
+          <p className={`${theme.groupLabel} mb-2 flex items-center gap-1.5`}>
+            <span>Competenza {anno}</span>
+            <Tooltip
+              content={`Questa tabella ragiona per competenza: quanto è dovuto PER il ${anno} e quanto resta da versare. Gli acconti scalati sono quelli DOVUTI col metodo INPS (sui redditi del ${anno - 1}), non i pagamenti che trovi nella scheda ${anno}. La sezione "Righi dichiarazione" ragiona per cassa — quanto hai materialmente pagato nel ${anno} — e per i contributi arriva a una cifra diversa: le due letture sono entrambe corrette.`}
+              label="Differenza tra competenza e cassa"
+              allinea="sinistra"
+            />
+          </p>
           <Table hoverable theme={tableTheme}>
             <TableHead>
               <TableRow>
@@ -209,7 +217,11 @@ export function SaldiCrediti({ anno, calcoli }: Props) {
       <p className={`${theme.helpText} mt-2`}>
         Promemoria sugli anni: il <strong>saldo {anno}</strong> e il <strong>1° acconto {anno + 1}</strong>{' '}
         si versano insieme a giugno {anno + 1}; il <strong>2° acconto {anno + 1}</strong> a novembre {anno + 1}.
-        Gli acconti del {anno} mostrati sopra sono quelli versati nel corso del {anno} (giugno e novembre {anno}).
+        Gli acconti del {anno} mostrati sopra sono quelli versati nel corso del {anno} (giugno e novembre {anno}),
+        cioè le righe della <strong>scheda {anno}</strong>. Nel calendario il saldo della competenza {anno - 1}{' '}
+        (pagabile a giugno {anno}) è invece nettato con gli acconti del {anno - 1}, che stanno nella{' '}
+        <strong>scheda {anno - 1}</strong>: è la scheda dell'anno di competenza a governare ogni saldo, non
+        quella dell'anno in cui lo paghi.
       </p>
     </Card>
   )

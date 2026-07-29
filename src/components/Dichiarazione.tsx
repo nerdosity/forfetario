@@ -84,7 +84,7 @@ export function Dichiarazione({ anno, calcoli, input, anagrafica }: Props) {
       title="Righi dichiarazione"
       icon={FileSpreadsheet}
       iconIntent="info"
-      info="Traduzione dei calcoli nei campi dei quadri LM (regime forfettario), RS (contributi dedotti) e RR (contributi INPS) da riportare nei Redditi PF. Promemoria di compilazione: non sostituisce la dichiarazione."
+      info={`Traduzione dei calcoli nei campi dei quadri LM (regime forfettario), RS (contributi dedotti) e RR (contributi INPS) da riportare nei Redditi PF. I contributi dedotti in LM35 seguono il criterio di CASSA: quanto hai materialmente pagato nel ${anno} (scheda ${anno}), saldo della competenza ${anno - 1} incluso. In "Saldi e crediti" la cifra dei contributi è diversa perché lì si ragiona per competenza: entrambe sono corrette. Promemoria di compilazione: non sostituisce la dichiarazione.`}
     >
       <div className="space-y-6">
         <div className="flex items-center justify-between">

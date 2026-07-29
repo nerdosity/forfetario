@@ -312,3 +312,114 @@ describe('quadro RR sezione II — gestione separata', () => {
     expect(righi.quadroRRSeparata).toHaveLength(0)
   })
 })
+
+// ---------------------------------------------------------------------------
+// Cassa (dichiarazione) vs competenza (saldi e crediti / calendario)
+// ---------------------------------------------------------------------------
+
+/**
+ * Le due sezioni dell'app guardano lo stesso anno con due lenti diverse e le
+ * cifre G.S. NON devono coincidere:
+ *
+ * - CASSA (dichiarazione, LM35): quanto è stato materialmente pagato nel 2025,
+ *   cioè il saldo della competenza 2024 + gli acconti della competenza 2025,
+ *   tutti letti dalla scheda 2025. È il contributo deducibile.
+ * - COMPETENZA (saldi e crediti, calendario): quanto è dovuto PER il 2025
+ *   meno gli acconti DOVUTI col metodo INPS (80% del dovuto 2024). Non guarda
+ *   la cassa della scheda 2025.
+ *
+ * Il test fissa la relazione: aggiungere versamenti alla scheda 2025 muove solo
+ * la cifra di cassa, mai i due saldi di competenza.
+ */
+describe('cassa vs competenza — la scheda 2025 muove solo la dichiarazione', () => {
+  // Reddito costante 30.000 × 67% = 20.100 in tutti gli anni, così il dovuto
+  // G.S. 2023/2024/2025 è sempre 20.100 × 26,07% = 5.240,07.
+  const gsAnno = (id: string): Regime => ({
+    id, tipo: 'separata', aliquota: 15, coefficiente: 67,
+    meseInizio: 1, giornoInizio: 1, meseFine: 12, giornoFine: 31,
+    fatturato: 30000, riduzioneContributi: 'nessuna',
+  })
+
+  // Versamenti della scheda 2024: saldo competenza 2023 + i due acconti 2024.
+  const versamenti2024 = () => [v('gs-saldo', 1000), v('gs-acconto-1', 381.32), v('gs-acconto-2', 381.31)]
+
+  const costruisci = (versamenti2025: VersamentoContributo[]): CalcoloInput => ({
+    anno: 2025,
+    anni: {
+      2023: datiAnno([gsAnno('r23')], null),
+      2024: datiAnno([gsAnno('r24')], versamenti2024()),
+      2025: datiAnno([gsAnno('r25')], versamenti2025),
+    },
+    rateazioniImposta: {},
+  })
+
+  const saldoCompetenza = (calcoli: ReturnType<typeof calcola>, anno: number, dove: 'corrente' | 'successivo') =>
+    (dove === 'corrente' ? calcoli.scadenzeAnnoCorrente : calcoli.scadenzeAnnoSuccessivo).find(
+      (s) => /Gestione separata/i.test(s.categoria ?? '') && s.voce === `Saldo · competenza ${anno}`,
+    )
+
+  const DOVUTO_GS = 5240.07 // 20.100 × 26,07%
+
+  it('variante i — scheda 2025 senza versamenti: cassa 0, competenze invariate', () => {
+    const input = costruisci([])
+    const calcoli = calcola(input)
+    const righi = generaRighiDichiarazione(calcoli, 2025, input)
+
+    // Cassa: nulla pagato nel 2025 → nessun contributo deducibile.
+    expect(righi.riepilogoLM.find((c) => c.rigo === 'LM35')?.valore).toBe(0)
+
+    // Competenza 2025: dovuto − acconti DOVUTI (80% del dovuto 2024).
+    expect(calcoli.totaleContributiSeparata).toBeCloseTo(DOVUTO_GS, 2)
+    expect(calcoli.accontiGSVersatiPerAnnoRif).toBeCloseTo(0.8 * DOVUTO_GS, 2) // 4.192,06
+    expect(saldoCompetenza(calcoli, 2025, 'successivo')?.importo).toBeCloseTo(1048.01, 2)
+
+    // Competenza 2024, pagabile a giugno 2025: nettata con gli acconti dovuti
+    // per il 2024 (base: redditi 2023), non con la cassa della scheda 2025.
+    expect(saldoCompetenza(calcoli, 2024, 'corrente')?.importo).toBeCloseTo(1022.29, 2)
+  })
+
+  it('variante ii — acconti G.S. nella scheda 2025: cambia solo la cassa', () => {
+    // 2.000 di saldo competenza 2024 + 762,63 di acconti competenza 2025.
+    const input = costruisci([v('gs-saldo', 2000), v('gs-acconto-1', 381.32), v('gs-acconto-2', 381.31)])
+    const calcoli = calcola(input)
+    const righi = generaRighiDichiarazione(calcoli, 2025, input)
+
+    // Cassa: TUTTO ciò che è uscito nel 2025 (saldo 2024 + acconti 2025), non
+    // i soli acconti: 2.000 + 762,63 = 2.762,63 → 2.763.
+    expect(calcoli.contributiVersatiAnnoImpostaPerDeducibilita).toBeCloseTo(2762.63, 2)
+    expect(righi.riepilogoLM.find((c) => c.rigo === 'LM35')?.valore).toBe(2763)
+
+    // I due saldi di competenza restano IDENTICI alla variante i: la cassa
+    // della scheda 2025 non li tocca.
+    expect(saldoCompetenza(calcoli, 2025, 'successivo')?.importo).toBeCloseTo(1048.01, 2)
+    expect(saldoCompetenza(calcoli, 2024, 'corrente')?.importo).toBeCloseTo(1022.29, 2)
+
+    // Gli acconti versati reali sono esposti a parte, distinti dai dovuti.
+    expect(calcoli.accontiGSVersatiRealiPerAnnoRif).toBeCloseTo(762.63, 2)
+    expect(calcoli.accontiGSVersatiPerAnnoRif).toBeCloseTo(0.8 * DOVUTO_GS, 2)
+  })
+
+  it('il quadro RR resta per competenza: acconti 2025, non la cassa 2025', () => {
+    const input = costruisci([v('gs-saldo', 2000), v('gs-acconto-1', 381.32), v('gs-acconto-2', 381.31)])
+    const righi = generaRighiDichiarazione(calcola(input), 2025, input)
+    const campi = righi.quadroRRSeparata
+    // RR guarda la competenza: solo i 762,63 di acconto, non i 2.762,63 di cassa.
+    expect(campi.find((c) => c.descrizione.includes('Acconti versati'))?.valore).toBe(763)
+    expect(campi.find((c) => c.descrizione.includes('Contributo dovuto'))?.valore).toBe(5240)
+    expect(campi.find((c) => c.descrizione.includes('Contributo a debito'))?.valore).toBe(5240 - 763)
+  })
+
+  it('senza la scheda 2024 il saldo 2025 ripiega sugli acconti VERSATI e lo dichiara', () => {
+    // Senza l'anno precedente gli acconti dovuti non sono calcolabili: il saldo
+    // netta i soli acconti realmente versati (762,63), non il saldo di cassa.
+    const input: CalcoloInput = {
+      anno: 2025,
+      anni: { 2025: datiAnno([gsAnno('r25')], [v('gs-acconto-1', 381.32), v('gs-acconto-2', 381.31)]) },
+      rateazioniImposta: {},
+    }
+    const calcoli = calcola(input)
+    const saldo = saldoCompetenza(calcoli, 2025, 'successivo')
+    expect(saldo?.importo).toBeCloseTo(DOVUTO_GS - 762.63, 2) // 4.477,44
+    expect(saldo?.nota).toMatch(/acconti versati/i)
+  })
+})

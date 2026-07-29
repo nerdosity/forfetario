@@ -186,7 +186,12 @@ export function generaRighiDichiarazione(
       colonna: 1,
       descrizione: 'Contributi previdenziali e assistenziali versati',
       valore: lm35,
-      nota: 'Contributi INPS pagati nell\'anno (deducibili). Vedi anche quadro RS.',
+      nota:
+        `Criterio di CASSA: tutti i contributi INPS materialmente pagati nel ${anno}, presi dalla ` +
+        `scheda ${anno}. Comprende quindi il saldo della competenza ${anno - 1} versato a giugno ${anno} ` +
+        `insieme agli acconti di competenza ${anno}: si deduce ciò che è uscito nell'anno, a prescindere ` +
+        `dall'anno di competenza. Per questo la cifra NON coincide con quella di "Saldi e crediti", che ` +
+        `ragiona per competenza (quanto è dovuto per il ${anno}): entrambe sono corrette. Vedi anche quadro RS.`,
     },
     {
       rigo: 'LM36',
@@ -255,7 +260,9 @@ export function generaRighiDichiarazione(
       colonna: 1,
       descrizione: 'Contributi previdenziali versati e dedotti',
       valore: contributiDeducibiliEffettivi,
-      nota: 'Contributi INPS versati nell\'anno, dedotti dal reddito forfettario (max = reddito lordo).',
+      nota:
+        `Contributi INPS pagati nel ${anno} per cassa (dalla scheda ${anno}), dedotti dal reddito ` +
+        'forfettario (max = reddito lordo).',
     },
     {
       rigo: 'RP26',
@@ -643,7 +650,9 @@ function generaQuadroRRSeparata(
       valore: acconti === null ? 'da inserire' : eu(acconti),
       nota: acconti === null
         ? 'Ricavabile solo dalla lista dettagliata dei versamenti (non dalla cifra unica).'
-        : `Acconti G.S. versati nel ${anno} (giugno + novembre).`,
+        : `Solo i due acconti di competenza ${anno} versati nel ${anno} (giugno + novembre), dalla ` +
+          `scheda ${anno}. Qui il quadro RR ragiona per competenza, quindi la cifra è più bassa di ` +
+          `LM35, che per cassa somma anche il saldo della competenza ${anno - 1} pagato nel ${anno}.`,
     },
   ]
 
