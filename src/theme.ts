@@ -77,6 +77,20 @@ export const theme = {
   metricValue: 'text-lg font-bold tabular-nums',
   metricLabel: 'text-xs text-slate-500',
   highlightBox: 'rounded-lg bg-slate-50 p-4 text-center border border-slate-200',
+
+  // --- Diagramma di flusso (Sankey) ---
+  // Il wrapper scorre DENTRO di sé come le tabelle (vedi tableTheme.root.wrapper):
+  // su schermi stretti il diagramma non spinge la pagina in orizzontale.
+  flowWrap: 'relative max-w-full overflow-x-auto overflow-y-hidden',
+  // min-w garantisce leggibilità delle etichette anche sotto i 400px di viewport
+  flowSvg: 'block h-auto w-full min-w-[560px]',
+  flowHeader: 'mb-3 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1',
+  flowCaption: 'text-xs text-slate-400',
+  flowEmpty: 'rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-10 text-center text-sm text-slate-500',
+  // Legenda testuale sotto il diagramma: i valori restano leggibili senza colore
+  flowLegend: 'mt-3 flex flex-wrap gap-x-4 gap-y-1.5 border-t border-slate-100 pt-3',
+  flowLegendItem: 'flex items-center gap-1.5 text-xs text-slate-600',
+  flowLegendDot: 'inline-flex h-2 w-2 shrink-0 rounded-full',
 } as const
 
 /**
@@ -110,6 +124,21 @@ export const intent = {
 } as const
 
 export type Intent = keyof typeof intent
+
+/**
+ * Colori del diagramma di flusso, per le cinque voci del percorso del fatturato.
+ * Dentro l'SVG servono classi `fill-*` (nodi e nastri) e `text-*` (etichette),
+ * più un `bg-*` per il pallino della legenda. Le tonalità riprendono gli accenti
+ * `intent`: neutro = slate, imponibile = blue/info, contributi = amber/warning,
+ * imposta = red/cost, netto = emerald/income.
+ */
+export const flowColore = {
+  neutro: { nodo: 'fill-slate-400', nastro: 'fill-slate-300', testo: 'text-slate-500', dot: 'bg-slate-400' },
+  imponibile: { nodo: 'fill-blue-500', nastro: 'fill-blue-300', testo: 'text-blue-700', dot: 'bg-blue-500' },
+  contributi: { nodo: 'fill-amber-500', nastro: 'fill-amber-300', testo: 'text-amber-700', dot: 'bg-amber-500' },
+  imposta: { nodo: 'fill-red-500', nastro: 'fill-red-300', testo: 'text-red-700', dot: 'bg-red-500' },
+  netto: { nodo: 'fill-emerald-500', nastro: 'fill-emerald-300', testo: 'text-emerald-700', dot: 'bg-emerald-500' },
+} as const
 
 /**
  * Superfici colorate (sfondo + bordo + testo) per blocchi evidenziati,

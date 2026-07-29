@@ -2,7 +2,7 @@ import { BarChart3 } from 'lucide-react'
 import { Badge } from 'flowbite-react'
 import type { RisultatoCalcolo } from '@/domain/types'
 import { Card, SummaryRow, Metric, Tooltip } from '@/components/ui'
-import { FunnelImposta } from '@/components/FunnelImposta'
+import { SankeyFlusso } from '@/components/SankeyFlusso'
 import { labelTipo, formatEuro } from '@/domain/labels'
 import { theme } from '@/theme'
 
@@ -40,13 +40,16 @@ export function DettaglioRegimi({ anno, calcoli }: Props) {
         />
       </div>
 
-      {/* Funnel dal fatturato all'imposta */}
+      {/* Flusso dal fatturato al netto in tasca */}
       <div className="mb-6">
-        <FunnelImposta
+        <SankeyFlusso
           fatturato={calcoli.totaleFatturato}
           imponibileLordo={calcoli.totaleImponibileLordo}
           contributiINPS={calcoli.totaleContributiINPS}
-          imposta={calcoli.totaleImposte}
+          imposte={calcoli.totaleImposte}
+          contributiSeparata={calcoli.totaleContributiSeparata}
+          contributiFissiArtComm={calcoli.totaleContributiFissiArtComm}
+          contributiEccedenzaArtComm={calcoli.totaleContributiEccedenzaArtComm}
         />
       </div>
 
