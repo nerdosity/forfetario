@@ -8,6 +8,9 @@ import {
   pathNastro,
   contaIncroci,
   incrociInevitabili,
+  geometriaEtichetta,
+  riquadroRiga,
+  bandaNastro,
   SOGLIA_RAMO,
   type IngressoSankey,
 } from './sankey'
@@ -212,11 +215,14 @@ describe('costruisciSankey — grafo', () => {
     }
   })
 
-  it('il fatturato etichetta a sinistra, le colonne intermedie sopra', () => {
+  it('il fatturato etichetta a sinistra, le colonne intermedie fuori dal rettangolo', () => {
     const g = costruisciSankey(misto)
     expect(g.nodi.find((n) => n.id === 'fatturato')?.posizioneEtichetta).toBe('sinistra')
     expect(g.nodi.find((n) => n.id === 'imponibile')?.posizioneEtichetta).toBe('sopra')
-    expect(g.nodi.find((n) => n.id === 'nonImponibile')?.posizioneEtichetta).toBe('sopra')
+    // 'sotto' e non 'sopra': è l'ultimo nodo della colonna 1 e la fascia sopra il
+    // suo bordo alto è attraversata dalle diagonali che scendono dall'imponibile
+    // verso il fondo della colonna 2 (vedi la suite sulle sovrapposizioni).
+    expect(g.nodi.find((n) => n.id === 'nonImponibile')?.posizioneEtichetta).toBe('sotto')
   })
 
   it('lascia spazio verticale sopra ogni nodo con etichetta "sopra"', () => {
@@ -542,6 +548,117 @@ describe('layout anti-incrocio', () => {
     for (const nodo of g.nodi) {
       expect(nodo.y).toBeGreaterThanOrEqual(0)
       expect(nodo.y + nodo.altezza).toBeLessThanOrEqual(340.001)
+    }
+  })
+})
+
+/**
+ * Caso semplice: una sola gestione, quindi nessuna colonna 3 e etichette
+ * 'destra' sulla colonna 2. Serve a verificare che il layout delle etichette
+ * non regredisca sullo scenario più stretto, dove il passo fra colonne è ampio.
+ */
+const piccolo: IngressoSankey = {
+  fatturato: 15_000,
+  imponibileLordo: 11_700,
+  contributiINPS: 3_800,
+  imposte: 900,
+}
+
+describe('etichette: nessuna sovrapposizione con elementi estranei', () => {
+  /** Opzioni identiche a quelle usate dal componente (viewBox 900, corsie 92/132). */
+  const COME_IL_COMPONENTE_REALE = {
+    larghezza: 900 - 92 - 132,
+    altezza: 380,
+    margineEtichette: 0,
+  }
+
+  /** Lo stesso testo di importo e quota che passa il componente, a larghezza tipica. */
+  const TESTO_VALORE = '00.000,00 € · 00%'
+
+  const casi: Array<[string, IngressoSankey]> = [
+    ['dati reali artigiano', realeArtigiano],
+    ['gestione separata', separata],
+    ['anno misto', misto],
+    ['fatturato basso senza gestioni multiple', piccolo],
+  ]
+
+  /** Sovrapposizione fra due riquadri: positiva su entrambi gli assi = collisione. */
+  const sovrapposti = (
+    a: { x0: number; x1: number; y0: number; y1: number },
+    b: { x0: number; x1: number; y0: number; y1: number },
+  ): boolean =>
+    Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0) > 0 &&
+    Math.min(a.y1, b.y1) - Math.max(a.y0, b.y0) > 0
+
+  for (const [nome, ingresso] of casi) {
+    it(`${nome}: nessuna etichetta invade un nodo o un nastro estraneo`, () => {
+      const g = costruisciSankey(ingresso, COME_IL_COMPONENTE_REALE)
+      const collisioni: string[] = []
+
+      for (const nodo of g.nodi) {
+        const etichetta = geometriaEtichetta(nodo, TESTO_VALORE, g.passoX, 8)
+        for (const riga of etichetta.righe) {
+          const box = riquadroRiga(riga, etichetta.x, etichetta.anchor)
+
+          // Contro i nodi: l'etichetta non deve coprire nessun ALTRO rettangolo.
+          for (const altro of g.nodi) {
+            if (altro.id === nodo.id) continue
+            const rettangolo = {
+              x0: altro.x,
+              x1: altro.x + altro.larghezza,
+              y0: altro.y,
+              y1: altro.y + altro.altezza,
+            }
+            if (sovrapposti(box, rettangolo)) {
+              collisioni.push(`"${riga.testo}" (${nodo.id}) sul nodo ${altro.id}`)
+            }
+          }
+
+          // Contro i nastri: sono ammessi solo i nastri del nodo etichettato,
+          // che nascono o finiscono sul suo bordo e gli appartengono visivamente.
+          for (const nastro of g.nastri) {
+            if (nastro.da === nodo.id || nastro.a === nodo.id) continue
+            const banda = bandaNastro(nastro, g.nodi, box.x0, box.x1)
+            if (!banda) continue
+            const oy = Math.min(box.y1, banda.bottom) - Math.max(box.y0, banda.top)
+            if (oy > 0) {
+              collisioni.push(
+                `"${riga.testo}" (${nodo.id}) sul nastro ${nastro.da}→${nastro.a} (${oy.toFixed(1)} unità)`,
+              )
+            }
+          }
+        }
+      }
+
+      expect(collisioni).toEqual([])
+    })
+
+    it(`${nome}: ogni etichetta resta dentro il viewBox in verticale`, () => {
+      // Il blocco 'sotto' cresce verso il margine inferiore: va verificato che la
+      // coda riservata in fondo alla colonna basti davvero.
+      const g = costruisciSankey(ingresso, COME_IL_COMPONENTE_REALE)
+      for (const nodo of g.nodi) {
+        const etichetta = geometriaEtichetta(nodo, TESTO_VALORE, g.passoX, 8)
+        for (const riga of etichetta.righe) {
+          const box = riquadroRiga(riga, etichetta.x, etichetta.anchor)
+          expect(box.y0).toBeGreaterThanOrEqual(0)
+          expect(box.y1).toBeLessThanOrEqual(380)
+        }
+      }
+    })
+  }
+
+  it('la quota non imponibile etichetta sotto il proprio bordo inferiore', () => {
+    // È il fix della collisione misurata: sopra il suo bordo alto passano le
+    // diagonali imponibile→contributi e imponibile→imposta, che coprono l'intera
+    // banda a qualunque ascissa. Sotto il bordo inferiore non passa nulla.
+    const g = costruisciSankey(realeArtigiano, COME_IL_COMPONENTE_REALE)
+    const nonImponibile = g.nodi.find((n) => n.id === 'nonImponibile')!
+    expect(nonImponibile.posizioneEtichetta).toBe('sotto')
+
+    const etichetta = geometriaEtichetta(nonImponibile, TESTO_VALORE, g.passoX, 8)
+    for (const riga of etichetta.righe) {
+      expect(riga.y).toBeGreaterThan(nonImponibile.y + nonImponibile.altezza)
     }
   })
 })

@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react'
 import {
   costruisciSankey,
+  geometriaEtichetta,
+  type EtichettaGeometrica,
   type IngressoSankey,
   type NastroSankey,
   type NodoSankey,
@@ -12,14 +14,25 @@ interface Props extends IngressoSankey {
   titolo?: string
 }
 
-/** Larghezza del viewBox: coordinate di lavoro, non pixel (l'SVG scala). */
-const LARGHEZZA = 760
-/** Altezza del viewBox, tarata per lasciare aria alle etichette su due righe. */
-const ALTEZZA = 340
+/**
+ * Larghezza del viewBox: coordinate di lavoro, non pixel (l'SVG scala sulla
+ * larghezza del contenitore). Più larga è, più spazio orizzontale hanno le
+ * etichette rispetto al testo, che resta di 11 unità.
+ */
+const LARGHEZZA = 900
+/** Altezza del viewBox, tarata per lasciare aria alle etichette su più righe. */
+const ALTEZZA = 380
 /** Distanza fra il bordo del nodo e l'inizio del testo dell'etichetta. */
 const GAP_ETICHETTA = 8
-/** Spazio riservato al testo su ciascun lato del disegno. */
-const CORSIA_TESTO = 148
+/**
+ * Corsie di testo esterne al disegno. Sono asimmetriche perché lo sono le
+ * etichette che ci scrivono: a sinistra solo "Fatturato" (che con l'importo
+ * sta in ~80 unità), a destra le voci più lunghe delle gestioni. Tenere la
+ * corsia sinistra stretta restituisce spazio al disegno, e quindi al passo fra
+ * colonne entro cui devono stare le etichette 'sopra'.
+ */
+const CORSIA_SINISTRA = 92
+const CORSIA_DESTRA = 132
 
 /**
  * Diagramma Sankey "dove vanno i soldi": colonne di nodi collegate da nastri
@@ -58,7 +71,7 @@ export function SankeyFlusso({
           contributiEccedenzaArtComm,
         },
         {
-          larghezza: LARGHEZZA - 2 * CORSIA_TESTO,
+          larghezza: LARGHEZZA - CORSIA_SINISTRA - CORSIA_DESTRA,
           altezza: ALTEZZA,
           margineEtichette: 0,
         },
@@ -119,7 +132,7 @@ export function SankeyFlusso({
           {/* Uscendo dall'area del disegno l'evidenziazione si azzera, anche se
               il puntatore lascia l'SVG di scatto senza passare dagli elementi. */}
           <g
-            transform={`translate(${CORSIA_TESTO} 0)`}
+            transform={`translate(${CORSIA_SINISTRA} 0)`}
             onMouseLeave={() => setEvidenza(null)}
           >
             {/* I nastri stanno sotto i nodi: i bordi dei nodi li rifiniscono. */}
@@ -174,7 +187,7 @@ export function SankeyFlusso({
                 mai dentro il nastro. Non si attenuano MAI con l'evidenziazione:
                 l'informazione non dipende dall'effetto al passaggio del mouse. */}
             {grafico.nodi.map((nodo) => (
-              <EtichettaNodo key={nodo.id} nodo={nodo} />
+              <EtichettaNodo key={nodo.id} nodo={nodo} passoX={grafico.passoX} />
             ))}
           </g>
         </svg>
@@ -198,32 +211,34 @@ export function SankeyFlusso({
 }
 
 /**
- * Nome su una riga, importo e quota sulla successiva. Sempre FUORI dal nastro,
- * così anche i rami sottilissimi restano etichettati e leggibili.
+ * Nome (su una o due righe, secondo la lunghezza) e, sotto, importo e quota.
+ * Sempre FUORI dal nastro, così anche i rami sottilissimi restano etichettati.
+ *
+ * La geometria — righe, a-capo e coordinate — arriva da `geometriaEtichetta`:
+ * l'SVG non manda a capo da solo e il calcolo sta nel dominio, dove i test
+ * possono verificare che nessuna etichetta finisca sopra un nastro altrui.
  */
-function EtichettaNodo({ nodo }: { nodo: NodoSankey }) {
+function EtichettaNodo({ nodo, passoX }: { nodo: NodoSankey; passoX: number }) {
   const colore = flowColore[nodo.colore]
-  const sopra = nodo.posizioneEtichetta === 'sopra'
-
-  // 'sopra': testo allineato al bordo sinistro del nodo, appoggiato sopra di esso.
-  // 'sinistra'/'destra': testo centrato verticalmente sul nodo, nella corsia esterna.
-  const x = sopra
-    ? nodo.x
-    : nodo.posizioneEtichetta === 'destra'
-      ? nodo.x + nodo.larghezza + GAP_ETICHETTA
-      : nodo.x - GAP_ETICHETTA
-  const anchor = sopra ? 'start' : nodo.posizioneEtichetta === 'destra' ? 'start' : 'end'
-  const yNome = sopra ? nodo.y - 14 : nodo.y + nodo.altezza / 2 - 2
-  const yValore = sopra ? nodo.y - 3 : nodo.y + nodo.altezza / 2 + 12
+  const etichetta: EtichettaGeometrica = geometriaEtichetta(
+    nodo,
+    `${formatEuro(nodo.valore)} · ${formatPercent(nodo.quota)}`,
+    passoX,
+    GAP_ETICHETTA,
+  )
 
   return (
-    <g textAnchor={anchor} className={`${colore.testo} ${theme.flowEtichetta}`} aria-hidden>
-      <text x={x} y={yNome} className={theme.flowNome}>
-        {nodo.etichetta}
-      </text>
-      <text x={x} y={yValore} className={theme.flowValore}>
-        {formatEuro(nodo.valore)} · {formatPercent(nodo.quota)}
-      </text>
+    <g textAnchor={etichetta.anchor} className={`${colore.testo} ${theme.flowEtichetta}`} aria-hidden>
+      {etichetta.righe.map((riga) => (
+        <text
+          key={`${riga.valore ? 'v' : 'n'}-${riga.y}`}
+          x={etichetta.x}
+          y={riga.y}
+          className={riga.valore ? theme.flowValore : theme.flowNome}
+        >
+          {riga.testo}
+        </text>
+      ))}
     </g>
   )
 }

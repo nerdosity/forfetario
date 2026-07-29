@@ -37,8 +37,15 @@ export type ColoreSankey = 'neutro' | 'imponibile' | 'contributi' | 'imposta' | 
  * 'sopra' (testo appoggiato sopra il bordo alto del nodo) perché a sinistra e a
  * destra lo spazio orizzontale è occupato dai nastri e dalle etichette delle
  * colonne adiacenti: così le etichette non si sovrappongono mai fra colonne.
+ *
+ * 'sotto' è la variante per l'ULTIMO nodo di una colonna interna. Sopra di lui
+ * passano le diagonali che scendono dai nodi più alti della sua colonna verso il
+ * fondo di quella successiva: quella fascia è attraversata per intero a
+ * qualunque ascissa, quindi nessuna riduzione di larghezza del testo la libera.
+ * Sotto il suo bordo inferiore, invece, non passa più nulla — i nastri nascono
+ * tutti dai bordi ALTI dei nodi e l'ultimo nodo è il più basso della colonna.
  */
-export type PosizioneEtichetta = 'sinistra' | 'destra' | 'sopra'
+export type PosizioneEtichetta = 'sinistra' | 'destra' | 'sopra' | 'sotto'
 
 /** Totali di partenza, presi dai campi già esposti dall'engine `calcola`. */
 export interface IngressoSankey {
@@ -102,6 +109,11 @@ export interface GraficoSankey {
   nastri: NastroSankey[]
   larghezza: number
   altezza: number
+  /**
+   * Distanza orizzontale fra due colonne consecutive. È lo spazio entro cui
+   * un'etichetta 'sopra' deve stare per non invadere la colonna successiva.
+   */
+  passoX: number
   /** Falso quando non c'è nulla da mostrare (fatturato a zero). */
   haDati: boolean
 }
@@ -120,19 +132,103 @@ export interface OpzioniSankey {
   margineEtichette?: number
 }
 
+/** Altezza di una riga di testo da 11px, comprensiva di interlinea. */
+export const ALTEZZA_RIGA = 11
+/**
+ * Larghezza media di un carattere a 11px nel font dell'interfaccia. Non è una
+ * misura tipografica esatta — serve come stima prudente e ripetibile per
+ * decidere gli a-capo e per il controllo di sovrapposizione nei test.
+ */
+export const LARGHEZZA_CARATTERE = 6
+/** Parte della riga sopra la linea di base (approssimata, font da 11px). */
+export const ASCENDENTE = 8
+/** Parte della riga sotto la linea di base. */
+export const DISCENDENTE = 3
+/**
+ * Aria fra il testo di un'etichetta e l'elemento che la segue: sotto, il bordo
+ * del nodo etichettato; a destra, la colonna successiva.
+ */
+export const RESPIRO_ETICHETTA = 6
+/** Distacco minimo fra due nodi della stessa colonna senza etichetta in mezzo. */
+export const DISTACCO_MINIMO = 8
+/**
+ * Quota del passo fra colonne che un'etichetta 'sopra' può occupare.
+ *
+ * Non è tutto il passo: lo spazio fra due colonne è attraversato dai nastri di
+ * quello span, che partono orizzontali dal bordo del nodo e curvano verso metà
+ * strada. Il vincolo non riguarda solo i nastri dello stesso span: un'etichetta
+ * lunga può anche sconfinare in un nastro che nasce da un ALTRO nodo della
+ * propria colonna (a un'altezza diversa) o da una colonna successiva. Restando
+ * in una fascia stretta vicino al bordo del nodo il testo occupa lo spazio in
+ * cui i nastri sono ancora prevedibilmente vicini alla loro quota di partenza;
+ * il valore è tarato sugli scenari reali in sankey.test.ts (nessuna etichetta
+ * deve invadere un nodo o un nastro estraneo).
+ */
+export const QUOTA_PASSO_ETICHETTA = 0.45
+
 const DEFAULT: Required<OpzioniSankey> = {
   larghezza: 720,
   altezza: 380,
   spessoreNodo: 10,
-  // Deve bastare a due righe di testo da 11px: le etichette 'sopra' vivono qui.
-  spazioNodi: 34,
-  margineVerticale: 30,
+  // Deve bastare alle righe di testo delle etichette 'sopra', che vivono qui:
+  // nome (fino a due righe se lungo) più la riga di importo e quota.
+  spazioNodi: 46,
+  margineVerticale: 34,
   margineEtichette: 4,
 }
 
 /** Azzera i negativi e i NaN: nel diagramma non esistono importi sotto zero. */
 export function clamp(valore: number): number {
   return Number.isFinite(valore) && valore > 0 ? valore : 0
+}
+
+/** Larghezza stimata di una stringa a 11px, in unità del viewBox. */
+export function larghezzaTesto(testo: string): number {
+  return testo.length * LARGHEZZA_CARATTERE
+}
+
+/**
+ * Larghezza utile per un'etichetta 'sopra', dato il passo fra colonne. Unico
+ * punto di verità: la usano sia il calcolo dell'altezza delle righe in
+ * `costruisciSankey` sia `geometriaEtichetta`, che devono concordare.
+ */
+export function larghezzaEtichettaSopra(passoX: number): number {
+  return Math.max(40, passoX * QUOTA_PASSO_ETICHETTA - RESPIRO_ETICHETTA)
+}
+
+/**
+ * Spezza l'etichetta in righe che stiano entro `larghezzaMax`.
+ *
+ * L'SVG non manda a capo da solo: un `<text>` lungo esce dal suo spazio e si
+ * scrive sopra i nastri della colonna successiva. Con le gestioni attive il
+ * passo fra colonne scende a ~150 unità, mentre "Quota non imponibile
+ * (coefficiente)" da sola ne misura ~210: senza a-capo sfonda l'intero span.
+ *
+ * Taglia solo sugli spazi (non spezza le parole) e si ferma al massimo a
+ * `righeMax` righe: se una parola da sola sfora, resta sulla sua riga.
+ */
+export function spezzaEtichetta(
+  testo: string,
+  larghezzaMax: number,
+  righeMax = 2,
+): string[] {
+  const parole = testo.split(' ').filter((p) => p.length > 0)
+  if (parole.length === 0) return ['']
+
+  const righe: string[] = []
+  let corrente = parole[0]
+  for (const parola of parole.slice(1)) {
+    const tentativo = `${corrente} ${parola}`
+    // Sull'ultima riga disponibile non si spezza più: si accoda tutto il resto.
+    if (righe.length === righeMax - 1 || larghezzaTesto(tentativo) <= larghezzaMax) {
+      corrente = tentativo
+    } else {
+      righe.push(corrente)
+      corrente = parola
+    }
+  }
+  righe.push(corrente)
+  return righe
 }
 
 /**
@@ -243,7 +339,7 @@ export function costruisciSankey(
   const v = ripartisci(ingresso)
 
   if (v.fatturato <= SOGLIA_RAMO) {
-    return { nodi: [], nastri: [], larghezza: opt.larghezza, altezza: opt.altezza, haDati: false }
+    return { nodi: [], nastri: [], larghezza: opt.larghezza, altezza: opt.altezza, passoX: 0, haDati: false }
   }
 
   // Le gestioni si mostrano solo se più di una supera la soglia: con una sola
@@ -277,7 +373,12 @@ export function costruisciSankey(
       // contesa con i nastri né con le etichette delle colonne vicine.
       { id: 'fatturato', etichetta: 'Fatturato', valore: v.fatturato, colonna: 0, colore: 'neutro', posizioneEtichetta: 'sinistra' },
       { id: 'imponibile', etichetta: 'Imponibile lordo', valore: v.imponibileLordo, colonna: 1, colore: 'imponibile', posizioneEtichetta: 'sopra' },
-      { id: 'nonImponibile', etichetta: 'Quota non imponibile (coefficiente)', valore: v.quotaNonImponibile, colonna: 1, colore: 'neutro', posizioneEtichetta: 'sopra' },
+      // 'sotto' e non 'sopra': è l'ultimo nodo della colonna 1, e la fascia sopra
+      // il suo bordo alto è attraversata per intero dalle diagonali che scendono
+      // da "Imponibile lordo" verso il fondo della colonna 2 (contributi e
+      // imposta). Restringere il testo non serve — il nastro copre quella banda a
+      // qualunque ascissa; sotto il bordo inferiore, invece, non passa nulla.
+      { id: 'nonImponibile', etichetta: 'Quota non imponibile (coefficiente)', valore: v.quotaNonImponibile, colonna: 1, colore: 'neutro', posizioneEtichetta: 'sotto' },
       { id: 'netto', etichetta: 'Netto in tasca', valore: v.nettoInTasca, colonna: 2, colore: 'netto', posizioneEtichetta: mostraGestioni ? 'sopra' : 'destra' },
       { id: 'contributi', etichetta: 'Contributi INPS', valore: v.contributiINPS, colonna: 2, colore: 'contributi', posizioneEtichetta: mostraGestioni ? 'sopra' : 'destra' },
       { id: 'imposta', etichetta: 'Imposta sostitutiva', valore: v.imposte, colonna: 2, colore: 'imposta', posizioneEtichetta: mostraGestioni ? 'sopra' : 'destra' },
@@ -313,25 +414,98 @@ export function costruisciSankey(
   const nodiPerColonna = new Map<number, NodoGrezzo[]>()
   for (const c of colonne) nodiPerColonna.set(c, grezzi.filter((n) => n.colonna === c))
 
-  const spazioMassimo = Math.max(
-    ...colonne.map((c) => (nodiPerColonna.get(c)!.length - 1) * opt.spazioNodi),
-  )
-  const altezzaUtile = Math.max(20, opt.altezza - 2 * opt.margineVerticale - spazioMassimo)
-  const scala = altezzaUtile / v.fatturato
-
   const ultimaColonna = colonne[colonne.length - 1]
   const xDisponibile = opt.larghezza - 2 * opt.margineEtichette - opt.spessoreNodo
   const passoX = ultimaColonna > 0 ? xDisponibile / ultimaColonna : 0
 
+  // Quante righe scrive un nodo fuori dal proprio rettangolo: le righe del nome
+  // (una o due, secondo la lunghezza) più quella di importo e quota. Solo le
+  // etichette 'sopra' e 'sotto' consumano spazio verticale; 'sinistra' e
+  // 'destra' scrivono nelle corsie esterne, centrate sul nodo.
+  const larghezzaUtile = larghezzaEtichettaSopra(passoX)
+  const righeFuori = new Map<string, number>()
+  for (const grezzo of grezzi) {
+    righeFuori.set(
+      grezzo.id,
+      grezzo.posizioneEtichetta === 'sopra' || grezzo.posizioneEtichetta === 'sotto'
+        ? spezzaEtichetta(grezzo.etichetta, larghezzaUtile).length + 1
+        : 0,
+    )
+  }
+
+  /** Altezza del blocco di testo di un'etichetta, compresa l'aria dal nodo. */
+  const bloccoEtichetta = (id: string): number => {
+    const righe = righeFuori.get(id) ?? 0
+    return righe === 0 ? 0 : righe * ALTEZZA_RIGA + RESPIRO_ETICHETTA
+  }
+
+  /**
+   * Spazio da lasciare SOPRA un nodo per la sua etichetta. Chi non scrive sopra
+   * non ha bisogno di nulla, ma fra due nodi resta comunque un distacco minimo
+   * perché i due rettangoli non si tocchino.
+   */
+  const spazioSopra = (id: string): number => {
+    const grezzo = grezzi.find((n) => n.id === id)
+    if (grezzo?.posizioneEtichetta !== 'sopra') return DISTACCO_MINIMO
+    return Math.max(DISTACCO_MINIMO, bloccoEtichetta(id))
+  }
+
+  /**
+   * Spazio da lasciare SOTTO un nodo: serve solo a chi scrive 'sotto', e va
+   * riservato in fondo alla colonna perché il testo non esca dal viewBox.
+   */
+  const spazioSotto = (id: string): number => {
+    const grezzo = grezzi.find((n) => n.id === id)
+    if (grezzo?.posizioneEtichetta !== 'sotto') return 0
+    return bloccoEtichetta(id) + DISCENDENTE
+  }
+
+  // Lo spazio fra due nodi consecutivi dipende da quante righe scrive il nodo
+  // di sotto: con `spazioNodi` fisso l'etichetta più lunga finiva dentro il
+  // nastro sottostante. `spazioNodi` resta come minimo garantito. Se il nodo di
+  // SOPRA scrive 'sotto', il suo blocco occupa la stessa intercapedine: i due
+  // ingombri si sommano, altrimenti si sovrapporrebbero.
+  const spazioFra = (idSopra: string, idSotto: string): number =>
+    Math.max(opt.spazioNodi, spazioSopra(idSotto) + spazioSotto(idSopra))
+
+  // Il primo nodo di ogni colonna deve stare abbastanza in basso perché la sua
+  // etichetta non esca dal viewBox: è il caso di "Netto in tasca", primo nodo
+  // della colonna 2 e più alto di tutti.
+  const cimaColonna = (lista: NodoGrezzo[]): number =>
+    Math.max(opt.margineVerticale, spazioSopra(lista[0].id) + ASCENDENTE)
+
+  /** Spazio sotto l'ultimo nodo della colonna, per la sua etichetta 'sotto'. */
+  const codaColonna = (lista: NodoGrezzo[]): number => spazioSotto(lista[lista.length - 1].id)
+
+  /** Somma delle intercapedini fra i nodi di una colonna. */
+  const intercapedini = (lista: NodoGrezzo[]): number =>
+    lista
+      .slice(1)
+      .reduce((somma, n, i) => somma + spazioFra(lista[i].id, n.id), 0)
+
+  const spazioMassimo = Math.max(...colonne.map((c) => intercapedini(nodiPerColonna.get(c)!)))
+  const cimaMassima = Math.max(...colonne.map((c) => cimaColonna(nodiPerColonna.get(c)!)))
+  const codaMassima = Math.max(...colonne.map((c) => codaColonna(nodiPerColonna.get(c)!)))
+  const altezzaUtile = Math.max(
+    20,
+    opt.altezza - cimaMassima - Math.max(opt.margineVerticale, codaMassima) - spazioMassimo,
+  )
+  const scala = altezzaUtile / v.fatturato
+
   const nodi: NodoSankey[] = []
   for (const c of colonne) {
     const listaColonna = nodiPerColonna.get(c)!
+    const cima = cimaColonna(listaColonna)
     const altezzaTotale =
       listaColonna.reduce((somma, n) => somma + n.valore * scala, 0) +
-      (listaColonna.length - 1) * opt.spazioNodi
-    // Colonna centrata verticalmente: i nastri restano il più orizzontali possibile.
-    let y = opt.margineVerticale + Math.max(0, (opt.altezza - 2 * opt.margineVerticale - altezzaTotale) / 2)
-    for (const grezzo of listaColonna) {
+      intercapedini(listaColonna)
+    // Colonna centrata nello spazio disponibile: i nastri restano il più
+    // orizzontali possibile, senza risalire sopra la cima riservata alle etichette
+    // né scendere nella coda riservata all'etichetta 'sotto' dell'ultimo nodo.
+    const fondo = Math.max(opt.margineVerticale, codaColonna(listaColonna))
+    let y = cima + Math.max(0, (opt.altezza - cima - fondo - altezzaTotale) / 2)
+    for (const [indice, grezzo] of listaColonna.entries()) {
+      if (indice > 0) y += spazioFra(listaColonna[indice - 1].id, grezzo.id)
       const altezza = Math.max(1, grezzo.valore * scala)
       nodi.push({
         ...grezzo,
@@ -341,7 +515,7 @@ export function costruisciSankey(
         larghezza: opt.spessoreNodo,
         altezza,
       })
-      y += altezza + opt.spazioNodi
+      y += altezza
     }
   }
 
@@ -352,7 +526,110 @@ export function costruisciSankey(
     nastri: costruisciNastri(nodi, nastriGrezzi, scala),
     larghezza: opt.larghezza,
     altezza: opt.altezza,
+    passoX,
     haDati: true,
+  }
+}
+
+/**
+ * Righe di testo di un'etichetta, con la geometria già risolta: il componente
+ * le disegna, i test ne verificano le sovrapposizioni. Tenere il calcolo qui
+ * (e non nel JSX) è ciò che rende la verifica possibile senza un browser.
+ */
+export interface RigaEtichetta {
+  testo: string
+  /** Coordinata della linea di base. */
+  y: number
+  /** `true` per la riga di importo e quota, `false` per le righe del nome. */
+  valore: boolean
+}
+
+export interface EtichettaGeometrica {
+  nodo: NodoSankey
+  /** Ascissa di ancoraggio del testo. */
+  x: number
+  /** Ancoraggio SVG corrispondente a `posizioneEtichetta`. */
+  anchor: 'start' | 'end'
+  righe: RigaEtichetta[]
+}
+
+/**
+ * Calcola le righe e le coordinate dell'etichetta di un nodo.
+ *
+ * 'sopra': il blocco di testo è appoggiato SOPRA il bordo alto del nodo, con la
+ * riga di importo per ultima, subito sopra il rettangolo; il nome va a capo se
+ * non sta nel passo fra colonne. 'sotto': stesso blocco, appoggiato SOTTO il
+ * bordo inferiore, con le righe che si impilano verso il basso.
+ * 'sinistra'/'destra': testo nella corsia esterna, centrato verticalmente sul
+ * nodo, sempre su due righe.
+ */
+export function geometriaEtichetta(
+  nodo: NodoSankey,
+  testoValore: string,
+  passoX: number,
+  gapEtichetta: number,
+): EtichettaGeometrica {
+  if (nodo.posizioneEtichetta === 'sopra' || nodo.posizioneEtichetta === 'sotto') {
+    const righeNome = spezzaEtichetta(nodo.etichetta, larghezzaEtichettaSopra(passoX))
+    const testi = [...righeNome, testoValore]
+    // 'sopra': l'ultima riga si appoggia sopra il bordo alto e le altre si
+    // impilano verso l'alto, così il blocco cresce lontano dal nodo e non dentro
+    // di esso. 'sotto': la PRIMA riga si appoggia sotto il bordo inferiore e le
+    // successive scendono, per lo stesso motivo speculare.
+    const sotto = nodo.posizioneEtichetta === 'sotto'
+    const primaBase = nodo.y + nodo.altezza + RESPIRO_ETICHETTA + ASCENDENTE
+    const ultimaBase = nodo.y - RESPIRO_ETICHETTA
+    return {
+      nodo,
+      x: nodo.x,
+      anchor: 'start',
+      righe: testi.map((testo, i) => ({
+        testo,
+        y: sotto ? primaBase + i * ALTEZZA_RIGA : ultimaBase - (testi.length - 1 - i) * ALTEZZA_RIGA,
+        valore: i === testi.length - 1,
+      })),
+    }
+  }
+
+  const destra = nodo.posizioneEtichetta === 'destra'
+  return {
+    nodo,
+    x: destra ? nodo.x + nodo.larghezza + gapEtichetta : nodo.x - gapEtichetta,
+    anchor: destra ? 'start' : 'end',
+    righe: [
+      { testo: nodo.etichetta, y: nodo.y + nodo.altezza / 2 - 2, valore: false },
+      { testo: testoValore, y: nodo.y + nodo.altezza / 2 + 12, valore: true },
+    ],
+  }
+}
+
+/** Rettangolo di ingombro, in unità del viewBox. */
+export interface Riquadro {
+  x0: number
+  y0: number
+  x1: number
+  y1: number
+}
+
+/** Ingombro stimato di una riga di testo, secondo il suo ancoraggio. */
+export function riquadroRiga(riga: RigaEtichetta, x: number, anchor: 'start' | 'end'): Riquadro {
+  const larghezza = larghezzaTesto(riga.testo)
+  return {
+    x0: anchor === 'start' ? x : x - larghezza,
+    x1: anchor === 'start' ? x + larghezza : x,
+    y0: riga.y - ASCENDENTE,
+    y1: riga.y + DISCENDENTE,
+  }
+}
+
+/** Ingombro complessivo di tutte le righe di un'etichetta. */
+export function riquadroEtichetta(etichetta: EtichettaGeometrica): Riquadro {
+  const riquadri = etichetta.righe.map((r) => riquadroRiga(r, etichetta.x, etichetta.anchor))
+  return {
+    x0: Math.min(...riquadri.map((r) => r.x0)),
+    x1: Math.max(...riquadri.map((r) => r.x1)),
+    y0: Math.min(...riquadri.map((r) => r.y0)),
+    y1: Math.max(...riquadri.map((r) => r.y1)),
   }
 }
 
@@ -461,6 +738,51 @@ function costruisciNastri(
       descrizione: `${sorgente.etichetta} → ${destinazione.etichetta}`,
     }
   })
+}
+
+/**
+ * Banda verticale occupata da un nastro nell'intervallo orizzontale [xa, xb].
+ *
+ * Il nastro è una Bézier cubica a tangenti orizzontali con spessore costante:
+ * si campiona la curva e si prende il minimo/massimo nell'intervallo. Serve al
+ * controllo di sovrapposizione delle etichette: un'etichetta non deve mai
+ * cadere sopra un nastro che non sia uno dei propri.
+ *
+ * Restituisce `null` se il nastro non passa affatto per quell'intervallo.
+ */
+export function bandaNastro(
+  nastro: NastroSankey,
+  nodi: NodoSankey[],
+  xa: number,
+  xb: number,
+  campioni = 160,
+): { top: number; bottom: number } | null {
+  const perId = new Map(nodi.map((n) => [n.id, n]))
+  const sorgente = perId.get(nastro.da)
+  const destinazione = perId.get(nastro.a)
+  if (!sorgente || !destinazione || sorgente.valore <= 0) return null
+
+  const x0 = sorgente.x + sorgente.larghezza
+  const x1 = destinazione.x
+  const cx = (x0 + x1) / 2
+  const spessore = Math.max(1, nastro.valore * (sorgente.altezza / sorgente.valore))
+
+  let top = Infinity
+  let bottom = -Infinity
+  for (let i = 0; i <= campioni; i++) {
+    const t = i / campioni
+    const u = 1 - t
+    const x = u * u * u * x0 + 3 * u * u * t * cx + 3 * u * t * t * cx + t * t * t * x1
+    if (x < xa || x > xb) continue
+    const y =
+      u * u * u * nastro.y0 +
+      3 * u * u * t * nastro.y0 +
+      3 * u * t * t * nastro.y1 +
+      t * t * t * nastro.y1
+    top = Math.min(top, y)
+    bottom = Math.max(bottom, y + spessore)
+  }
+  return Number.isFinite(top) ? { top, bottom } : null
 }
 
 /**
