@@ -1,7 +1,8 @@
 import { Plus, Trash2 } from 'lucide-react'
 import { Button, Dropdown, DropdownItem } from 'flowbite-react'
-import type { RisultatoCalcolo, TipoVersamento, VersamentoContributo } from '@/domain/types'
+import type { OpzioniRateazione, RisultatoCalcolo, TipoVersamento, VersamentoContributo } from '@/domain/types'
 import { versamentoVuoto } from '@/domain/regimeFactory'
+import { chiaveRateazioneVersamento, numeroRatePerChiave } from '@/domain/rateazione'
 import { Field, MoneyInput, Select, Tooltip } from '@/components/ui'
 import { formatEuro } from '@/domain/labels'
 import { theme } from '@/theme'
@@ -14,10 +15,18 @@ interface Props {
   modalita: 'totale' | 'dettaglio'
   totale: number | null
   dettaglio: VersamentoContributo[]
+  /** Scelte di rateazione globali: determinano quante rate mostrare per una voce. */
+  rateazioniImposta: Record<string, OpzioniRateazione>
   onChangeModalita: (m: 'totale' | 'dettaglio') => void
   onChangeTotale: (v: number | null) => void
   onChangeDettaglio: (righe: VersamentoContributo[]) => void
 }
+
+/** Tipi di versamento contributi che possono essere rateizzati dal calendario. */
+const TIPI_RATEIZZABILI = ['gs-saldo', 'gs-acconto-1', 'ecc-saldo', 'ecc-acconto-1'] as const
+type TipoRateizzabile = (typeof TIPI_RATEIZZABILI)[number]
+const isRateizzabile = (tipo: TipoVersamento): tipo is TipoRateizzabile =>
+  (TIPI_RATEIZZABILI as readonly string[]).includes(tipo)
 
 const TIPI: { value: TipoVersamento; label: string }[] = [
   { value: 'gs-saldo', label: 'G.S. · saldo (anno prec.)' },
@@ -106,20 +115,41 @@ export function ContributiVersati({
   modalita,
   totale,
   dettaglio,
+  rateazioniImposta,
   onChangeModalita,
   onChangeTotale,
   onChangeDettaglio,
 }: Props) {
   const somma = dettaglio.reduce((s, r) => s + (r.importo ?? 0), 0)
 
-  // Ogni voce tipizzata (saldo, acconto, singola rata) è unica per anno; solo
-  // 'altro' può ripetersi. Un tipo già presente non è riaggiungibile/riselezionabile.
-  const giaUsato = (tipo: TipoVersamento, escludiId?: string) =>
-    tipo !== 'altro' && dettaglio.some((r) => r.tipo === tipo && r.id !== escludiId)
+  // Numero di rate attive per un tipo rateizzabile (1 = nessuna rateazione).
+  const numeroRate = (tipo: TipoVersamento): number =>
+    isRateizzabile(tipo)
+      ? numeroRatePerChiave(rateazioniImposta, chiaveRateazioneVersamento(tipo, anno))
+      : 1
+
+  // Ogni voce tipizzata è unica per anno (una riga per numeroRata se rateizzata
+  // con più rate); solo 'altro' può ripetersi liberamente. Un tipo/rata già
+  // presente non è riaggiungibile/riselezionabile.
+  const giaUsato = (tipo: TipoVersamento, escludiId?: string) => {
+    if (tipo === 'altro') return false
+    const righeTipo = dettaglio.filter((r) => r.tipo === tipo && r.id !== escludiId)
+    return righeTipo.length >= numeroRate(tipo)
+  }
 
   const aggiungi = (tipo: TipoVersamento) => {
     if (giaUsato(tipo)) return
-    onChangeDettaglio([...dettaglio, versamentoVuoto(tipo)])
+    const n = numeroRate(tipo)
+    if (n <= 1) {
+      onChangeDettaglio([...dettaglio, versamentoVuoto(tipo)])
+      return
+    }
+    // Rateizzata: crea in un colpo solo le righe per tutte le rate mancanti.
+    const presenti = new Set(dettaglio.filter((r) => r.tipo === tipo).map((r) => r.numeroRata))
+    const nuove = Array.from({ length: n }, (_, i) => i + 1)
+      .filter((numeroRata) => !presenti.has(numeroRata))
+      .map((numeroRata) => ({ ...versamentoVuoto(tipo), numeroRata }))
+    onChangeDettaglio([...dettaglio, ...nuove])
   }
   const rimuovi = (id: string) => onChangeDettaglio(dettaglio.filter((r) => r.id !== id))
   const aggiorna = (id: string, patch: Partial<VersamentoContributo>) =>
@@ -140,6 +170,12 @@ export function ContributiVersati({
   const placeholderRiga = (r: VersamentoContributo): string => {
     const s = suggerimentoRiga(r)
     return s && s > 0.005 ? `Suggerito: ${formatEuro(s)}` : '0'
+  }
+
+  const etichettaRiga = (r: VersamentoContributo): string | undefined => {
+    if (r.numeroRata == null) return undefined
+    const n = numeroRate(r.tipo)
+    return n > 1 ? `Rata ${r.numeroRata} di ${n}` : undefined
   }
 
   return (
@@ -188,21 +224,35 @@ export function ContributiVersati({
             </p>
           )}
 
-          {dettaglio.map((r) => (
+          {dettaglio.map((r) => {
+            const etichettaRata = etichettaRiga(r)
+            return (
             <div key={r.id} className="space-y-2">
               <div className="flex items-start gap-2">
-                {/* Tipo: elastico. Importo: stretto (~8 cifre). Cestino: a destra. */}
+                {/* Tipo: elastico. Importo: stretto (~8 cifre). Cestino: a destra.
+                    Le righe-rata (parte di un piano di rateazione) mostrano il
+                    tipo come testo fisso: cambiarlo su una singola rata non ha senso. */}
                 <div className="min-w-0 flex-1">
-                  <Select<TipoVersamento>
-                    small
-                    value={r.tipo}
-                    onChange={(v) => {
-                      if (giaUsato(v, r.id)) return // tipo già presente in un'altra riga
-                      aggiorna(r.id, { tipo: v })
-                    }}
-                    // Mostra solo i tipi non già usati altrove (più quello corrente)
-                    options={TIPI.filter((t) => !giaUsato(t.value, r.id))}
-                  />
+                  {etichettaRata ? (
+                    <div className="flex h-full min-h-[2.125rem] items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-2.5 text-xs text-slate-600">
+                      <span className="font-medium text-slate-700">
+                        {TIPI.find((t) => t.value === r.tipo)?.label ?? r.tipo}
+                      </span>
+                      <span className="text-slate-400">·</span>
+                      <span>{etichettaRata}</span>
+                    </div>
+                  ) : (
+                    <Select<TipoVersamento>
+                      small
+                      value={r.tipo}
+                      onChange={(v) => {
+                        if (giaUsato(v, r.id)) return // tipo già presente in un'altra riga
+                        aggiorna(r.id, { tipo: v })
+                      }}
+                      // Mostra solo i tipi non già usati altrove (più quello corrente)
+                      options={TIPI.filter((t) => !giaUsato(t.value, r.id))}
+                    />
+                  )}
                 </div>
                 <div className="w-28 shrink-0">
                   <MoneyInput
@@ -253,7 +303,8 @@ export function ContributiVersati({
                 </div>
               )}
             </div>
-          ))}
+            )
+          })}
 
           {/* Aggiunta per categoria: le voci già inserite spariscono dai menu */}
           <div className="flex flex-wrap gap-2">

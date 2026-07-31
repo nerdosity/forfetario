@@ -7,9 +7,10 @@ import { ContributiVersati } from '@/components/ContributiVersati'
 import { AnagraficaPanel } from '@/components/AnagraficaPanel'
 import { Card, Field, MoneyInput, Select } from '@/components/ui'
 import { anniDisponibili } from '@/data/taxData'
-import type { CalcoloInput, DatiAnno, RisultatoCalcolo } from '@/domain/types'
+import type { CalcoloInput, DatiAnno, OpzioniRateazione, RisultatoCalcolo } from '@/domain/types'
 import { datiDellAnno } from '@/domain/types'
 import { regimeVuoto } from '@/domain/regimeFactory'
+import { chiaveRateazioneImposta, numeroRatePerChiave } from '@/domain/rateazione'
 import { esportaInput, importaInput } from '@/data/inputStorage'
 import type { AnagraficaContribuente } from '@/data/anagraficaStorage'
 import { theme } from '@/theme'
@@ -36,6 +37,7 @@ function SezioneAnno({
   sottotitolo,
   dati,
   calcoli,
+  rateazioniImposta,
   onChange,
 }: {
   anno: number
@@ -43,10 +45,24 @@ function SezioneAnno({
   sottotitolo: string
   dati: DatiAnno
   calcoli: RisultatoCalcolo | null
+  rateazioniImposta: Record<string, OpzioniRateazione>
   onChange: (d: DatiAnno) => void
 }) {
   const set = (patch: Partial<DatiAnno>) => onChange({ ...dati, ...patch })
   const hasGS = dati.regimi.some((r) => r.tipo === 'separata')
+
+  // Numero di rate attive per saldo/1° acconto imposta (1 = nessuna rateazione).
+  const nRateSaldo = numeroRatePerChiave(rateazioniImposta, chiaveRateazioneImposta('saldo', anno))
+  const nRateAcconto1 = numeroRatePerChiave(rateazioniImposta, chiaveRateazioneImposta('acconto1', anno))
+
+  // Aggiorna l'importo di una rata dell'array corrispondente, creandolo se assente.
+  const setRata = (campo: 'impostaSaldoVersatoRate' | 'impostaAcconto1VersatoRate', n: number) =>
+    (indice: number, valore: number | null) => {
+      const attuale = dati[campo] ?? Array(n).fill(null)
+      const rate = [...attuale]
+      rate[indice] = valore
+      set({ [campo]: rate })
+    }
 
   return (
     <Card
@@ -67,6 +83,7 @@ function SezioneAnno({
           modalita={dati.modalitaContributi}
           totale={dati.contributiVersatiTotale}
           dettaglio={dati.contributiVersati}
+          rateazioniImposta={rateazioniImposta}
           onChangeModalita={(m) => set({ modalitaContributi: m })}
           onChangeTotale={(v) => set({ contributiVersatiTotale: v })}
           onChangeDettaglio={(righe) => set({ contributiVersati: righe })}
@@ -76,31 +93,75 @@ function SezioneAnno({
       <div className="mt-5">
         <p className={`${theme.groupLabel} mb-2`}>Imposta sostitutiva versata nel {anno}</p>
         <div className="space-y-3">
-          <Field
-            label="Saldo imposta (competenza anno prec.)"
-            small
-            info={`Saldo dell'imposta sostitutiva ${anno - 1}, versato a giugno ${anno}.`}
-          >
-            <MoneyInput
-              value={dati.impostaSaldoVersato}
-              onChange={(v) => set({ impostaSaldoVersato: v })}
-              placeholder="0"
-              min={0}
-              step={0.01}
-              nullable
-            />
-          </Field>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="1° acconto" small info={`1° acconto imposta versato a giugno ${anno}.`}>
+          {nRateSaldo <= 1 ? (
+            <Field
+              label="Saldo imposta (competenza anno prec.)"
+              small
+              info={`Saldo dell'imposta sostitutiva ${anno - 1}, versato a giugno ${anno}.`}
+            >
               <MoneyInput
-                value={dati.impostaAcconto1Versato}
-                onChange={(v) => set({ impostaAcconto1Versato: v })}
+                value={dati.impostaSaldoVersato}
+                onChange={(v) => set({ impostaSaldoVersato: v })}
                 placeholder="0"
                 min={0}
                 step={0.01}
                 nullable
               />
             </Field>
+          ) : (
+            <div className="space-y-2">
+              <p className={theme.labelSmall}>
+                Saldo imposta (competenza {anno - 1}) — rateizzato in {nRateSaldo} rate
+              </p>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {Array.from({ length: nRateSaldo }, (_, i) => (
+                  <Field key={i} label={`Rata ${i + 1} di ${nRateSaldo}`} small>
+                    <MoneyInput
+                      small
+                      value={dati.impostaSaldoVersatoRate?.[i] ?? null}
+                      onChange={(v) => setRata('impostaSaldoVersatoRate', nRateSaldo)(i, v)}
+                      placeholder="0"
+                      min={0}
+                      step={0.01}
+                      nullable
+                    />
+                  </Field>
+                ))}
+              </div>
+            </div>
+          )}
+          <div className="grid grid-cols-2 gap-3">
+            {nRateAcconto1 <= 1 ? (
+              <Field label="1° acconto" small info={`1° acconto imposta versato a giugno ${anno}.`}>
+                <MoneyInput
+                  value={dati.impostaAcconto1Versato}
+                  onChange={(v) => set({ impostaAcconto1Versato: v })}
+                  placeholder="0"
+                  min={0}
+                  step={0.01}
+                  nullable
+                />
+              </Field>
+            ) : (
+              <div className="col-span-2 space-y-2">
+                <p className={theme.labelSmall}>1° acconto — rateizzato in {nRateAcconto1} rate</p>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  {Array.from({ length: nRateAcconto1 }, (_, i) => (
+                    <Field key={i} label={`Rata ${i + 1} di ${nRateAcconto1}`} small>
+                      <MoneyInput
+                        small
+                        value={dati.impostaAcconto1VersatoRate?.[i] ?? null}
+                        onChange={(v) => setRata('impostaAcconto1VersatoRate', nRateAcconto1)(i, v)}
+                        placeholder="0"
+                        min={0}
+                        step={0.01}
+                        nullable
+                      />
+                    </Field>
+                  ))}
+                </div>
+              </div>
+            )}
             <Field label="2° acconto" small info={`2° acconto imposta versato a novembre ${anno}.`}>
               <MoneyInput
                 value={dati.impostaAcconto2Versato}
@@ -234,6 +295,7 @@ export function InputPanel({ input, calcoli, anagrafica, onChangeAnagrafica, onC
           sottotitolo={`Anno precedente: usato per acconti e saldi del ${anno}.`}
           dati={conRegime(datiPrec)}
           calcoli={null}
+          rateazioniImposta={input.rateazioniImposta}
           onChange={(d) => setAnno(anno - 1, d)}
         />
         <SezioneAnno
@@ -242,6 +304,7 @@ export function InputPanel({ input, calcoli, anagrafica, onChangeAnagrafica, onC
           sottotitolo="Anno di riferimento: la dichiarazione e i contributi che stai calcolando."
           dati={conRegime(datiRif)}
           calcoli={calcoli}
+          rateazioniImposta={input.rateazioniImposta}
           onChange={(d) => setAnno(anno, d)}
         />
         <SezioneAnno
@@ -249,6 +312,7 @@ export function InputPanel({ input, calcoli, anagrafica, onChangeAnagrafica, onC
           sottotitolo={`Anno successivo: i pagamenti fatti nel ${anno + 1} (saldo ${anno}, acconti ${anno + 1}, 4ª rata ${anno}).`}
           dati={conRegime(datiSucc)}
           calcoli={calcoli}
+          rateazioniImposta={input.rateazioniImposta}
           onChange={(d) => setAnno(anno + 1, d)}
         />
       </div>

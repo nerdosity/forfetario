@@ -133,8 +133,10 @@ describe('espandiRateazione', () => {
     expect(out[1].data).toBe('16 Luglio 2026')
     expect(out[2].data).toBe('20 Agosto 2026')
     expect(out[6].data).toBe('16 Dicembre 2026')
-    // Con più rate il collegamento ai versamenti non è più significativo.
-    for (const r of out) expect(r.riferimenti).toBeUndefined()
+    // I riferimenti restano (per-rata, via numeroRata): versatoPerScadenza
+    // confronta ogni rata coi versamenti inseriti per quel numero di rata.
+    for (const r of out) expect(r.riferimenti).toEqual(['imposta-saldo'])
+    expect(out.map((r) => r.numeroRata)).toEqual([1, 2, 3, 4, 5, 6, 7])
     // La chiave e l'importo originario restano per riconfigurare il piano.
     for (const r of out) {
       expect(r.chiaveRateazione).toBe('saldo-2025')

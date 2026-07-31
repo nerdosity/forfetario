@@ -105,6 +105,13 @@ export interface Scadenza {
    */
   dataRateazioneBase?: string
   /**
+   * Sulle righe-rata generate da una rateazione (numeroRate > 1): numero
+   * 1-based della rata, per collegarla al versamento corrispondente
+   * (VersamentoContributo.numeroRata o impostaSaldoVersatoRate/
+   * impostaAcconto1VersatoRate) in versatoPerScadenza.
+   */
+  numeroRata?: number
+  /**
    * Importo "consigliato" da versare, diverso dal dovuto ufficiale: tiene conto
    * di un credito della stessa gestione INPS maturato l'anno prima (versamenti
    * netti in più del dovuto). Può essere negativo (credito > saldo). Presente
@@ -193,6 +200,15 @@ export interface VersamentoContributo {
    * che dipende solo dal tipo.
    */
   deducibile?: boolean
+  /**
+   * Presente solo se `tipo` è stato rateizzato (vedi Scadenza.chiaveRateazione):
+   * numero della rata (1-based) a cui questo versamento si riferisce. Righe
+   * generate automaticamente da ContributiVersati quando la voce ha un piano di
+   * rateazione attivo, una per rata. Non incide sulla somma per `tipo` (usata
+   * ovunque come dovuto/deducibilità), serve solo a versatoPerScadenza per
+   * confrontare la singola rata col relativo importo nel calendario.
+   */
+  numeroRata?: number
 }
 
 /**
@@ -222,6 +238,17 @@ export interface DatiAnno {
 
   /** Imposta sostitutiva: 2° acconto versato durante l'anno (novembre). */
   impostaAcconto2Versato: number | null
+
+  /**
+   * Presenti SOLO quando il rispettivo versamento (saldo o 1° acconto) è stato
+   * rateizzato (vedi Scadenza.chiaveRateazione / CalcoloInput.rateazioniImposta):
+   * un importo per rata (indice 0 = rata 1), al posto della cifra unica. Quando
+   * l'array esiste sostituisce il campo scalare corrispondente ovunque serva il
+   * totale versato (la somma dei suoi elementi non-null). Il 2° acconto non è
+   * rateizzabile e non ha un equivalente.
+   */
+  impostaSaldoVersatoRate?: (number | null)[]
+  impostaAcconto1VersatoRate?: (number | null)[]
 }
 
 /** DatiAnno vuoto (un solo regime vuoto, nessun versamento). */

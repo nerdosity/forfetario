@@ -94,6 +94,12 @@ export interface RisultatoScadenze {
  * i campi acconti imposta; gli altri le righe tipizzate della lista contributi.
  * Restituisce null se la scadenza non è tracciabile (nessun riferimento, es.
  * scadenze future i cui versamenti non sono ancora stati inseriti).
+ *
+ * Sulle righe-rata (scadenza.numeroRata presente) il confronto si restringe
+ * alla singola rata: righe di dettaglio con lo stesso numeroRata, o l'elemento
+ * corrispondente degli array *VersatoRate. Se quell'array non esiste ancora
+ * (rateazione appena applicata, nessun versamento per-rata inserito) si ricade
+ * sul valore scalare solo per la rata 1, così una rata unica resta tracciabile.
  */
 export function versatoPerScadenza(scadenza: Scadenza, input: CalcoloInput): number | null {
   const rif = scadenza.riferimenti
@@ -103,17 +109,24 @@ export function versatoPerScadenza(scadenza: Scadenza, input: CalcoloInput): num
   // i suoi versamenti stanno in anni[annoScadenza]. Così i pagamenti seguono
   // sempre l'anno giusto, senza distinzioni corrente/successivo.
   const dati = datiDellAnno(input, scadenza.annoScadenza)
+  const numeroRata = scadenza.numeroRata
 
   const importoVoce = (tipo: TipoVersamento): number =>
     dati.modalitaContributi === 'dettaglio'
       ? dati.contributiVersati
-          .filter((r) => r.tipo === tipo)
+          .filter((r) => r.tipo === tipo && (numeroRata == null || r.numeroRata === numeroRata))
           .reduce((s, r) => s + (r.importo ?? 0), 0)
       : 0
 
+  const importoImposta = (scalare: number | null, rate: (number | null)[] | undefined): number => {
+    if (numeroRata == null) return scalare ?? 0
+    if (rate) return rate[numeroRata - 1] ?? 0
+    return numeroRata === 1 ? scalare ?? 0 : 0
+  }
+
   return rif.reduce((tot, r) => {
-    if (r === 'imposta-saldo') return tot + (dati.impostaSaldoVersato ?? 0)
-    if (r === 'imposta-acconto1') return tot + (dati.impostaAcconto1Versato ?? 0)
+    if (r === 'imposta-saldo') return tot + importoImposta(dati.impostaSaldoVersato, dati.impostaSaldoVersatoRate)
+    if (r === 'imposta-acconto1') return tot + importoImposta(dati.impostaAcconto1Versato, dati.impostaAcconto1VersatoRate)
     if (r === 'imposta-acconto2') return tot + (dati.impostaAcconto2Versato ?? 0)
     return tot + importoVoce(r)
   }, 0)

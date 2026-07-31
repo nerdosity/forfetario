@@ -25,6 +25,8 @@ function input(over: {
   impostaSaldoVersatoAnnoCorrente?: number | null
   impostaAcconto1VersatoAnnoCorrente?: number | null
   impostaAcconto2VersatoAnnoCorrente?: number | null
+  impostaSaldoVersatoRate?: (number | null)[]
+  impostaAcconto1VersatoRate?: (number | null)[]
 } = {}): CalcoloInput {
   return {
     anno: 2025,
@@ -37,6 +39,8 @@ function input(over: {
         impostaSaldoVersato: over.impostaSaldoVersatoAnnoCorrente ?? null,
         impostaAcconto1Versato: over.impostaAcconto1VersatoAnnoCorrente ?? null,
         impostaAcconto2Versato: over.impostaAcconto2VersatoAnnoCorrente ?? null,
+        ...(over.impostaSaldoVersatoRate ? { impostaSaldoVersatoRate: over.impostaSaldoVersatoRate } : {}),
+        ...(over.impostaAcconto1VersatoRate ? { impostaAcconto1VersatoRate: over.impostaAcconto1VersatoRate } : {}),
       },
     },
     rateazioniImposta: {},
@@ -85,6 +89,49 @@ describe('versatoPerScadenza', () => {
     expect(versatoPerScadenza(scadenza({ riferimenti: ['imposta-saldo'] }), i)).toBe(100)
     expect(versatoPerScadenza(scadenza({ riferimenti: ['imposta-acconto1'] }), i)).toBe(200)
     expect(versatoPerScadenza(scadenza({ riferimenti: ['imposta-acconto2'] }), i)).toBe(300)
+  })
+
+  describe('righe-rata (scadenza.numeroRata presente)', () => {
+    it('imposta rateizzata: legge il valore della rata dall\'array *VersatoRate', () => {
+      const i = input({ impostaSaldoVersatoRate: [111, 222, null] })
+      const rata1 = scadenza({ riferimenti: ['imposta-saldo'], numeroRata: 1 })
+      const rata2 = scadenza({ riferimenti: ['imposta-saldo'], numeroRata: 2 })
+      const rata3 = scadenza({ riferimenti: ['imposta-saldo'], numeroRata: 3 })
+      expect(versatoPerScadenza(rata1, i)).toBe(111)
+      expect(versatoPerScadenza(rata2, i)).toBe(222)
+      expect(versatoPerScadenza(rata3, i)).toBe(0)
+    })
+
+    it('imposta rateizzata senza array ancora creato: fallback sul valore scalare solo per la rata 1', () => {
+      const i = input({ impostaSaldoVersatoAnnoCorrente: 992.35 })
+      const rata1 = scadenza({ riferimenti: ['imposta-saldo'], numeroRata: 1 })
+      const rata2 = scadenza({ riferimenti: ['imposta-saldo'], numeroRata: 2 })
+      expect(versatoPerScadenza(rata1, i)).toBe(992.35)
+      expect(versatoPerScadenza(rata2, i)).toBe(0)
+    })
+
+    it('contributi rateizzati: legge solo le righe con lo stesso numeroRata', () => {
+      const i = input({
+        contributiVersatiDettaglio: [
+          { id: 'a', tipo: 'gs-saldo', descrizione: '', importo: 300, numeroRata: 1 },
+          { id: 'b', tipo: 'gs-saldo', descrizione: '', importo: 400, numeroRata: 2 },
+        ],
+      })
+      const rata1 = scadenza({ riferimenti: ['gs-saldo'], numeroRata: 1 })
+      const rata2 = scadenza({ riferimenti: ['gs-saldo'], numeroRata: 2 })
+      expect(versatoPerScadenza(rata1, i)).toBe(300)
+      expect(versatoPerScadenza(rata2, i)).toBe(400)
+    })
+
+    it('scadenza non-rata (numeroRata assente) continua a sommare tutte le righe del tipo', () => {
+      const i = input({
+        contributiVersatiDettaglio: [
+          { id: 'a', tipo: 'gs-saldo', descrizione: '', importo: 300, numeroRata: 1 },
+          { id: 'b', tipo: 'gs-saldo', descrizione: '', importo: 400, numeroRata: 2 },
+        ],
+      })
+      expect(versatoPerScadenza(scadenza({ riferimenti: ['gs-saldo'] }), i)).toBe(700)
+    })
   })
 })
 

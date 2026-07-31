@@ -96,6 +96,49 @@ export function rateazioneNeutra(opzioni: OpzioniRateazione): boolean {
   return o.inizio === 'giugno' && o.numeroRate === 1
 }
 
+/**
+ * Numero di rate attive per una chiave di rateazione (1 se non rateizzata):
+ * usato dalle UI di inserimento versamenti (ContributiVersati, InputPanel) per
+ * decidere quante righe/campi mostrare per una voce rateizzabile.
+ */
+export function numeroRatePerChiave(
+  rateazioniImposta: Record<string, OpzioniRateazione> | undefined,
+  chiave: string | undefined,
+): number {
+  const opzioni = chiave ? rateazioniImposta?.[chiave] : undefined
+  return opzioni ? normalizzaOpzioni(opzioni).numeroRate : 1
+}
+
+/**
+ * Chiave di rateazione (vedi Scadenza.chiaveRateazione, generata in scadenze.ts)
+ * dei tipi di versamento contributi rateizzabili, per l'anno SOLARE in cui il
+ * versamento è stato fatto: il saldo versato durante l'anno X è sempre di
+ * competenza X-1, l'acconto-1 versato durante l'anno X è di competenza X.
+ * Restituisce undefined per i tipi non rateizzabili (2° acconto, fissi, altro).
+ */
+export function chiaveRateazioneVersamento(
+  tipo: 'gs-saldo' | 'gs-acconto-1' | 'ecc-saldo' | 'ecc-acconto-1',
+  annoVersamento: number,
+): string {
+  switch (tipo) {
+    case 'gs-saldo': return `gs-saldo-${annoVersamento - 1}`
+    case 'gs-acconto-1': return `gs-acconto1-${annoVersamento}`
+    case 'ecc-saldo': return `ecc-saldo-${annoVersamento - 1}`
+    case 'ecc-acconto-1': return `ecc-acconto1-${annoVersamento}`
+  }
+}
+
+/**
+ * Come chiaveRateazioneVersamento, per i due campi imposta sostitutiva
+ * rateizzabili (il 2° acconto non lo è mai).
+ */
+export function chiaveRateazioneImposta(
+  tipo: 'saldo' | 'acconto1',
+  annoVersamento: number,
+): string {
+  return tipo === 'saldo' ? `saldo-${annoVersamento - 1}` : `acconto1-${annoVersamento}`
+}
+
 /** Una rata del piano di versamento. */
 export interface RataPiano {
   numero: number
@@ -204,9 +247,10 @@ export function modalitaDaChiave(chiave?: string): ModalitaRateazione {
 /**
  * Espande una scadenza d'imposta rateizzata nelle sue righe-rata per il
  * calendario. Con opzioni neutre (giugno, rata unica) restituisce la scadenza
- * invariata. Le righe-rata non sono collegate ai versamenti inseriti
- * (l'importo cambia per maggiorazione/interessi), salvo il caso di rata unica
- * differita a luglio, che resta un singolo versamento tracciabile.
+ * invariata. Ogni riga-rata riceve `numeroRata` e mantiene i `riferimenti`
+ * della scadenza originaria: versatoPerScadenza le confronta coi versamenti
+ * inseriti per quella rata specifica (non con l'aggregato del tipo), quindi
+ * il collegamento resta possibile anche con più rate.
  */
 export function espandiRateazione(scadenza: Scadenza, opzioni: OpzioniRateazione): Scadenza[] {
   if (rateazioneNeutra(opzioni)) return [scadenza]
@@ -254,8 +298,8 @@ export function espandiRateazione(scadenza: Scadenza, opzioni: OpzioniRateazione
       chiaveRateazione: scadenza.chiaveRateazione,
       importoRateazioneBase: scadenza.importo,
       dataRateazioneBase: scadenza.data,
-      // Con più rate il collegamento ai versamenti inseriti perde significato.
-      riferimenti: n === 1 ? scadenza.riferimenti : undefined,
+      riferimenti: scadenza.riferimenti,
+      numeroRata: rata.numero,
     }
   })
 }

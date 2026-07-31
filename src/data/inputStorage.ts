@@ -62,6 +62,7 @@ function normalizzaVersamento(raw: unknown): VersamentoContributo {
   const base = versamentoVuoto()
   if (typeof raw !== 'object' || raw === null) return base
   const o = raw as Record<string, unknown>
+  const numeroRata = num(o.numeroRata, 0)
   return {
     id: base.id,
     tipo: TIPI_VERS.includes(o.tipo as TipoVersamento) ? (o.tipo as TipoVersamento) : 'altro',
@@ -69,6 +70,7 @@ function normalizzaVersamento(raw: unknown): VersamentoContributo {
     importo: numOrNull(o.importo),
     // default true: voce deducibile salvo che sia stata esplicitamente esclusa
     deducibile: o.deducibile === false ? false : true,
+    ...(numeroRata > 0 ? { numeroRata } : {}),
   }
 }
 
@@ -93,11 +95,19 @@ function normalizzaRateazioni(raw: unknown): Record<string, OpzioniRateazione> {
   return out
 }
 
+/** Ricostruisce un array di importi per rata da dati grezzi, o undefined se assente/vuoto. */
+function normalizzaRateImposta(raw: unknown): (number | null)[] | undefined {
+  if (!Array.isArray(raw) || raw.length === 0) return undefined
+  return raw.map(numOrNull)
+}
+
 /** Ricostruisce un DatiAnno valido da dati grezzi. */
 function normalizzaDatiAnno(raw: unknown): DatiAnno {
   const base = datiAnnoVuoto([regimeVuoto()])
   if (typeof raw !== 'object' || raw === null) return base
   const o = raw as Record<string, unknown>
+  const impostaSaldoVersatoRate = normalizzaRateImposta(o.impostaSaldoVersatoRate)
+  const impostaAcconto1VersatoRate = normalizzaRateImposta(o.impostaAcconto1VersatoRate)
   return {
     regimi: normalizzaRegimi(o.regimi),
     modalitaContributi: o.modalitaContributi === 'dettaglio' ? 'dettaglio' : 'totale',
@@ -106,6 +116,8 @@ function normalizzaDatiAnno(raw: unknown): DatiAnno {
     impostaSaldoVersato: numOrNull(o.impostaSaldoVersato),
     impostaAcconto1Versato: numOrNull(o.impostaAcconto1Versato),
     impostaAcconto2Versato: numOrNull(o.impostaAcconto2Versato),
+    ...(impostaSaldoVersatoRate ? { impostaSaldoVersatoRate } : {}),
+    ...(impostaAcconto1VersatoRate ? { impostaAcconto1VersatoRate } : {}),
   }
 }
 
