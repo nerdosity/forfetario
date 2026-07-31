@@ -234,6 +234,47 @@ describe('calcolaScadenze — rateazione imposta', () => {
     expect(saldo[0].data).toBe('30 Giugno 2026')
   })
 
+  it('saldo e 1° acconto imposte anno+1 sono tracciabili (riferimenti imposta-*)', () => {
+    // Regressione: queste due scadenze (a differenza delle gemelle nell'anno
+    // corrente) non avevano mai avuto `riferimenti`, quindi versatoPerScadenza
+    // le trattava sempre come non tracciabili (—) anche da versamento unico.
+    const { scadenzeAnnoSuccessivo } = calcolaScadenze(params)
+    const saldo = scadenzeAnnoSuccessivo.find((s) => s.chiaveRateazione === 'saldo-2025')
+    const acconto1 = scadenzeAnnoSuccessivo.find((s) => s.chiaveRateazione === 'acconto1-2026')
+    expect(saldo?.riferimenti).toEqual(['imposta-saldo'])
+    expect(acconto1?.riferimenti).toEqual(['imposta-acconto1'])
+  })
+
+  it('con rateazione applicata: ogni rata resta tracciabile per numeroRata', () => {
+    const { scadenzeAnnoSuccessivo } = calcolaScadenze({
+      ...params,
+      rateazioniImposta: { 'saldo-2025': { inizio: 'giugno', numeroRate: 5 } },
+    })
+    const rate = scadenzeAnnoSuccessivo.filter((s) => s.chiaveRateazione === 'saldo-2025')
+    expect(rate).toHaveLength(5)
+    for (const r of rate) expect(r.riferimenti).toEqual(['imposta-saldo'])
+    expect(rate.map((r) => r.numeroRata)).toEqual([1, 2, 3, 4, 5])
+
+    const i: CalcoloInput = {
+      anno: 2025,
+      anni: {
+        2026: {
+          regimi: [],
+          modalitaContributi: 'totale',
+          contributiVersatiTotale: null,
+          contributiVersati: [],
+          impostaSaldoVersato: null,
+          impostaAcconto1Versato: null,
+          impostaAcconto2Versato: null,
+          impostaSaldoVersatoRate: [199.28, 199.28, 199.26, 199.26, 195.27],
+        },
+      },
+      rateazioniImposta: {},
+    }
+    expect(versatoPerScadenza(rate[0], i)).toBe(199.28)
+    expect(versatoPerScadenza(rate[2], i)).toBe(199.26)
+  })
+
   it('con rateazione applicata: il calendario espone le rate con le loro date', () => {
     const { scadenzeAnnoSuccessivo } = calcolaScadenze({
       ...params,

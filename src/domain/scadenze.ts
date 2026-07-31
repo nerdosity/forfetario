@@ -656,6 +656,7 @@ export function calcolaScadenze({
       importo: saldoImposteDaVersare,
       componenti: [{ tipo: `Saldo imposte ${anno}`, importo: saldoImposteDaVersare }],
       annoScadenza: annoSucc,
+      riferimenti: ['imposta-saldo'],
       chiaveRateazione: `saldo-${anno}`,
     })
   }
@@ -668,6 +669,7 @@ export function calcolaScadenze({
       importo: accontoImposteAnnoSucc,
       componenti: [{ tipo: `1° acconto imposte ${annoSucc} (su tax ${anno})`, importo: accontoImposteAnnoSucc }],
       annoScadenza: annoSucc,
+      riferimenti: ['imposta-acconto1'],
       chiaveRateazione: `acconto1-${annoSucc}`,
     })
   }
