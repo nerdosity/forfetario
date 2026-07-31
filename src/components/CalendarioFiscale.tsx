@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { Calendar, CalendarClock } from 'lucide-react'
+import { Calendar, CalendarArrowDown, CalendarClock } from 'lucide-react'
 import {
   Badge,
+  Button,
   Table,
   TableBody,
   TableCell,
@@ -14,6 +15,7 @@ import { scadenzaPagata, versatoPerScadenza, bilancioPagamenti, type BilancioCat
 import { Card, Tooltip } from '@/components/ui'
 import { RateazioneModal } from '@/components/RateazioneModal'
 import { formatEuro } from '@/domain/labels'
+import { generaIcsScadenze, dataStampaIcsOra } from '@/domain/icsCalendario'
 import { theme, tableTheme } from '@/theme'
 
 interface Props {
@@ -309,6 +311,17 @@ function TabellaScadenze({ titolo, sottotitolo, scadenze, input, mostraBilancio,
   )
 }
 
+/** Scarica una stringa come file, tramite un Blob e un link temporaneo. */
+function scaricaFile(contenuto: string, nomeFile: string, mime: string): void {
+  const blob = new Blob([contenuto], { type: mime })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = nomeFile
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 /** Calendario fiscale: adempimenti dell'anno corrente e del successivo in tabella. */
 export function CalendarioFiscale({ anno, calcoli, input, onRateazioneChange }: Props) {
   const correnti = calcoli.scadenzeAnnoCorrente.filter((s) => s.importo > 0.005)
@@ -318,6 +331,15 @@ export function CalendarioFiscale({ anno, calcoli, input, onRateazioneChange }: 
   const [daRateizzare, setDaRateizzare] = useState<Scadenza | null>(null)
   const onRateizza = onRateazioneChange ? setDaRateizzare : undefined
 
+  // Esporta come .ics le scadenze non ancora pagate (evita di riempire il
+  // calendario Google di eventi ormai chiusi): un evento per ciascuna, con
+  // dettaglio dell'importo e promemoria, importabile in Google/Outlook/Apple Calendar.
+  const esportaCalendario = () => {
+    const daEsportare = [...correnti, ...future].filter((s) => !scadenzaPagata(s, input))
+    const ics = generaIcsScadenze(daEsportare, dataStampaIcsOra())
+    scaricaFile(ics, `forfettario-scadenze-${anno}.ics`, 'text/calendar')
+  }
+
   return (
     <Card
       title="Calendario fiscale"
@@ -325,6 +347,19 @@ export function CalendarioFiscale({ anno, calcoli, input, onRateazioneChange }: 
       iconIntent="warning"
       info="Le date indicate sono quelle nominali. Se cadono in giorni festivi o prefestivi slittano al primo giorno lavorativo utile. Le voci già coperte da un versamento inserito appaiono barrate."
     >
+      <div className="mb-5 flex items-center justify-end gap-1.5">
+        <Button color="light" size="sm" onClick={esportaCalendario}>
+          <CalendarArrowDown size={15} className="mr-2" aria-hidden />
+          Esporta scadenze (.ics)
+        </Button>
+        <Tooltip
+          content="Scarica un file .ics con un evento per ogni scadenza non ancora pagata (dettaglio importo e rata inclusi), da importare in Google Calendar, Outlook o Apple Calendar. Le scadenze già segnate come pagate non vengono incluse."
+          label="Cosa contiene il file"
+          posizione="sotto"
+          allinea="destra"
+        />
+      </div>
+
       <div className="space-y-8">
         <TabellaScadenze
           titolo={`Scadenze ${anno}`}
