@@ -7,12 +7,13 @@ import { ContributiVersati } from '@/components/ContributiVersati'
 import { AnagraficaPanel } from '@/components/AnagraficaPanel'
 import { Card, Field, MoneyInput, Select } from '@/components/ui'
 import { anniDisponibili } from '@/data/taxData'
-import type { CalcoloInput, DatiAnno, OpzioniRateazione, RisultatoCalcolo } from '@/domain/types'
+import type { CalcoloInput, DatiAnno, OpzioniRateazione, RisultatoCalcolo, Scadenza } from '@/domain/types'
 import { datiDellAnno } from '@/domain/types'
 import { regimeVuoto } from '@/domain/regimeFactory'
 import { chiaveRateazioneImposta, numeroRatePerChiave } from '@/domain/rateazione'
 import { esportaInput, importaInput } from '@/data/inputStorage'
 import type { AnagraficaContribuente } from '@/data/anagraficaStorage'
+import { formatEuro } from '@/domain/labels'
 import { theme } from '@/theme'
 
 interface InputPanelProps {
@@ -37,6 +38,7 @@ function SezioneAnno({
   sottotitolo,
   dati,
   calcoli,
+  scadenzeAnno,
   rateazioniImposta,
   onChange,
 }: {
@@ -45,6 +47,8 @@ function SezioneAnno({
   sottotitolo: string
   dati: DatiAnno
   calcoli: RisultatoCalcolo | null
+  /** Scadenze che cadono in quest'anno (calcoli.scadenzeAnnoCorrente/Successivo), per mostrare il dovuto di ogni rata. */
+  scadenzeAnno: Scadenza[]
   rateazioniImposta: Record<string, OpzioniRateazione>
   onChange: (d: DatiAnno) => void
 }) {
@@ -54,6 +58,12 @@ function SezioneAnno({
   // Numero di rate attive per saldo/1° acconto imposta (1 = nessuna rateazione).
   const nRateSaldo = numeroRatePerChiave(rateazioniImposta, chiaveRateazioneImposta('saldo', anno))
   const nRateAcconto1 = numeroRatePerChiave(rateazioniImposta, chiaveRateazioneImposta('acconto1', anno))
+
+  // Importo dovuto di ogni rata (per chiave), da mostrare accanto al campo:
+  // evita di scambiare per errore l'importo di una rata di Saldo con quello
+  // della stessa rata di 1° acconto (voci diverse, stesse date/numerazione).
+  const dovutoRata = (chiave: string, numeroRata: number): number | undefined =>
+    scadenzeAnno.find((s) => s.chiaveRateazione === chiave && s.numeroRata === numeroRata)?.importo
 
   // Aggiorna l'importo di una rata dell'array corrispondente, creandolo se assente.
   const setRata = (campo: 'impostaSaldoVersatoRate' | 'impostaAcconto1VersatoRate', n: number) =>
@@ -84,6 +94,7 @@ function SezioneAnno({
           totale={dati.contributiVersatiTotale}
           dettaglio={dati.contributiVersati}
           rateazioniImposta={rateazioniImposta}
+          scadenzeAnno={scadenzeAnno}
           onChangeModalita={(m) => set({ modalitaContributi: m })}
           onChangeTotale={(v) => set({ contributiVersatiTotale: v })}
           onChangeDettaglio={(righe) => set({ contributiVersati: righe })}
@@ -114,19 +125,27 @@ function SezioneAnno({
                 Saldo imposta (competenza {anno - 1}) — rateizzato in {nRateSaldo} rate
               </p>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                {Array.from({ length: nRateSaldo }, (_, i) => (
-                  <Field key={i} label={`Rata ${i + 1} di ${nRateSaldo}`} small>
-                    <MoneyInput
+                {Array.from({ length: nRateSaldo }, (_, i) => {
+                  const dovuto = dovutoRata(chiaveRateazioneImposta('saldo', anno), i + 1)
+                  return (
+                    <Field
+                      key={i}
+                      label={`Rata ${i + 1} di ${nRateSaldo}`}
                       small
-                      value={dati.impostaSaldoVersatoRate?.[i] ?? null}
-                      onChange={(v) => setRata('impostaSaldoVersatoRate', nRateSaldo)(i, v)}
-                      placeholder="0"
-                      min={0}
-                      step={0.01}
-                      nullable
-                    />
-                  </Field>
-                ))}
+                      info={dovuto != null ? `Dovuto per questa rata: ${formatEuro(dovuto)}.` : undefined}
+                    >
+                      <MoneyInput
+                        small
+                        value={dati.impostaSaldoVersatoRate?.[i] ?? null}
+                        onChange={(v) => setRata('impostaSaldoVersatoRate', nRateSaldo)(i, v)}
+                        placeholder={dovuto != null ? `Dovuto: ${formatEuro(dovuto)}` : '0'}
+                        min={0}
+                        step={0.01}
+                        nullable
+                      />
+                    </Field>
+                  )
+                })}
               </div>
             </div>
           )}
@@ -146,19 +165,27 @@ function SezioneAnno({
               <div className="col-span-2 space-y-2">
                 <p className={theme.labelSmall}>1° acconto — rateizzato in {nRateAcconto1} rate</p>
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                  {Array.from({ length: nRateAcconto1 }, (_, i) => (
-                    <Field key={i} label={`Rata ${i + 1} di ${nRateAcconto1}`} small>
-                      <MoneyInput
+                  {Array.from({ length: nRateAcconto1 }, (_, i) => {
+                    const dovuto = dovutoRata(chiaveRateazioneImposta('acconto1', anno), i + 1)
+                    return (
+                      <Field
+                        key={i}
+                        label={`Rata ${i + 1} di ${nRateAcconto1}`}
                         small
-                        value={dati.impostaAcconto1VersatoRate?.[i] ?? null}
-                        onChange={(v) => setRata('impostaAcconto1VersatoRate', nRateAcconto1)(i, v)}
-                        placeholder="0"
-                        min={0}
-                        step={0.01}
-                        nullable
-                      />
-                    </Field>
-                  ))}
+                        info={dovuto != null ? `Dovuto per questa rata: ${formatEuro(dovuto)}.` : undefined}
+                      >
+                        <MoneyInput
+                          small
+                          value={dati.impostaAcconto1VersatoRate?.[i] ?? null}
+                          onChange={(v) => setRata('impostaAcconto1VersatoRate', nRateAcconto1)(i, v)}
+                          placeholder={dovuto != null ? `Dovuto: ${formatEuro(dovuto)}` : '0'}
+                          min={0}
+                          step={0.01}
+                          nullable
+                        />
+                      </Field>
+                    )
+                  })}
                 </div>
               </div>
             )}
@@ -295,6 +322,7 @@ export function InputPanel({ input, calcoli, anagrafica, onChangeAnagrafica, onC
           sottotitolo={`Anno precedente: usato per acconti e saldi del ${anno}.`}
           dati={conRegime(datiPrec)}
           calcoli={null}
+          scadenzeAnno={[]}
           rateazioniImposta={input.rateazioniImposta}
           onChange={(d) => setAnno(anno - 1, d)}
         />
@@ -304,6 +332,7 @@ export function InputPanel({ input, calcoli, anagrafica, onChangeAnagrafica, onC
           sottotitolo="Anno di riferimento: la dichiarazione e i contributi che stai calcolando."
           dati={conRegime(datiRif)}
           calcoli={calcoli}
+          scadenzeAnno={calcoli?.scadenzeAnnoCorrente ?? []}
           rateazioniImposta={input.rateazioniImposta}
           onChange={(d) => setAnno(anno, d)}
         />
@@ -312,6 +341,7 @@ export function InputPanel({ input, calcoli, anagrafica, onChangeAnagrafica, onC
           sottotitolo={`Anno successivo: i pagamenti fatti nel ${anno + 1} (saldo ${anno}, acconti ${anno + 1}, 4ª rata ${anno}).`}
           dati={conRegime(datiSucc)}
           calcoli={calcoli}
+          scadenzeAnno={calcoli?.scadenzeAnnoSuccessivo ?? []}
           rateazioniImposta={input.rateazioniImposta}
           onChange={(d) => setAnno(anno + 1, d)}
         />

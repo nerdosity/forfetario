@@ -1,6 +1,6 @@
 import { Plus, Trash2 } from 'lucide-react'
 import { Button, Dropdown, DropdownItem } from 'flowbite-react'
-import type { OpzioniRateazione, RisultatoCalcolo, TipoVersamento, VersamentoContributo } from '@/domain/types'
+import type { OpzioniRateazione, RisultatoCalcolo, Scadenza, TipoVersamento, VersamentoContributo } from '@/domain/types'
 import { versamentoVuoto } from '@/domain/regimeFactory'
 import { chiaveRateazioneVersamento, numeroRatePerChiave } from '@/domain/rateazione'
 import { Field, MoneyInput, Select, Tooltip } from '@/components/ui'
@@ -17,6 +17,8 @@ interface Props {
   dettaglio: VersamentoContributo[]
   /** Scelte di rateazione globali: determinano quante rate mostrare per una voce. */
   rateazioniImposta: Record<string, OpzioniRateazione>
+  /** Scadenze che cadono in quest'anno, per mostrare il dovuto di ogni rata. */
+  scadenzeAnno: Scadenza[]
   onChangeModalita: (m: 'totale' | 'dettaglio') => void
   onChangeTotale: (v: number | null) => void
   onChangeDettaglio: (righe: VersamentoContributo[]) => void
@@ -116,6 +118,7 @@ export function ContributiVersati({
   totale,
   dettaglio,
   rateazioniImposta,
+  scadenzeAnno,
   onChangeModalita,
   onChangeTotale,
   onChangeDettaglio,
@@ -167,7 +170,18 @@ export function ContributiVersati({
   const suggerimentoRiga = (r: VersamentoContributo): number | null =>
     r.tipo === 'altro' ? null : suggerimento(r.tipo, calcoli, hasGSCorrente)
 
+  // Dovuto della singola rata (dalle scadenze del calendario): evita di
+  // scambiare per errore l'importo di una rata di un tipo con quello della
+  // stessa rata di un altro tipo (voci diverse, stesse date/numerazione).
+  const dovutoRiga = (r: VersamentoContributo): number | undefined => {
+    if (r.numeroRata == null || !isRateizzabile(r.tipo)) return undefined
+    const chiave = chiaveRateazioneVersamento(r.tipo, anno)
+    return scadenzeAnno.find((s) => s.chiaveRateazione === chiave && s.numeroRata === r.numeroRata)?.importo
+  }
+
   const placeholderRiga = (r: VersamentoContributo): string => {
+    const dovuto = dovutoRiga(r)
+    if (dovuto != null) return `Dovuto: ${formatEuro(dovuto)}`
     const s = suggerimentoRiga(r)
     return s && s > 0.005 ? `Suggerito: ${formatEuro(s)}` : '0'
   }
