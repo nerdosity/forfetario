@@ -51,6 +51,8 @@ export const theme = {
   h3: 'text-base font-semibold text-slate-800',
   labelSmall: 'block text-xs font-medium text-slate-600',
   helpText: 'text-xs text-slate-500',
+  // Link inline per applicare un valore suggerito a un campo
+  btnSuggerimento: 'text-xs font-medium text-blue-600 underline-offset-2 transition-colors hover:text-blue-800 hover:underline',
 
   // --- Bottoni icona (azioni inline nei card) ---
   btnIcon: 'inline-flex items-center justify-center rounded-md p-1.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700',

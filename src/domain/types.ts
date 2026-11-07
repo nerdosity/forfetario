@@ -358,6 +358,12 @@ export interface RisultatoCalcolo extends RisultatoAnno {
   /** Saldo eccedenza Art/Comm anno corrente. */
   saldoContributiEccArtCommAnnoCorrente: number
 
+  /** Saldo G.S. dell'anno precedente, al netto degli acconti dovuti (si versa nell'anno corrente). */
+  saldoContributiGSPrecedente: number
+
+  /** Saldo eccedenza Art/Comm dell'anno precedente, al netto degli acconti dovuti. */
+  saldoContributiEccArtCommPrecedente: number
+
   /** Scadenze che cadono nell'anno di riferimento. */
   scadenzeAnnoCorrente: Scadenza[]
 

@@ -499,3 +499,16 @@ describe('SaldiCrediti legge lo stesso saldo del calendario', () => {
     expect(saldo!.nota).toBeDefined()
   })
 })
+
+describe('saldi contributi anno precedente esposti per la UI', () => {
+  it('saldo G.S. N-1 = dovuto N-1 meno acconti dovuti N-1, non il dovuto pieno', () => {
+    const r = calcola(mkInput({
+      anno: 2024,
+      regimiCorrente: [regimeSeparata],
+      regimiPrecedente: [{ ...regimeSeparata, id: 'p' }],
+    }))
+    expect(r.saldoContributiGSPrecedente).toBeLessThanOrEqual(r.datiAnnoPrecedente.totaleContributiSeparata)
+    expect(r.saldoContributiGSPrecedente).toBeGreaterThanOrEqual(0)
+    expect(r.saldoContributiEccArtCommPrecedente).toBe(0)
+  })
+})

@@ -53,7 +53,6 @@ function SezioneAnno({
   onChange: (d: DatiAnno) => void
 }) {
   const set = (patch: Partial<DatiAnno>) => onChange({ ...dati, ...patch })
-  const hasGS = dati.regimi.some((r) => r.tipo === 'separata')
 
   // Numero di rate attive per saldo/1° acconto imposta (1 = nessuna rateazione).
   const nRateSaldo = numeroRatePerChiave(rateazioniImposta, chiaveRateazioneImposta('saldo', anno))
@@ -89,7 +88,6 @@ function SezioneAnno({
         <ContributiVersati
           anno={anno}
           calcoli={calcoli}
-          hasGSCorrente={hasGS}
           modalita={dati.modalitaContributi}
           totale={dati.contributiVersatiTotale}
           dettaglio={dati.contributiVersati}

@@ -10,8 +10,6 @@ import { theme } from '@/theme'
 interface Props {
   anno: number
   calcoli: RisultatoCalcolo | null
-  /** Vero se l'anno corrente ha almeno un periodo in gestione separata. */
-  hasGSCorrente: boolean
   modalita: 'totale' | 'dettaglio'
   totale: number | null
   dettaglio: VersamentoContributo[]
@@ -69,41 +67,38 @@ const MENU: { label: string; voci: { tipo: TipoVersamento; label: string }[] }[]
 ]
 
 /**
- * Importo suggerito (placeholder) per una tipologia di versamento, secondo le
- * regole di cassa INPS (nel forfettario i contributi a percentuale si versano
- * a saldo l'anno dopo, con acconti per l'anno in corso):
- * - G.S. saldo  → dovuto G.S. dell'anno precedente.
- * - G.S. acconto → 40% del dovuto G.S. dell'anno precedente (regola ADE: acconto
- *   = 80% in due rate del 40%), solo se ancora in G.S.
- * - Fissi 1-3 → rata trimestrale esatta dell'anno corrente.
- * - Fissi 4ª  → rata trimestrale dell'anno precedente (si versa a febbraio).
- * - Eccedenza saldo → eccedenza dovuta dell'anno precedente.
- * - Eccedenza acconto → eccedenza dovuta dell'anno corrente, 50% a rata.
+ * Importo suggerito per una tipologia di versamento: quanto si PAGA in cassa
+ * nell'anno, preso dal motore di calcolo (nessun ricalcolo qui):
+ * - G.S. / eccedenza saldo → saldo NETTO dell'anno precedente.
+ * - G.S. / eccedenza acconto → metà degli acconti dovuti (due rate).
+ * - Fissi 1-3 → rata trimestrale dell'anno corrente.
+ * - Fissi 4ª → rata trimestrale dell'anno precedente (si versa a febbraio).
  */
-function suggerimento(
-  tipo: TipoVersamento,
-  calcoli: RisultatoCalcolo | null,
-  hasGSCorrente: boolean,
-): number | null {
+function suggerimento(tipo: TipoVersamento, calcoli: RisultatoCalcolo | null): number | null {
   if (!calcoli) return null
-  const prec = calcoli.datiAnnoPrecedente
-  // G.S.: 40% del dovuto dell'anno precedente per rata; eccedenza: 50% a rata.
-  const accGS = hasGSCorrente ? ((prec?.totaleContributiSeparata ?? 0) * 0.8) / 2 : 0
-  const accEcc = calcoli.totaleContributiEccedenzaArtComm / 2
   switch (tipo) {
-    case 'gs-saldo': return prec?.totaleContributiSeparata ?? 0
+    case 'gs-saldo': return calcoli.saldoContributiGSPrecedente
     case 'gs-acconto-1':
-    case 'gs-acconto-2': return accGS
+    case 'gs-acconto-2': return calcoli.accontiGSVersatiPerAnnoRif / 2
     case 'fissi-1': return calcoli.rateFisse[0]
     case 'fissi-2': return calcoli.rateFisse[1]
     case 'fissi-3': return calcoli.rateFisse[2]
-    case 'fissi-4-prec': return prec?.rateFisse[3] ?? 0
-    case 'ecc-saldo': return prec?.totaleContributiEccedenzaArtComm ?? 0
+    case 'fissi-4-prec': return calcoli.datiAnnoPrecedente.rateFisse[3]
+    case 'ecc-saldo': return calcoli.saldoContributiEccArtCommPrecedente
     case 'ecc-acconto-1':
-    case 'ecc-acconto-2': return accEcc
+    case 'ecc-acconto-2': return calcoli.accontiEccArtCommVersatiPerAnnoRif / 2
     default: return null
   }
 }
+
+/** Tipi che concorrono alla stima della cifra unica (tutto ciò che si versa nell'anno). */
+const TIPI_STIMA: TipoVersamento[] = [
+  'gs-saldo', 'gs-acconto-1', 'gs-acconto-2',
+  'fissi-1', 'fissi-2', 'fissi-3', 'fissi-4-prec',
+  'ecc-saldo', 'ecc-acconto-1', 'ecc-acconto-2',
+]
+
+const arrotonda = (v: number) => Math.round(v * 100) / 100
 
 /**
  * Inserimento dei contributi versati nell'anno: o una cifra unica modificabile,
@@ -113,7 +108,6 @@ function suggerimento(
 export function ContributiVersati({
   anno,
   calcoli,
-  hasGSCorrente,
   modalita,
   totale,
   dettaglio,
@@ -124,6 +118,8 @@ export function ContributiVersati({
   onChangeDettaglio,
 }: Props) {
   const somma = dettaglio.reduce((s, r) => s + (r.importo ?? 0), 0)
+  // Stima della cifra unica: somma dei suggerimenti per riga (calcolata una volta).
+  const stimaTotale = TIPI_STIMA.reduce((s, t) => s + (suggerimento(t, calcoli) ?? 0), 0)
 
   // Numero di rate attive per un tipo rateizzabile (1 = nessuna rateazione).
   const numeroRate = (tipo: TipoVersamento): number =>
@@ -168,7 +164,7 @@ export function ContributiVersati({
     )
 
   const suggerimentoRiga = (r: VersamentoContributo): number | null =>
-    r.tipo === 'altro' ? null : suggerimento(r.tipo, calcoli, hasGSCorrente)
+    r.tipo === 'altro' ? null : suggerimento(r.tipo, calcoli)
 
   // Dovuto della singola rata (dalle scadenze del calendario): evita di
   // scambiare per errore l'importo di una rata di un tipo con quello della
@@ -224,11 +220,16 @@ export function ContributiVersati({
           <MoneyInput
             value={totale}
             onChange={onChangeTotale}
-            placeholder={`Stima: ${formatEuro(calcoli?.totaleContributiINPS ?? 0)}`}
+            placeholder={`Stima: ${formatEuro(stimaTotale)}`}
             min={0}
             step={0.01}
             nullable
           />
+          {stimaTotale > 0.005 && (
+            <button type="button" className={theme.btnSuggerimento} onClick={() => onChangeTotale(arrotonda(stimaTotale))}>
+              Usa stima {formatEuro(stimaTotale)}
+            </button>
+          )}
         </Field>
       ) : (
         <div className="space-y-3">
@@ -278,6 +279,16 @@ export function ContributiVersati({
                     step={0.01}
                     nullable
                   />
+                  {(() => {
+                    const sug = suggerimentoRiga(r)
+                    const val = dovutoRiga(r) ?? sug
+                    if (val == null || val <= 0.005 || r.importo != null) return null
+                    return (
+                      <button type="button" className={theme.btnSuggerimento} onClick={() => aggiorna(r.id, { importo: arrotonda(val) })}>
+                        Usa {formatEuro(val)}
+                      </button>
+                    )
+                  })()}
                 </div>
                 <button
                   type="button"

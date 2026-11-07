@@ -324,6 +324,8 @@ export function calcola(input: CalcoloInput): RisultatoCalcolo {
     accontiEccArtCommVersatiPerAnnoRif: accontiEccDovuti,
     accontiEccArtCommVersatiRealiPerAnnoRif: accontoVersatoDaLista(datiAnnoRif, 'ecc'),
     saldoContributiEccArtCommAnnoCorrente: saldoContributiEccArtComm,
+    saldoContributiGSPrecedente,
+    saldoContributiEccArtCommPrecedente,
     scadenzeAnnoCorrente,
     scadenzeAnnoSuccessivo,
   }
