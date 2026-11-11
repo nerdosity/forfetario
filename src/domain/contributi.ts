@@ -240,7 +240,7 @@ const TRIMESTRI_MESI: number[][] = [[1, 2, 3], [4, 5, 6], [7, 8, 9], [10, 11, 12
  * regimi in gestione separata restituisce tutte zero.
  */
 export function rateFissePerTrimestre(regime: Regime, anno: number): [number, number, number, number] {
-  if (regime.tipo === 'separata') return [0, 0, 0, 0]
+  if (regime.tipo === 'separata' || regime.tipo === 'enpap') return [0, 0, 0, 0]
   const dati = datiFiscaliConFallback(anno)
   const { ivsAnnuale, maternitaMensile } =
     regime.tipo === 'commercianti' ? dati.contributoFisso.commercianti : dati.contributoFisso.artigiani

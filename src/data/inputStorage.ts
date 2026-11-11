@@ -1,4 +1,4 @@
-import type { CalcoloInput, DatiAnno, OpzioniRateazione, Regime, TipoVersamento, VersamentoContributo } from '@/domain/types'
+import type { CalcoloInput, DatiAnno, InizioAttivita, OpzioniRateazione, Regime, TipoVersamento, VersamentoContributo } from '@/domain/types'
 import { datiAnnoVuoto } from '@/domain/types'
 import { regimeVuoto, versamentoVuoto } from '@/domain/regimeFactory'
 import { normalizzaOpzioni, rateazioneNeutra } from '@/domain/rateazione'
@@ -27,7 +27,16 @@ function normalizzaRegime(raw: unknown): Regime {
   if (typeof raw !== 'object' || raw === null) return base
   const o = raw as Record<string, unknown>
 
-  const tipo = o.tipo === 'artigiani' || o.tipo === 'commercianti' ? o.tipo : 'separata'
+  const tipo = o.tipo === 'artigiani' || o.tipo === 'commercianti' || o.tipo === 'enpap' ? o.tipo : 'separata'
+  const aliquotaEnpap =
+    typeof o.aliquotaSoggettivoEnpap === 'number' && Number.isInteger(o.aliquotaSoggettivoEnpap) &&
+    o.aliquotaSoggettivoEnpap >= 10 && o.aliquotaSoggettivoEnpap <= 30 && (o.aliquotaSoggettivoEnpap - 10) % 2 === 0
+      ? o.aliquotaSoggettivoEnpap
+      : 10
+  const riduzioneEnpap =
+    o.riduzioneMinimoEnpap === 'meta' || o.riduzioneMinimoEnpap === 'terzo' || o.riduzioneMinimoEnpap === 'quinto'
+      ? o.riduzioneMinimoEnpap
+      : 'nessuna'
   const aliquota = o.aliquota === 5 || o.aliquota === 15 ? o.aliquota : base.aliquota
   const riduzione =
     o.riduzioneContributi === '35' || o.riduzioneContributi === '50' ? o.riduzioneContributi : 'nessuna'
@@ -43,6 +52,7 @@ function normalizzaRegime(raw: unknown): Regime {
     giornoFine: num(o.giornoFine, base.giornoFine),
     fatturato: num(o.fatturato, 0),
     riduzioneContributi: riduzione,
+    ...(tipo === 'enpap' ? { aliquotaSoggettivoEnpap: aliquotaEnpap, riduzioneMinimoEnpap: riduzioneEnpap } : {}),
   }
 }
 
@@ -54,7 +64,8 @@ function normalizzaRegimi(raw: unknown): Regime[] {
 const TIPI_VERS: TipoVersamento[] = [
   'gs-saldo', 'gs-acconto-1', 'gs-acconto-2',
   'fissi-1', 'fissi-2', 'fissi-3', 'fissi-4-prec',
-  'ecc-saldo', 'ecc-acconto-1', 'ecc-acconto-2', 'altro',
+  'ecc-saldo', 'ecc-acconto-1', 'ecc-acconto-2',
+  'enpap-soggettivo', 'enpap-integrativo', 'enpap-maternita', 'altro',
 ]
 
 /** Ricostruisce una riga di versamento valida da dati grezzi. */
@@ -69,7 +80,8 @@ function normalizzaVersamento(raw: unknown): VersamentoContributo {
     descrizione: typeof o.descrizione === 'string' ? o.descrizione : '',
     importo: numOrNull(o.importo),
     // default true: voce deducibile salvo che sia stata esplicitamente esclusa
-    deducibile: o.deducibile === false ? false : true,
+    // l'integrativo ENPAP è in rivalsa sul cliente: mai deducibile
+    deducibile: o.deducibile === false || o.tipo === 'enpap-integrativo' ? false : true,
     ...(numeroRata > 0 ? { numeroRata } : {}),
   }
 }
@@ -174,6 +186,16 @@ function migraDalVecchio(o: Record<string, unknown>, anno: number): Record<numbe
   return anni
 }
 
+/** Inizio attività valido (anno intero plausibile, mese 1-12) oppure null. */
+function normalizzaInizioAttivita(raw: unknown): InizioAttivita | null {
+  if (typeof raw !== 'object' || raw === null) return null
+  const o = raw as Record<string, unknown>
+  const { anno, mese } = o
+  if (typeof anno !== 'number' || !Number.isInteger(anno) || anno < 1950 || anno > 2200) return null
+  if (typeof mese !== 'number' || !Number.isInteger(mese) || mese < 1 || mese > 12) return null
+  return { anno, mese }
+}
+
 /**
  * Ricostruisce un CalcoloInput valido da un oggetto grezzo (già parsato). Accetta
  * sia il formato nuovo (mappa `anni`) sia il vecchio mono-anno (migrato). `base`
@@ -183,7 +205,12 @@ function normalizzaInput(o: Record<string, unknown>, base: CalcoloInput): Calcol
   const anniOk = anniDisponibili()
   const anno = typeof o.anno === 'number' && anniOk.includes(o.anno) ? o.anno : base.anno
   const anni = o.anni !== undefined ? normalizzaAnni(o.anni) : migraDalVecchio(o, anno)
-  return { anno, anni, rateazioniImposta: normalizzaRateazioni(o.rateazioniImposta) }
+  return {
+    anno,
+    anni,
+    rateazioniImposta: normalizzaRateazioni(o.rateazioniImposta),
+    inizioAttivita: normalizzaInizioAttivita(o.inizioAttivita),
+  }
 }
 
 /**

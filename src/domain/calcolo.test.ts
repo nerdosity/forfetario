@@ -512,3 +512,45 @@ describe('saldi contributi anno precedente esposti per la UI', () => {
     expect(r.saldoContributiEccArtCommPrecedente).toBe(0)
   })
 })
+
+describe('calcola — ENPAP', () => {
+  const enpap: Regime = {
+    id: 'e',
+    tipo: 'enpap',
+    aliquota: 5,
+    coefficiente: 78,
+    meseInizio: 10, giornoInizio: 1,
+    meseFine: 12, giornoFine: 31,
+    fatturato: 2000,
+    riduzioneContributi: 'nessuna',
+    aliquotaSoggettivoEnpap: 10,
+    riduzioneMinimoEnpap: 'nessuna',
+  }
+
+  it('minimo soggettivo dovuto per intero su anno parziale; integrativo al minimo e maternità fissa', () => {
+    const r = calcola(mkInput({ anno: 2026, regimiCorrente: [enpap], regimiPrecedente: [] }))
+    expect(r.totaleContributiEnpapSoggettivo).toBe(856)
+    expect(r.totaleContributiEnpapIntegrativo).toBe(66)
+    expect(r.totaleContributiEnpapMaternita).toBe(130)
+    expect(r.totaleContributiINPS).toBe(856 + 130)
+  })
+
+  it('riduzione a un terzo del minimo', () => {
+    const r = calcola(mkInput({
+      anno: 2026,
+      regimiCorrente: [{ ...enpap, riduzioneMinimoEnpap: 'terzo' }],
+      regimiPrecedente: [],
+    }))
+    expect(r.totaleContributiEnpapSoggettivo).toBe(286)
+  })
+
+  it('acconto zero al primo anno, 70% dell\'anno precedente altrimenti', () => {
+    const primo = calcola(mkInput({ anno: 2026, regimiCorrente: [enpap], regimiPrecedente: [] }))
+    expect(primo.accontoEnpapDovutoPerAnnoRif).toBe(0)
+    expect(primo.saldoEnpapAnnoCorrente).toBe(856 + 66)
+
+    const secondo = calcola(mkInput({ anno: 2026, regimiCorrente: [enpap], regimiPrecedente: [{ ...enpap, id: 'p' }] }))
+    expect(secondo.accontoEnpapDovutoPerAnnoRif).toBeCloseTo(0.7 * (856 + 66), 6)
+    expect(secondo.saldoEnpapAnnoCorrente).toBeCloseTo(856 + 66 - 0.7 * (856 + 66), 6)
+  })
+})

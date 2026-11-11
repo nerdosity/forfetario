@@ -71,6 +71,24 @@
         "artigiani": { "ivsAnnuale": 4453.2, "maternitaMensile": 0.62 },
         "commercianti": { "ivsAnnuale": 4542.26, "maternitaMensile": 0.62 }
       },
+      "enpap": {
+        "aliquotaSoggettivoMin": 10,
+        "aliquotaSoggettivoMax": 30,
+        "passoAliquota": 2,
+        "minimoSoggettivo": 856,
+        "minimoMeta": 428,
+        "minimoTerzo": 286,
+        "minimoQuinto": 172,
+        "sogliaRedditoQuinto": 1712,
+        "aliquotaIntegrativo": 2,
+        "minimoIntegrativo": 66,
+        "sogliaMinimoIntegrativo": 3300,
+        "maternita": 130,
+        "percentualeAcconto": 70,
+        "massimale": 120607,
+        "scadenzaAcconto": "03-01",
+        "scadenzaSaldo": "10-01"
+      },
       "scadenze": {
         "rateContributiFissi": ["05-16", "08-20", "11-18", "02-17"],
         "saldoImposte": "06-30",
@@ -90,6 +108,24 @@
       "contributoFisso": {
         "artigiani": { "ivsAnnuale": 4513.92, "maternitaMensile": 0.62 },
         "commercianti": { "ivsAnnuale": 4604.20, "maternitaMensile": 0.62 }
+      },
+      "enpap": {
+        "aliquotaSoggettivoMin": 10,
+        "aliquotaSoggettivoMax": 30,
+        "passoAliquota": 2,
+        "minimoSoggettivo": 856,
+        "minimoMeta": 428,
+        "minimoTerzo": 286,
+        "minimoQuinto": 172,
+        "sogliaRedditoQuinto": 1712,
+        "aliquotaIntegrativo": 2,
+        "minimoIntegrativo": 66,
+        "sogliaMinimoIntegrativo": 3300,
+        "maternita": 130,
+        "percentualeAcconto": 70,
+        "massimale": 122295,
+        "scadenzaAcconto": "03-01",
+        "scadenzaSaldo": "10-01"
       },
       "scadenze": {
         "rateContributiFissi": ["05-16", "08-20", "11-16", "02-16"],

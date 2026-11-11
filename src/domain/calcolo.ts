@@ -6,7 +6,8 @@ import type {
   RisultatoCalcolo,
 } from '@/domain/types'
 import { datiDellAnno } from '@/domain/types'
-import { aliquotaContributi, datiAnno } from '@/data/taxData'
+import { aliquotaContributi, datiAnno, datiEnpap } from '@/data/taxData'
+import type { DatiEnpap } from '@/data/taxData'
 import { giorniPermanenza } from '@/domain/dates'
 import { getMesiInPeriodo, applicaRiduzioneIVS, contributiVersatiEffettivi, rateFissePerTrimestre, baseEccedenzaAcconto, accontoVersatoDaLista } from '@/domain/contributi'
 import { calcolaScadenze } from '@/domain/scadenze'
@@ -15,6 +16,48 @@ import { contributoFissoAnno } from '@/data/taxData'
 // ---------------------------------------------------------------------------
 // Calcolo di un singolo anno
 // ---------------------------------------------------------------------------
+
+interface EnpapAnno {
+  imponibileTotale: number
+  soggettivo: number
+  integrativo: number
+  maternita: number
+  /** Vero se il soggettivo coincide col minimo (non l'aliquota sul reddito). */
+  sulMinimo: boolean
+}
+
+/**
+ * Contributi ENPAP aggregati su tutti i periodi enpap dell'anno. Minimo
+ * (secondo la riduzione del primo periodo) e maternità una sola volta; il
+ * massimale cappa l'imponibile complessivo, ripartito proporzionalmente.
+ */
+function calcolaEnpapAnno(regimiEnpap: Regime[], c: DatiEnpap | undefined): EnpapAnno {
+  const zero: EnpapAnno = { imponibileTotale: 0, soggettivo: 0, integrativo: 0, maternita: 0, sulMinimo: false }
+  if (regimiEnpap.length === 0 || !c) {
+    return { ...zero, imponibileTotale: regimiEnpap.reduce((s, r) => s + (r.fatturato * r.coefficiente) / 100, 0) }
+  }
+  const imponibili = regimiEnpap.map((r) => (r.fatturato * r.coefficiente) / 100)
+  const imponibileTotale = imponibili.reduce((s, x) => s + x, 0)
+  const fatturato = regimiEnpap.reduce((s, r) => s + r.fatturato, 0)
+  const fattoreMassimale = imponibileTotale > c.massimale ? c.massimale / imponibileTotale : 1
+  const percentuale = regimiEnpap.reduce(
+    (s, r, i) => s + (imponibili[i] * fattoreMassimale * (r.aliquotaSoggettivoEnpap ?? c.aliquotaSoggettivoMin)) / 100,
+    0,
+  )
+  const minimo = {
+    nessuna: c.minimoSoggettivo,
+    meta: c.minimoMeta,
+    terzo: c.minimoTerzo,
+    quinto: c.minimoQuinto,
+  }[regimiEnpap[0].riduzioneMinimoEnpap ?? 'nessuna']
+  return {
+    imponibileTotale,
+    soggettivo: Math.max(minimo, percentuale),
+    integrativo: fatturato <= c.sogliaMinimoIntegrativo ? c.minimoIntegrativo : (fatturato * c.aliquotaIntegrativo) / 100,
+    maternita: c.maternita,
+    sulMinimo: minimo >= percentuale,
+  }
+}
 
 /**
  * Calcola imponibili, contributi e imposte per tutti i regimi di un anno.
@@ -35,6 +78,17 @@ function calcolaDatiAnno(
   let totaleFatturato = 0
 
   const dettagliRegimiCalcolati: DettaglioRegime[] = []
+
+  // ENPAP: minimi e maternità sono dovuti UNA volta per anno (anche con più
+  // periodi enpap) e per intero, senza proporzione ai giorni (regolamento
+  // ENPAP art. 5). Il soggettivo si calcola quindi sull'aggregato dell'anno e
+  // poi si ripartisce sui periodi in proporzione all'imponibile.
+  const regimiEnpap = regimi.filter((r) => r.tipo === 'enpap')
+  const costantiEnpap = regimiEnpap.length > 0 ? datiEnpap(anno) : undefined
+  const enpap = calcolaEnpapAnno(regimiEnpap, costantiEnpap)
+  let totaleContributiEnpapSoggettivo = 0
+  let totaleContributiEnpapIntegrativo = 0
+  let totaleContributiEnpapMaternita = 0
 
   for (const regime of regimi) {
     const giorniRegime = giorniPermanenza(
@@ -58,6 +112,25 @@ function calcolaDatiAnno(
       contributiRegimeINPS = (imponibileLordoRegime * aliquota) / 100
       totaleContributiSeparata += contributiRegimeINPS
       dettaglioCalcoloContributi = `Separata: ${imponibileLordoRegime.toFixed(2)} € × ${aliquota}% = ${contributiRegimeINPS.toFixed(2)} €`
+    } else if (regime.tipo === 'enpap') {
+      const primo = regime.id === regimiEnpap[0].id
+      const quota = enpap.imponibileTotale > 0
+        ? imponibileLordoRegime / enpap.imponibileTotale
+        : primo ? 1 : 0
+      const soggettivo = enpap.soggettivo * quota
+      const maternita = primo ? enpap.maternita : 0
+      contributiRegimeINPS = soggettivo + maternita
+      totaleContributiEnpapSoggettivo += soggettivo
+      totaleContributiEnpapMaternita += maternita
+      if (primo) totaleContributiEnpapIntegrativo += enpap.integrativo
+      dettaglioCalcoloContributi = costantiEnpap
+        ? `ENPAP soggettivo (periodo): ${soggettivo.toFixed(2)} € (totale anno ${enpap.soggettivo.toFixed(2)} €, ${enpap.sulMinimo ? 'minimo' : 'aliquota sul reddito'})` +
+          (primo
+            ? `
+Integrativo (rivalsa sul cliente): ${enpap.integrativo.toFixed(2)} €
+Maternità: ${enpap.maternita.toFixed(2)} €`
+            : '')
+        : 'ENPAP: costanti non disponibili per questo anno'
     } else {
       // Artigiani / commercianti: contributi fissi (mensili) + eccedenza
       const { minimaleReddito, sogliaPrimaFascia } = datiAnno(anno)
@@ -159,6 +232,9 @@ function calcolaDatiAnno(
     totaleImposte,
     totaleFatturato,
     imponibileNettoTotalePerImposte,
+    totaleContributiEnpapSoggettivo,
+    totaleContributiEnpapIntegrativo,
+    totaleContributiEnpapMaternita,
     rateFisse,
   }
 }
@@ -174,6 +250,9 @@ const annoVuoto = (): RisultatoAnno => ({
   totaleImposte: 0,
   totaleFatturato: 0,
   imponibileNettoTotalePerImposte: 0,
+  totaleContributiEnpapSoggettivo: 0,
+  totaleContributiEnpapIntegrativo: 0,
+  totaleContributiEnpapMaternita: 0,
   rateFisse: [0, 0, 0, 0],
 })
 
@@ -275,6 +354,42 @@ export function calcola(input: CalcoloInput): RisultatoCalcolo {
     datiPrecedente.totaleContributiEccedenzaArtComm - accontiEccDovutiPerPrecedente,
   )
 
+  // ─── ENPAP: acconto e saldo ────────────────────────────────────────────────
+  // Acconto = percentuale di (soggettivo + integrativo) DOVUTI dell'anno
+  // precedente, solo se in N-1 c'era enpap (primo anno: nessun acconto).
+  const enpapPrecedente = regimiPrecedente.some((r) => r.tipo === 'enpap')
+  const percentualeAccontoEnpap = datiEnpap(anno)?.percentualeAcconto ?? 0
+  const accontoEnpapDovuto = enpapPrecedente
+    ? (percentualeAccontoEnpap / 100) *
+      (datiPrecedente.totaleContributiEnpapSoggettivo + datiPrecedente.totaleContributiEnpapIntegrativo)
+    : 0
+  // Maternità esclusa dal saldo: si versa per intero a marzo insieme all'acconto.
+  const saldoEnpap = Math.max(
+    0,
+    datiCorrente.totaleContributiEnpapSoggettivo +
+      datiCorrente.totaleContributiEnpapIntegrativo -
+      accontoEnpapDovuto,
+  )
+  // Competenza N-1 (versata in N): stessa regola, acconto sulla base di N-2.
+  const enpapDueAnniPrima = regimiDueAnniPrima.some((r) => r.tipo === 'enpap')
+  let percentualeAccontoEnpapPrec = 0
+  try {
+    percentualeAccontoEnpapPrec = datiEnpap(anno - 1)?.percentualeAcconto ?? 0
+  } catch {
+    percentualeAccontoEnpapPrec = 0
+  }
+  const datiDueAnniPrima = calcolaDatiAnnoSicuro(regimiDueAnniPrima, anno - 2)
+  const accontoEnpapPrec = enpapDueAnniPrima
+    ? (percentualeAccontoEnpapPrec / 100) *
+      (datiDueAnniPrima.totaleContributiEnpapSoggettivo + datiDueAnniPrima.totaleContributiEnpapIntegrativo)
+    : 0
+  const saldoEnpapPrec = Math.max(
+    0,
+    datiPrecedente.totaleContributiEnpapSoggettivo +
+      datiPrecedente.totaleContributiEnpapIntegrativo -
+      accontoEnpapPrec,
+  )
+
   // ─── Scadenze ─────────────────────────────────────────────────────────────
   const { scadenzeAnnoCorrente, scadenzeAnnoSuccessivo } = calcolaScadenze({
     anno,
@@ -306,6 +421,10 @@ export function calcola(input: CalcoloInput): RisultatoCalcolo {
     // saldo) è calcolato dentro calcolaScadenze, che dispone dei dovuti di cassa.
     input,
     rateazioniImposta: input.rateazioniImposta,
+    enpap: {
+      precedente: { acconto: accontoEnpapPrec, maternita: datiPrecedente.totaleContributiEnpapMaternita, saldo: saldoEnpapPrec },
+      corrente: { acconto: accontoEnpapDovuto, maternita: datiCorrente.totaleContributiEnpapMaternita, saldo: saldoEnpap },
+    },
   })
 
   return {
@@ -326,6 +445,8 @@ export function calcola(input: CalcoloInput): RisultatoCalcolo {
     saldoContributiEccArtCommAnnoCorrente: saldoContributiEccArtComm,
     saldoContributiGSPrecedente,
     saldoContributiEccArtCommPrecedente,
+    accontoEnpapDovutoPerAnnoRif: accontoEnpapDovuto,
+    saldoEnpapAnnoCorrente: saldoEnpap,
     scadenzeAnnoCorrente,
     scadenzeAnnoSuccessivo,
   }

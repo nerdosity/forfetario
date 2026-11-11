@@ -17,7 +17,12 @@ export function DettaglioRegimi({ anno, calcoli }: Props) {
     calcoli.totaleContributiSeparata > 0.005 && `G.S. ${formatEuro(calcoli.totaleContributiSeparata)}`,
     calcoli.totaleContributiFissiArtComm > 0.005 && `Fissi ${formatEuro(calcoli.totaleContributiFissiArtComm)}`,
     calcoli.totaleContributiEccedenzaArtComm > 0.005 && `Eccedenza ${formatEuro(calcoli.totaleContributiEccedenzaArtComm)}`,
+    calcoli.totaleContributiEnpapSoggettivo > 0.005 && `ENPAP soggettivo ${formatEuro(calcoli.totaleContributiEnpapSoggettivo)}`,
+    calcoli.totaleContributiEnpapMaternita > 0.005 && `ENPAP maternità ${formatEuro(calcoli.totaleContributiEnpapMaternita)}`,
   ].filter(Boolean) as string[]
+
+  const haEnpap =
+    calcoli.totaleContributiEnpapSoggettivo + calcoli.totaleContributiEnpapIntegrativo + calcoli.totaleContributiEnpapMaternita > 0.005
 
   return (
     <Card title={`Dettaglio calcoli per regime (${anno})`} icon={BarChart3} iconIntent="info">
@@ -50,8 +55,42 @@ export function DettaglioRegimi({ anno, calcoli }: Props) {
           contributiSeparata={calcoli.totaleContributiSeparata}
           contributiFissiArtComm={calcoli.totaleContributiFissiArtComm}
           contributiEccedenzaArtComm={calcoli.totaleContributiEccedenzaArtComm}
+          contributiEnpapSoggettivo={calcoli.totaleContributiEnpapSoggettivo}
+          contributiEnpapMaternita={calcoli.totaleContributiEnpapMaternita}
+          contributiEnpapIntegrativo={calcoli.totaleContributiEnpapIntegrativo}
         />
       </div>
+
+      {haEnpap && (
+        <div className={`mb-6 ${theme.cardInner}`}>
+          <h3 className={`${theme.h3} mb-3`}>Contributi ENPAP {anno}</h3>
+          <div className="space-y-2 rounded-lg bg-white p-3">
+            <SummaryRow label="Contributo soggettivo" value={calcoli.totaleContributiEnpapSoggettivo} />
+            <div className={theme.row}>
+              <span className={`${theme.rowLabel} flex items-center gap-1`}>
+                Contributo integrativo (in rivalsa)
+                <Tooltip content="L'integrativo è addebitato al cliente in fattura: non è un costo a carico, non è dedotto dall'imponibile e non riduce il netto in tasca. Si versa comunque all'ENPAP." label="Integrativo ENPAP" />
+              </span>
+              <span className="font-medium text-slate-600">{formatEuro(calcoli.totaleContributiEnpapIntegrativo)}</span>
+            </div>
+            <SummaryRow label="Contributo di maternità" value={calcoli.totaleContributiEnpapMaternita} />
+            <div className={theme.row}>
+              <span className={`${theme.rowLabel} flex items-center gap-1`}>
+                Acconto dovuto
+                <Tooltip content="Percentuale di soggettivo e integrativo dell'anno precedente, dovuta in acconto. Nessun acconto se l'anno precedente non prevedeva ENPAP." label="Acconto ENPAP" />
+              </span>
+              <span className="font-medium text-amber-700">- {formatEuro(calcoli.accontoEnpapDovutoPerAnnoRif)}</span>
+            </div>
+            <div className={theme.rowTotal}>
+              <span className="flex items-center gap-1 text-slate-700">
+                Saldo ENPAP
+                <Tooltip content="Soggettivo + integrativo + maternità, meno l'acconto dovuto (minimo zero)." label="Saldo ENPAP" />
+              </span>
+              <span className="text-red-700">{formatEuro(calcoli.saldoEnpapAnnoCorrente)}</span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Dettaglio per periodo */}
       <div className="space-y-3">
@@ -62,7 +101,7 @@ export function DettaglioRegimi({ anno, calcoli }: Props) {
               <div className="flex flex-wrap items-center gap-1.5">
                 <Badge color="info">{labelTipo(regime.tipo)}</Badge>
                 <Badge color="gray">Imposta {regime.aliquota}%</Badge>
-                {regime.riduzioneContributi !== 'nessuna' && (
+                {regime.tipo !== 'enpap' && regime.riduzioneContributi !== 'nessuna' && (
                   <Badge color="warning">Riduzione contributi {regime.riduzioneContributi}%</Badge>
                 )}
               </div>
@@ -77,7 +116,7 @@ export function DettaglioRegimi({ anno, calcoli }: Props) {
 
               <div className={theme.row}>
                 <span className={`${theme.rowLabel} flex items-center gap-1`}>
-                  Contributi INPS dovuti
+                  {regime.tipo === 'enpap' ? 'Contributi ENPAP dovuti (soggettivo e maternità)' : 'Contributi INPS dovuti'}
                   {regime.dettaglioCalcoloContributi && (
                     <Tooltip content={regime.dettaglioCalcoloContributi} label="Dettaglio calcolo contributi" />
                   )}

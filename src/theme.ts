@@ -120,6 +120,13 @@ export const theme = {
  * spurie) e riduce il padding delle celle da px-6 a px-3 così la tabella sta
  * nello spazio disponibile senza scroll. Passare con `theme={tableTheme}`.
  */
+/** Elenco di avvisi di coerenza (non bloccanti) sotto un campo. */
+export const avvisiTheme = {
+  lista: 'mt-2 space-y-1',
+  voce: 'flex items-start gap-2 text-xs text-amber-700',
+  icona: 'mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600',
+} as const
+
 export const tableTheme = {
   // wrapper: overflow-x-auto + max-w-full così una tabella più larga della
   // colonna scorre DENTRO di sé, senza spingere la pagina (niente scroll

@@ -5,7 +5,8 @@ import { RegimeEditor } from '@/components/RegimeEditor'
 import { GestoreAnni } from '@/components/GestoreAnni'
 import { ContributiVersati } from '@/components/ContributiVersati'
 import { AnagraficaPanel } from '@/components/AnagraficaPanel'
-import { Card, Field, MoneyInput, Select } from '@/components/ui'
+import { AvvisiInizioAttivita } from '@/components/AvvisiInizioAttivita'
+import { Card, Field, MoneyInput, NumberInput, Select } from '@/components/ui'
 import { anniDisponibili } from '@/data/taxData'
 import type { CalcoloInput, DatiAnno, OpzioniRateazione, RisultatoCalcolo, Scadenza } from '@/domain/types'
 import { datiDellAnno } from '@/domain/types'
@@ -13,7 +14,8 @@ import { regimeVuoto } from '@/domain/regimeFactory'
 import { chiaveRateazioneImposta, numeroRatePerChiave } from '@/domain/rateazione'
 import { esportaInput, importaInput } from '@/data/inputStorage'
 import type { AnagraficaContribuente } from '@/data/anagraficaStorage'
-import { formatEuro } from '@/domain/labels'
+import { formatEuro, NOMI_MESI } from '@/domain/labels'
+import { avvisiInizioAttivita } from '@/domain/diagnostica'
 import { theme } from '@/theme'
 
 interface InputPanelProps {
@@ -274,6 +276,40 @@ export function InputPanel({ input, calcoli, anagrafica, onChangeAnagrafica, onC
               />
             </div>
           </Field>
+          <Field
+            label="Inizio attività"
+            info="Facoltativo. Mese e anno di apertura della partita IVA: servono solo a segnalare incoerenze con la durata del 5% start-up (5 anni) e della riduzione contributiva del 50% (36 mesi). Non modificano i calcoli."
+          >
+            <div className="flex items-center gap-2">
+              <div className="w-36 sm:w-40">
+                <Select<number>
+                  value={input.inizioAttivita?.mese ?? 0}
+                  onChange={(m) =>
+                    onChange({
+                      inizioAttivita:
+                        m === 0 ? null : { anno: input.inizioAttivita?.anno ?? anno, mese: m },
+                    })
+                  }
+                  options={[
+                    { value: 0, label: 'Non indicato' },
+                    ...NOMI_MESI.map((nome, i) => ({ value: i + 1, label: nome })),
+                  ]}
+                />
+              </div>
+              {input.inizioAttivita && (
+                <div className="w-24">
+                  <NumberInput
+                    value={input.inizioAttivita.anno}
+                    onChange={(a) => {
+                      const cur = input.inizioAttivita
+                      if (a !== null && cur) onChange({ inizioAttivita: { ...cur, anno: a } })
+                    }}
+                    step={1}
+                  />
+                </div>
+              )}
+            </div>
+          </Field>
           <div className="pb-0.5">
             <GestoreAnni onAnniChanged={onAnniChanged} />
           </div>
@@ -305,6 +341,8 @@ export function InputPanel({ input, calcoli, anagrafica, onChangeAnagrafica, onC
           </Button>
         </div>
       </div>
+
+      <AvvisiInizioAttivita avvisi={avvisiInizioAttivita(input)} />
 
       {esitoImport && (
         <p className={`text-sm ${esitoImport.ok ? 'text-emerald-700' : 'text-red-700'}`}>

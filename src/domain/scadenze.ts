@@ -39,7 +39,19 @@ const regimiSeparata = (regimi: Regime[]) =>
 const attivoADicembre = (regimi: Regime[]) =>
   regimi.some((r) => r.meseFine === 12)
 
+/** Contributi ENPAP di una competenza, tutti versati nell'anno successivo. */
+export interface EnpapCompetenza {
+  /** Acconto di marzo: percentuale di (soggettivo + integrativo) dell'anno prima; 0 al primo anno. */
+  acconto: number
+  /** Maternità dell'anno di competenza, versata per intero a marzo. */
+  maternita: number
+  /** Saldo di ottobre: soggettivo + integrativo - acconto (maternità esclusa). */
+  saldo: number
+}
+
 interface ParamsScadenze {
+  /** Contributi ENPAP delle competenze N-1 (versati in N) e N (versati in N+1). */
+  enpap?: { precedente: EnpapCompetenza; corrente: EnpapCompetenza }
   anno: number
   regimiCorrente: Regime[]
   /** Periodi dell'anno precedente: per la 4ª rata fissi che si versa a febbraio. */
@@ -233,6 +245,7 @@ export function calcolaScadenze({
   accontiEccVersatiNelCorrente,
   input,
   rateazioniImposta,
+  enpap,
 }: ParamsScadenze): RisultatoScadenze {
   const globali: Scadenza[] = []
   const annoSucc = anno + 1
@@ -852,6 +865,53 @@ export function calcolaScadenze({
       }
     }
   }
+
+  // ─── Contributi ENPAP: marzo (acconto + maternità) e ottobre (saldo) ──────
+  // I contributi di competenza X si versano tutti in X+1. Nel calendario
+  // dell'anno compaiono quelli di competenza anno-1; in quello successivo
+  // quelli di competenza anno. Niente F24 di giugno/novembre. Le scadenze non
+  // sono collegate a righe di versamento (le righe ENPAP coprono acconto e saldo insieme).
+  const costantiEnpap = (competenza: number) => {
+    try {
+      return (annoEsisteNelDatabase(competenza) ? datiAnno(competenza) : proiettaDatiAnno(competenza))?.enpap
+    } catch {
+      return undefined
+    }
+  }
+  const pushEnpap = (competenza: number, c: EnpapCompetenza | undefined) => {
+    if (!c) return
+    const date = costantiEnpap(competenza) ?? costantiEnpap(competenza + 1)
+    if (!date) return
+    const annoPag = competenza + 1
+    const marzo = c.acconto + c.maternita
+    if (marzo > 0.005) {
+      const componenti: ComponenteScadenza[] = []
+      if (c.acconto > 0.005) componenti.push({ tipo: `Acconto ENPAP ${competenza} (su soggettivo e integrativo ${competenza - 1})`, importo: c.acconto })
+      if (c.maternita > 0.005) componenti.push({ tipo: `Contributo di maternità ENPAP ${competenza}`, importo: c.maternita })
+      globali.push({
+        data: formattaScadenza(date.scadenzaAcconto, annoPag),
+        descrizione: `Contributi ENPAP ${competenza}: acconto e maternità`,
+        categoria: 'Contributi ENPAP',
+        voce: `Acconto e maternità · competenza ${competenza}`,
+        importo: marzo,
+        componenti,
+        annoScadenza: annoPag,
+      })
+    }
+    if (c.saldo > 0.005) {
+      globali.push({
+        data: formattaScadenza(date.scadenzaSaldo, annoPag),
+        descrizione: `Saldo contributi ENPAP ${competenza}`,
+        categoria: 'Contributi ENPAP',
+        voce: `Saldo · competenza ${competenza}`,
+        importo: c.saldo,
+        componenti: [{ tipo: `Saldo soggettivo e integrativo ENPAP ${competenza}`, importo: c.saldo }],
+        annoScadenza: annoPag,
+      })
+    }
+  }
+  pushEnpap(annoPrec, enpap?.precedente)
+  pushEnpap(anno, enpap?.corrente)
 
   const ordina = (s: Scadenza[]) =>
     [...s].sort((a, b) => {

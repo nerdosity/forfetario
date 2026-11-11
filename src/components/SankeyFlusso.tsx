@@ -56,6 +56,9 @@ export function SankeyFlusso({
   contributiSeparata,
   contributiFissiArtComm,
   contributiEccedenzaArtComm,
+  contributiEnpapSoggettivo,
+  contributiEnpapMaternita,
+  contributiEnpapIntegrativo,
 }: Props) {
   // Dipendenze primitive: l'oggetto props cambia identità a ogni render, i numeri no.
   const grafico = useMemo(
@@ -69,6 +72,9 @@ export function SankeyFlusso({
           contributiSeparata,
           contributiFissiArtComm,
           contributiEccedenzaArtComm,
+          contributiEnpapSoggettivo,
+          contributiEnpapMaternita,
+          contributiEnpapIntegrativo,
         },
         {
           larghezza: LARGHEZZA - CORSIA_SINISTRA - CORSIA_DESTRA,
@@ -84,6 +90,9 @@ export function SankeyFlusso({
       contributiSeparata,
       contributiFissiArtComm,
       contributiEccedenzaArtComm,
+      contributiEnpapSoggettivo,
+      contributiEnpapMaternita,
+      contributiEnpapIntegrativo,
     ],
   )
 

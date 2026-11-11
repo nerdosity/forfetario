@@ -1,5 +1,5 @@
 /** Tipi di gestione contributiva INPS supportati dal regime forfettario. */
-export type TipoRegime = 'separata' | 'artigiani' | 'commercianti'
+export type TipoRegime = 'separata' | 'artigiani' | 'commercianti' | 'enpap'
 
 /** Aliquota dell'imposta sostitutiva: 5% (start-up) o 15% (a regime). */
 export type Aliquota = 5 | 15
@@ -11,6 +11,12 @@ export type Aliquota = 5 | 15
  * - '50'      → riduzione del 50% (altri casi previsti da legge)
  */
 export type RiduzioneContributi = 'nessuna' | '35' | '50'
+
+/**
+ * Riduzione del contributo soggettivo minimo ENPAP (solo tipo 'enpap'):
+ * 'meta' = 1/2, 'terzo' = 1/3, 'quinto' = 1/5 del minimo ordinario.
+ */
+export type RiduzioneMinimoEnpap = 'nessuna' | 'meta' | 'terzo' | 'quinto'
 
 /**
  * Un periodo all'interno di un anno fiscale. Un anno può contenere più periodi
@@ -35,6 +41,13 @@ export interface Regime {
    * La quota maternità non è riducibile.
    */
   riduzioneContributi: RiduzioneContributi
+  /**
+   * Solo tipo 'enpap': aliquota del contributo soggettivo (%), da 10 a 30 con
+   * passo 2. Se assente vale il minimo (10).
+   */
+  aliquotaSoggettivoEnpap?: number
+  /** Solo tipo 'enpap': riduzione del minimo soggettivo. Se assente: 'nessuna'. */
+  riduzioneMinimoEnpap?: RiduzioneMinimoEnpap
 }
 
 /** Componente di una scadenza fiscale (dettaglio della rata). */
@@ -183,6 +196,9 @@ export type TipoVersamento =
   | 'ecc-saldo'
   | 'ecc-acconto-1'
   | 'ecc-acconto-2'
+  | 'enpap-soggettivo'
+  | 'enpap-integrativo'
+  | 'enpap-maternita'
   | 'altro'
 
 /** Una singola voce di contributo versato durante l'anno. */
@@ -264,6 +280,12 @@ export function datiAnnoVuoto(regimi: Regime[]): DatiAnno {
   }
 }
 
+/** Mese e anno di inizio dell'attività (mese 1-12). */
+export interface InizioAttivita {
+  anno: number
+  mese: number
+}
+
 /**
  * Tutti gli input che alimentano il motore di calcolo.
  *
@@ -289,6 +311,13 @@ export interface CalcoloInput {
    */
   rateazioniImposta: Record<string, OpzioniRateazione>
 
+  /**
+   * Inizio dell'attività (facoltativo): serve solo a segnalare incoerenze con
+   * i limiti temporali del 5% start-up e della riduzione contributiva del 50%.
+   * Non influisce sui calcoli.
+   */
+  inizioAttivita?: InizioAttivita | null
+
   // Gli acconti contributi (G.S. ed eccedenza Art/Comm) NON sono campi a sé:
   // si ricavano dalle righe 'gs-acconto' / 'ecc-acconto' di DatiAnno.contributiVersati.
 }
@@ -312,6 +341,12 @@ export interface RisultatoAnno {
   totaleImposte: number
   totaleFatturato: number
   imponibileNettoTotalePerImposte: number
+  /** ENPAP: contributo soggettivo dovuto (minimi per intero, non proporzionati ai giorni). */
+  totaleContributiEnpapSoggettivo: number
+  /** ENPAP: contributo integrativo (rivalsa sul cliente: non entra in totaleContributiINPS). */
+  totaleContributiEnpapIntegrativo: number
+  /** ENPAP: contributo di maternità fisso annuo. */
+  totaleContributiEnpapMaternita: number
   /**
    * Importo dei contributi fissi per trimestre [1ª, 2ª, 3ª, 4ª], sommato su
    * tutti i regimi Art/Comm dell'anno. Per la 4ª rata il versamento materiale
@@ -363,6 +398,12 @@ export interface RisultatoCalcolo extends RisultatoAnno {
 
   /** Saldo eccedenza Art/Comm dell'anno precedente, al netto degli acconti dovuti. */
   saldoContributiEccArtCommPrecedente: number
+
+  /** Acconto ENPAP dovuto per l'anno corrente (percentuale di soggettivo + integrativo dell'anno precedente; 0 al primo anno). */
+  accontoEnpapDovutoPerAnnoRif: number
+
+  /** Saldo ENPAP anno corrente: soggettivo + integrativo - acconto dovuto (minimo 0); la maternità si versa a marzo. */
+  saldoEnpapAnnoCorrente: number
 
   /** Scadenze che cadono nell'anno di riferimento. */
   scadenzeAnnoCorrente: Scadenza[]

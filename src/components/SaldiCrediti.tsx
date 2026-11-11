@@ -84,10 +84,21 @@ export function SaldiCrediti({ anno, calcoli }: Props) {
       saldo: importoEcc,
       nota: saldoEcc?.nota,
     },
+    {
+      voce: 'Contributi ENPAP',
+      dovuto:
+        calcoli.totaleContributiEnpapSoggettivo +
+        calcoli.totaleContributiEnpapIntegrativo +
+        calcoli.totaleContributiEnpapMaternita,
+      acconti: calcoli.accontoEnpapDovutoPerAnnoRif,
+      accontiVersati: calcoli.accontoEnpapDovutoPerAnnoRif,
+      saldo: calcoli.saldoEnpapAnnoCorrente,
+      nota: "Soggettivo, integrativo (in rivalsa sul cliente) e maternità, al netto dell'acconto dovuto.",
+    },
   ].filter((r) => r.dovuto > 0.005 || r.acconti > 0.005)
 
   const totaleSaldi =
-    calcoli.saldoImposteDaVersareAnnoCorrente + importoGs + importoEcc
+    calcoli.saldoImposteDaVersareAnnoCorrente + importoGs + importoEcc + calcoli.saldoEnpapAnnoCorrente
 
   // Conguagli per gestione: di-più versato sulle rate obbligatorie, scalabile sul
   // saldo. Letti dalle scadenze dell'anno successivo (dove il saldo porta

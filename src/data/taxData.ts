@@ -25,6 +25,32 @@ export interface ScadenzeAnno {
   secondoAccontoContributi: string
 }
 
+/**
+ * Costanti ENPAP (psicologi) di un anno. Campo opzionale: gli anni senza nodo
+ * `enpap` restano validi. Nota 2026: la maternità (130) non è ancora stata
+ * deliberata per il 2026 ed è copiata dal 2025; da aggiornare alla delibera.
+ */
+export interface DatiEnpap {
+  aliquotaSoggettivoMin: number
+  aliquotaSoggettivoMax: number
+  passoAliquota: number
+  minimoSoggettivo: number
+  minimoMeta: number
+  minimoTerzo: number
+  minimoQuinto: number
+  sogliaRedditoQuinto: number
+  aliquotaIntegrativo: number
+  minimoIntegrativo: number
+  sogliaMinimoIntegrativo: number
+  maternita: number
+  /** Percentuale di (soggettivo + integrativo) dell'anno precedente dovuta in acconto. */
+  percentualeAcconto: number
+  /** Massimale di reddito per il soggettivo (L. 335/95). */
+  massimale: number
+  scadenzaAcconto: string
+  scadenzaSaldo: string
+}
+
 /** Costanti fiscali validate per un singolo anno. */
 export interface DatiAnno {
   minimaleReddito: number
@@ -37,6 +63,7 @@ export interface DatiAnno {
     commercianti: ContributoFisso
   }
   scadenze: ScadenzeAnno
+  enpap?: DatiEnpap
 }
 
 // ---------------------------------------------------------------------------
@@ -79,6 +106,42 @@ function contributoFisso(anno: string, campo: string, v: unknown): ContributoFis
   }
 }
 
+function validaEnpap(anno: string, v: unknown): DatiEnpap {
+  if (typeof v !== 'object' || v === null) {
+    throw new TaxDataError(anno, 'enpap', 'atteso oggetto')
+  }
+  const o = v as Record<string, unknown>
+  const n = (k: string) => numeroPositivo(anno, `enpap.${k}`, o[k])
+  const d: DatiEnpap = {
+    aliquotaSoggettivoMin: n('aliquotaSoggettivoMin'),
+    aliquotaSoggettivoMax: n('aliquotaSoggettivoMax'),
+    passoAliquota: n('passoAliquota'),
+    minimoSoggettivo: n('minimoSoggettivo'),
+    minimoMeta: n('minimoMeta'),
+    minimoTerzo: n('minimoTerzo'),
+    minimoQuinto: n('minimoQuinto'),
+    sogliaRedditoQuinto: n('sogliaRedditoQuinto'),
+    aliquotaIntegrativo: n('aliquotaIntegrativo'),
+    minimoIntegrativo: n('minimoIntegrativo'),
+    sogliaMinimoIntegrativo: n('sogliaMinimoIntegrativo'),
+    maternita: n('maternita'),
+    percentualeAcconto: n('percentualeAcconto'),
+    massimale: n('massimale'),
+    scadenzaAcconto: dataValida(anno, 'enpap.scadenzaAcconto', o.scadenzaAcconto),
+    scadenzaSaldo: dataValida(anno, 'enpap.scadenzaSaldo', o.scadenzaSaldo),
+  }
+  if (d.passoAliquota <= 0) {
+    throw new TaxDataError(anno, 'enpap.passoAliquota', 'atteso numero > 0')
+  }
+  if (d.aliquotaSoggettivoMin > d.aliquotaSoggettivoMax) {
+    throw new TaxDataError(anno, 'enpap.aliquotaSoggettivoMin', 'maggiore di aliquotaSoggettivoMax')
+  }
+  if (d.percentualeAcconto > 100) {
+    throw new TaxDataError(anno, 'enpap.percentualeAcconto', 'atteso valore tra 0 e 100')
+  }
+  return d
+}
+
 export function validaAnno(anno: string, v: unknown): DatiAnno {
   if (typeof v !== 'object' || v === null) {
     throw new TaxDataError(anno, '(root)', 'atteso oggetto')
@@ -92,6 +155,7 @@ export function validaAnno(anno: string, v: unknown): DatiAnno {
   }
 
   return {
+    ...(o.enpap !== undefined ? { enpap: validaEnpap(anno, o.enpap) } : {}),
     minimaleReddito: numeroPositivo(anno, 'minimaleReddito', o.minimaleReddito),
     sogliaPrimaFascia: numeroPositivo(anno, 'sogliaPrimaFascia', o.sogliaPrimaFascia),
     aliquotaSeparata: numeroPositivo(anno, 'aliquotaSeparata', o.aliquotaSeparata),
@@ -195,6 +259,9 @@ export function aliquotaContributi(anno: number, tipo: TipoRegime): number {
       return d.aliquotaArtigiani
     case 'commercianti':
       return d.aliquotaCommercianti
+    case 'enpap':
+      // L'aliquota ENPAP è scelta per periodo (Regime.aliquotaSoggettivoEnpap): qui il minimo.
+      return d.enpap?.aliquotaSoggettivoMin ?? 0
   }
 }
 
@@ -204,4 +271,9 @@ export function contributoFissoAnno(anno: number, tipo: TipoRegime): ContributoF
   if (tipo === 'artigiani') return d.contributoFisso.artigiani
   if (tipo === 'commercianti') return d.contributoFisso.commercianti
   return { ivsAnnuale: 0, maternitaMensile: 0 }
+}
+
+/** Costanti ENPAP dell'anno, o undefined se l'anno non ha il nodo `enpap`. */
+export function datiEnpap(anno: number): DatiEnpap | undefined {
+  return datiAnno(anno).enpap
 }

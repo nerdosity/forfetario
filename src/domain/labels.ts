@@ -8,6 +8,8 @@ export function labelTipo(tipo: TipoRegime): string {
       return 'Artigiani'
     case 'commercianti':
       return 'Commercianti'
+    case 'enpap':
+      return 'ENPAP'
   }
 }
 
@@ -44,3 +46,9 @@ export const formatPercent = (quota: number | null | undefined, decimali = 1): s
     maximumFractionDigits: decimali,
   }).format(q)
 }
+
+/** Nomi dei mesi in italiano (indice 0 = gennaio). */
+export const NOMI_MESI = [
+  'gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno',
+  'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre',
+] as const

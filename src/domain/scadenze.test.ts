@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { versatoPerScadenza, scadenzaPagata, bilancioPagamenti, calcolaScadenze } from './scadenze'
-import type { CalcoloInput, Scadenza, VersamentoContributo } from './types'
+import { calcola } from './calcolo'
+import type { CalcoloInput, Regime, Scadenza, VersamentoContributo } from './types'
 
 function scadenza(over: Partial<Scadenza>): Scadenza {
   return {
@@ -651,5 +652,55 @@ describe('calcolaScadenze — fallback sugli acconti versati', () => {
       expect(/^Quota/.test(c.tipo)).toBe(false)
       expect(/^(Interessi|Maggiorazione)/.test(c.tipo)).toBe(false)
     }
+  })
+})
+
+describe('calcolaScadenze — contributi ENPAP', () => {
+  const enpap: Regime = {
+    id: 'e',
+    tipo: 'enpap',
+    aliquota: 5,
+    coefficiente: 78,
+    meseInizio: 1, giornoInizio: 1,
+    meseFine: 12, giornoFine: 31,
+    fatturato: 2000,
+    riduzioneContributi: 'nessuna',
+    aliquotaSoggettivoEnpap: 10,
+    riduzioneMinimoEnpap: 'nessuna',
+  }
+  const mk = (corr: Regime[], prec: Regime[]): CalcoloInput => ({
+    anno: 2026,
+    anni: {
+      2026: { regimi: corr, modalitaContributi: 'totale', contributiVersatiTotale: null, contributiVersati: [], impostaSaldoVersato: null, impostaAcconto1Versato: null, impostaAcconto2Versato: null },
+      2025: { regimi: prec, modalitaContributi: 'totale', contributiVersatiTotale: null, contributiVersati: [], impostaSaldoVersato: null, impostaAcconto1Versato: null, impostaAcconto2Versato: null },
+    },
+    rateazioniImposta: {},
+  })
+  const enpapDi = (l: Scadenza[]) => l.filter((s) => s.categoria === 'Contributi ENPAP')
+
+  it('marzo: acconto 70% di (soggettivo + integrativo) dell\'anno prima + maternità', () => {
+    const r = calcola(mk([enpap], [{ ...enpap, id: 'p' }]))
+    const marzo = enpapDi(r.scadenzeAnnoSuccessivo).find((s) => s.data.startsWith('1 Marzo'))!
+    const base = r.totaleContributiEnpapSoggettivo + r.totaleContributiEnpapIntegrativo
+    expect(marzo.importo).toBeCloseTo(0.7 * (r.datiAnnoPrecedente.totaleContributiEnpapSoggettivo + r.datiAnnoPrecedente.totaleContributiEnpapIntegrativo) + r.totaleContributiEnpapMaternita, 6)
+    expect(marzo.componenti).toHaveLength(2)
+    expect(marzo.annoScadenza).toBe(2027)
+    expect(base).toBeGreaterThan(0)
+  })
+
+  it('ottobre: saldo = soggettivo + integrativo - acconto, maternità esclusa', () => {
+    const r = calcola(mk([enpap], [{ ...enpap, id: 'p' }]))
+    const ottobre = enpapDi(r.scadenzeAnnoSuccessivo).find((s) => s.data.startsWith('1 Ottobre'))!
+    expect(ottobre.importo).toBeCloseTo(r.saldoEnpapAnnoCorrente, 6)
+    expect(ottobre.importo).toBeCloseTo(r.totaleContributiEnpapSoggettivo + r.totaleContributiEnpapIntegrativo - r.accontoEnpapDovutoPerAnnoRif, 6)
+  })
+
+  it('primo anno: acconto zero, marzo solo maternità e nessuna competenza precedente', () => {
+    const r = calcola(mk([enpap], []))
+    const list = enpapDi(r.scadenzeAnnoSuccessivo)
+    const marzo = list.find((s) => s.data.startsWith('1 Marzo'))!
+    expect(marzo.importo).toBeCloseTo(r.totaleContributiEnpapMaternita, 6)
+    expect(marzo.componenti).toHaveLength(1)
+    expect(enpapDi(r.scadenzeAnnoCorrente)).toHaveLength(0)
   })
 })

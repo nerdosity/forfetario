@@ -1,13 +1,14 @@
 import { Plus, Trash2, TriangleAlert } from 'lucide-react'
-import type { Aliquota, Regime, RiduzioneContributi, TipoRegime } from '@/domain/types'
+import type { Aliquota, Regime, RiduzioneContributi, RiduzioneMinimoEnpap, TipoRegime } from '@/domain/types'
 import { regimeVuoto } from '@/domain/regimeFactory'
 import { NOMI_MESI, giorniPermanenza, giorniInMese, validaPeriodo } from '@/domain/dates'
 import { getMesiInPeriodo } from '@/domain/contributi'
 import { labelTipo, formatEuro } from '@/domain/labels'
 import { Field, NumberInput, MoneyInput, Select } from '@/components/ui'
+import { datiEnpap } from '@/data/taxData'
 import { theme } from '@/theme'
 
-const TIPI: TipoRegime[] = ['separata', 'artigiani', 'commercianti']
+const TIPI: TipoRegime[] = ['separata', 'artigiani', 'commercianti', 'enpap']
 const ALIQUOTE: Aliquota[] = [5, 15]
 const COEFFICIENTI = [40, 54, 62, 67, 78, 86]
 
@@ -16,6 +17,25 @@ const RIDUZIONI: { value: RiduzioneContributi; label: string }[] = [
   { value: '35', label: 'Riduzione 35% (forfettari)' },
   { value: '50', label: 'Riduzione 50% (altri casi)' },
 ]
+
+const RIDUZIONI_ENPAP: { value: RiduzioneMinimoEnpap; label: string }[] = [
+  { value: 'nessuna', label: 'Nessuna riduzione' },
+  { value: 'meta', label: 'Minimo ridotto della metà' },
+  { value: 'terzo', label: 'Minimo ridotto a un terzo' },
+  { value: 'quinto', label: 'Minimo ridotto a un quinto' },
+]
+
+const INFO_RIDUZIONE_ENPAP =
+  "Le riduzioni del contributo minimo si applicano solo su richiesta annuale nella comunicazione reddituale, non sono automatiche. Metà: anche lavoro dipendente nell'anno. Un terzo: iscritti all'ENPAP da non oltre tre anni. Un quinto: reddito netto sotto 1.712 €."
+
+/** Aliquote soggettive ENPAP selezionabili per l'anno (da min a max, a passo costante). */
+function aliquoteEnpap(anno: number): number[] {
+  const d = datiEnpap(anno)
+  if (!d || d.passoAliquota <= 0) return []
+  const valori: number[] = []
+  for (let a = d.aliquotaSoggettivoMin; a <= d.aliquotaSoggettivoMax + 1e-9; a += d.passoAliquota) valori.push(a)
+  return valori
+}
 
 interface RegimeEditorProps {
   titolo: string
@@ -51,6 +71,8 @@ export function RegimeEditor({ titolo, anno, regimi, onChange }: RegimeEditorPro
     aggiorna(id, campoGiorno, Math.max(1, Math.min(giorno, maxGiorno)))
   }
 
+  const aliquoteSoggettivo = aliquoteEnpap(anno)
+
   return (
     <div className={theme.sectionFlat}>
       <div className="flex items-center justify-between">
@@ -84,17 +106,17 @@ export function RegimeEditor({ titolo, anno, regimi, onChange }: RegimeEditorPro
           <Field
             label="Tipo regime"
             small
-            info="Gestione INPS: separata (percentuale flat sul reddito) oppure artigiani/commercianti (contributi fissi mensili più contributi sull'eccedenza del minimale)."
+            info="Gestione INPS: separata (percentuale flat sul reddito) oppure artigiani/commercianti (contributi fissi mensili più contributi sull'eccedenza del minimale). ENPAP: cassa previdenziale degli psicologi."
           >
             <Select<TipoRegime>
               small
               value={regime.tipo}
               onChange={(v) => aggiorna(regime.id, 'tipo', v)}
-              options={TIPI.map((t) => ({ value: t, label: labelTipo(t) }))}
+              options={TIPI.map((t) => ({ value: t, label: t === 'enpap' ? 'ENPAP (psicologi)' : labelTipo(t) }))}
             />
           </Field>
 
-          {regime.tipo !== 'separata' && (
+          {regime.tipo !== 'separata' && regime.tipo !== 'enpap' && (
             <Field
               label="Riduzione contributi"
               small
@@ -107,6 +129,31 @@ export function RegimeEditor({ titolo, anno, regimi, onChange }: RegimeEditorPro
                 options={RIDUZIONI}
               />
             </Field>
+          )}
+
+          {regime.tipo === 'enpap' && (
+            <div className="grid grid-cols-2 gap-2">
+              <Field
+                label="Aliquota soggettivo"
+                small
+                info="Aliquota del contributo soggettivo sul reddito, scelta dall'iscritto entro i limiti previsti dall'ENPAP. Se il risultato è inferiore al minimo, si versa il minimo."
+              >
+                <Select<number>
+                  small
+                  value={regime.aliquotaSoggettivoEnpap ?? aliquoteSoggettivo[0] ?? 0}
+                  onChange={(v) => aggiorna(regime.id, 'aliquotaSoggettivoEnpap', v)}
+                  options={aliquoteSoggettivo.map((a) => ({ value: a, label: `${a}%` }))}
+                />
+              </Field>
+              <Field label="Riduzione del minimo" small info={INFO_RIDUZIONE_ENPAP}>
+                <Select<RiduzioneMinimoEnpap>
+                  small
+                  value={regime.riduzioneMinimoEnpap ?? 'nessuna'}
+                  onChange={(v) => aggiorna(regime.id, 'riduzioneMinimoEnpap', v)}
+                  options={RIDUZIONI_ENPAP}
+                />
+              </Field>
+            </div>
           )}
 
           <div className="grid grid-cols-2 gap-2">
@@ -175,7 +222,7 @@ export function RegimeEditor({ titolo, anno, regimi, onChange }: RegimeEditorPro
 
           <Field
             label="Fatturato (compensi incassati nel periodo)"
-            info="Totale dei compensi incassati nel periodo, al lordo di imposte e contributi. È il dato di partenza: l'imponibile si ottiene applicando il coefficiente di redditività."
+            info={`Totale dei compensi incassati nel periodo, al lordo di imposte e contributi. È il dato di partenza: l'imponibile si ottiene applicando il coefficiente di redditività.${regime.tipo === 'enpap' ? " Per l'ENPAP inserisci l'importo al netto dell'integrativo 2% addebitato in fattura." : ''}`}
           >
             <MoneyInput
               value={regime.fatturato}

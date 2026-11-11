@@ -39,6 +39,9 @@ const TIPI: { value: TipoVersamento; label: string }[] = [
   { value: 'ecc-saldo', label: 'Eccedenza · saldo (anno prec.)' },
   { value: 'ecc-acconto-1', label: 'Eccedenza · 1° acconto' },
   { value: 'ecc-acconto-2', label: 'Eccedenza · 2° acconto' },
+  { value: 'enpap-soggettivo', label: 'ENPAP · soggettivo (anno prec.)' },
+  { value: 'enpap-integrativo', label: 'ENPAP · integrativo (anno prec.)' },
+  { value: 'enpap-maternita', label: 'ENPAP · maternità (anno prec.)' },
   { value: 'altro', label: 'Altro' },
 ]
 
@@ -64,7 +67,17 @@ const MENU: { label: string; voci: { tipo: TipoVersamento; label: string }[] }[]
       { tipo: 'ecc-acconto-2', label: 'Eccedenza · 2° acconto' },
     ],
   },
+  {
+    label: 'ENPAP',
+    voci: [
+      { tipo: 'enpap-soggettivo', label: 'Soggettivo (anno prec.)' },
+      { tipo: 'enpap-integrativo', label: 'Integrativo (anno prec.)' },
+      { tipo: 'enpap-maternita', label: 'Maternità (anno prec.)' },
+    ],
+  },
 ]
+
+const isEnpap = (tipo: TipoVersamento) => tipo.startsWith('enpap-')
 
 /**
  * Importo suggerito per una tipologia di versamento: quanto si PAGA in cassa
@@ -87,6 +100,10 @@ function suggerimento(tipo: TipoVersamento, calcoli: RisultatoCalcolo | null): n
     case 'ecc-saldo': return calcoli.saldoContributiEccArtCommPrecedente
     case 'ecc-acconto-1':
     case 'ecc-acconto-2': return calcoli.accontiEccArtCommVersatiPerAnnoRif / 2
+    // ENPAP: i contributi di competenza N-1 si versano per intero in N (marzo e ottobre).
+    case 'enpap-soggettivo': return calcoli.datiAnnoPrecedente.totaleContributiEnpapSoggettivo
+    case 'enpap-integrativo': return calcoli.datiAnnoPrecedente.totaleContributiEnpapIntegrativo
+    case 'enpap-maternita': return calcoli.datiAnnoPrecedente.totaleContributiEnpapMaternita
     default: return null
   }
 }
@@ -96,6 +113,7 @@ const TIPI_STIMA: TipoVersamento[] = [
   'gs-saldo', 'gs-acconto-1', 'gs-acconto-2',
   'fissi-1', 'fissi-2', 'fissi-3', 'fissi-4-prec',
   'ecc-saldo', 'ecc-acconto-1', 'ecc-acconto-2',
+  'enpap-soggettivo', 'enpap-maternita',
 ]
 
 const arrotonda = (v: number) => Math.round(v * 100) / 100
@@ -136,11 +154,25 @@ export function ContributiVersati({
     return righeTipo.length >= numeroRate(tipo)
   }
 
+  const nuovaRiga = (tipo: TipoVersamento): VersamentoContributo => ({
+    ...versamentoVuoto(tipo),
+    ...(tipo === 'enpap-integrativo' ? { deducibile: false } : {}),
+  })
+
+  // Le voci ENPAP servono solo con un regime ENPAP nell'anno o nel precedente
+  // (i totali ENPAP del motore sono > 0 solo in quel caso).
+  const haEnpap = calcoli != null && (
+    calcoli.totaleContributiEnpapSoggettivo + calcoli.totaleContributiEnpapMaternita +
+    calcoli.datiAnnoPrecedente.totaleContributiEnpapSoggettivo + calcoli.datiAnnoPrecedente.totaleContributiEnpapMaternita
+  ) > 0.005
+  const tipiVisibili = (t: TipoVersamento, escludiId?: string) =>
+    !isEnpap(t) || haEnpap || dettaglio.some((r) => r.tipo === t && r.id !== escludiId)
+
   const aggiungi = (tipo: TipoVersamento) => {
     if (giaUsato(tipo)) return
     const n = numeroRate(tipo)
     if (n <= 1) {
-      onChangeDettaglio([...dettaglio, versamentoVuoto(tipo)])
+      onChangeDettaglio([...dettaglio, nuovaRiga(tipo)])
       return
     }
     // Rateizzata: crea in un colpo solo le righe per tutte le rate mancanti.
@@ -156,9 +188,9 @@ export function ContributiVersati({
       dettaglio.map((r) => {
         if (r.id !== id) return r
         const next = { ...r, ...patch }
-        // I versamenti obbligatori (tutti tranne 'altro') sono sempre deducibili:
-        // forziamo true per sicurezza, la scelta resta solo per 'altro'.
-        if (next.tipo !== 'altro') next.deducibile = true
+        // I versamenti obbligatori (tutti tranne 'altro') sono sempre deducibili,
+        // salvo l'integrativo ENPAP (rivalsa sul cliente, mai deducibile).
+        if (next.tipo !== 'altro') next.deducibile = next.tipo !== 'enpap-integrativo'
         return next
       }),
     )
@@ -265,7 +297,7 @@ export function ContributiVersati({
                         aggiorna(r.id, { tipo: v })
                       }}
                       // Mostra solo i tipi non già usati altrove (più quello corrente)
-                      options={TIPI.filter((t) => !giaUsato(t.value, r.id))}
+                      options={TIPI.filter((t) => !giaUsato(t.value, r.id) && (t.value === r.tipo || tipiVisibili(t.value, r.id)))}
                     />
                   )}
                 </div>
@@ -301,6 +333,17 @@ export function ContributiVersati({
               </div>
               {/* La deducibilità si chiede SOLO per i versamenti "altro" (volontari):
                   i contributi previdenziali obbligatori sono sempre deducibili. */}
+              {r.tipo === 'enpap-integrativo' && (
+                <p className="flex items-center gap-1.5 text-xs text-slate-600">
+                  Non deducibile
+                  <Tooltip
+                    content="Il contributo integrativo ENPAP è addebitato al cliente in rivalsa: non si deduce dal reddito, quindi non entra nei contributi deducibili."
+                    label="Perché non è deducibile"
+                    posizione="sotto"
+                    allinea="sinistra"
+                  />
+                </p>
+              )}
               {r.tipo === 'altro' && (
                 <div className="space-y-2">
                   <label className="inline-flex items-center gap-1.5 text-xs text-slate-600">
@@ -334,7 +377,7 @@ export function ContributiVersati({
           {/* Aggiunta per categoria: le voci già inserite spariscono dai menu */}
           <div className="flex flex-wrap gap-2">
             {MENU.map((m) => {
-              const disponibili = m.voci.filter((v) => !giaUsato(v.tipo))
+              const disponibili = m.voci.filter((v) => !giaUsato(v.tipo) && tipiVisibili(v.tipo))
               if (disponibili.length === 0) return null // tutte usate → nascondi il menu
               return (
                 <Dropdown

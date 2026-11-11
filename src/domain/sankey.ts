@@ -63,6 +63,16 @@ export interface IngressoSankey {
   contributiFissiArtComm?: number
   /** RisultatoAnno.totaleContributiEccedenzaArtComm */
   contributiEccedenzaArtComm?: number
+  /** RisultatoAnno.totaleContributiEnpapSoggettivo (già compreso in contributiINPS) */
+  contributiEnpapSoggettivo?: number
+  /** RisultatoAnno.totaleContributiEnpapMaternita (già compresa in contributiINPS) */
+  contributiEnpapMaternita?: number
+  /**
+   * RisultatoAnno.totaleContributiEnpapIntegrativo. Rivalsa addebitata al
+   * cliente in fattura: non fa parte del fatturato né dei contributi a carico,
+   * quindi è un nodo a sé, senza nastri.
+   */
+  contributiEnpapIntegrativo?: number
 }
 
 /** Un nodo del grafo, con geometria già risolta. */
@@ -275,11 +285,13 @@ export function ripartisci(ingresso: IngressoSankey) {
   const dalNonImponibile = (valore: number) => valore * (1 - pesoImponibile)
 
   // Suddivisione per gestione: solo le voci effettivamente presenti.
-  const [separata, fissiArtComm, eccedenzaArtComm] = normalizzaFigli(
+  const [separata, fissiArtComm, eccedenzaArtComm, enpapSoggettivo, enpapMaternita] = normalizzaFigli(
     [
       ingresso.contributiSeparata ?? 0,
       ingresso.contributiFissiArtComm ?? 0,
       ingresso.contributiEccedenzaArtComm ?? 0,
+      ingresso.contributiEnpapSoggettivo ?? 0,
+      ingresso.contributiEnpapMaternita ?? 0,
     ],
     contributiINPS,
   )
@@ -294,6 +306,10 @@ export function ripartisci(ingresso: IngressoSankey) {
     separata,
     fissiArtComm,
     eccedenzaArtComm,
+    enpapSoggettivo,
+    enpapMaternita,
+    /** Integrativo ENPAP in rivalsa: fuori dal bilancio fatturato/contributi/imposta. */
+    enpapIntegrativo: clamp(ingresso.contributiEnpapIntegrativo ?? 0),
     /** Quota di ogni destinazione imputata all'imponibile lordo. */
     dalImponibile,
     /** Quota di ogni destinazione imputata alla parte non imponibile. */
@@ -349,6 +365,8 @@ export function costruisciSankey(
       { id: 'gs', etichetta: 'Gestione separata', valore: v.separata, colonna: 3, colore: 'contributi', posizioneEtichetta: 'destra' },
       { id: 'fissi', etichetta: 'Art/Comm fissi', valore: v.fissiArtComm, colonna: 3, colore: 'contributi', posizioneEtichetta: 'destra' },
       { id: 'ecc', etichetta: 'Art/Comm eccedenza', valore: v.eccedenzaArtComm, colonna: 3, colore: 'contributi', posizioneEtichetta: 'destra' },
+      { id: 'enpapSogg', etichetta: 'ENPAP soggettivo', valore: v.enpapSoggettivo, colonna: 3, colore: 'contributi', posizioneEtichetta: 'destra' },
+      { id: 'enpapMat', etichetta: 'ENPAP maternità', valore: v.enpapMaternita, colonna: 3, colore: 'contributi', posizioneEtichetta: 'destra' },
     ] satisfies NodoGrezzo[]
   ).filter((g) => g.valore > SOGLIA_RAMO)
   const mostraGestioni = gestioni.length > 1
@@ -382,6 +400,8 @@ export function costruisciSankey(
       { id: 'netto', etichetta: 'Netto in tasca', valore: v.nettoInTasca, colonna: 2, colore: 'netto', posizioneEtichetta: mostraGestioni ? 'sopra' : 'destra' },
       { id: 'contributi', etichetta: 'Contributi INPS', valore: v.contributiINPS, colonna: 2, colore: 'contributi', posizioneEtichetta: mostraGestioni ? 'sopra' : 'destra' },
       { id: 'imposta', etichetta: 'Imposta sostitutiva', valore: v.imposte, colonna: 2, colore: 'imposta', posizioneEtichetta: mostraGestioni ? 'sopra' : 'destra' },
+      // Rivalsa ENPAP: nodo isolato (nessun nastro), separato dal carico contributivo.
+      { id: 'enpapInt', etichetta: 'ENPAP integrativo (in rivalsa)', valore: v.enpapIntegrativo, colonna: 2, colore: 'neutro', posizioneEtichetta: mostraGestioni ? 'sopra' : 'destra' },
       ...(mostraGestioni ? gestioni : []),
     ] satisfies NodoGrezzo[]
   ).filter((n) => n.valore > SOGLIA_RAMO)
@@ -490,7 +510,8 @@ export function costruisciSankey(
     20,
     opt.altezza - cimaMassima - Math.max(opt.margineVerticale, codaMassima) - spazioMassimo,
   )
-  const scala = altezzaUtile / v.fatturato
+  // L'integrativo in rivalsa è un nodo in più nella colonna 2: la scala lo include.
+  const scala = altezzaUtile / (v.fatturato + v.enpapIntegrativo)
 
   const nodi: NodoSankey[] = []
   for (const c of colonne) {
