@@ -201,7 +201,7 @@ function normalizzaInizioAttivita(raw: unknown): InizioAttivita | null {
  * sia il formato nuovo (mappa `anni`) sia il vecchio mono-anno (migrato). `base`
  * fornisce l'anno di default se quello salvato non è più disponibile.
  */
-function normalizzaInput(o: Record<string, unknown>, base: CalcoloInput): CalcoloInput {
+export function normalizzaInput(o: Record<string, unknown>, base: CalcoloInput): CalcoloInput {
   const anniOk = anniDisponibili()
   const anno = typeof o.anno === 'number' && anniOk.includes(o.anno) ? o.anno : base.anno
   const anni = o.anni !== undefined ? normalizzaAnni(o.anni) : migraDalVecchio(o, anno)

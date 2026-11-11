@@ -51,6 +51,8 @@ export const theme = {
   h3: 'text-base font-semibold text-slate-800',
   labelSmall: 'block text-xs font-medium text-slate-600',
   helpText: 'text-xs text-slate-500',
+  // Blocco di testo preformattato (specifica di importazione, esempi JSON)
+  codeBlock: 'max-h-96 overflow-auto whitespace-pre-wrap rounded-lg border border-slate-200 bg-slate-50 p-3 font-mono text-xs leading-relaxed text-slate-800',
   // Link inline per applicare un valore suggerito a un campo
   btnSuggerimento: 'text-xs font-medium text-blue-600 underline-offset-2 transition-colors hover:text-blue-800 hover:underline',
 

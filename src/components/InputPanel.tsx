@@ -6,6 +6,7 @@ import { GestoreAnni } from '@/components/GestoreAnni'
 import { ContributiVersati } from '@/components/ContributiVersati'
 import { AnagraficaPanel } from '@/components/AnagraficaPanel'
 import { AvvisiInizioAttivita } from '@/components/AvvisiInizioAttivita'
+import { GuidaImport } from '@/components/GuidaImport'
 import { Card, Field, MoneyInput, NumberInput, Select } from '@/components/ui'
 import { anniDisponibili } from '@/data/taxData'
 import type { CalcoloInput, DatiAnno, OpzioniRateazione, RisultatoCalcolo, Scadenza } from '@/domain/types'
@@ -343,6 +344,8 @@ export function InputPanel({ input, calcoli, anagrafica, onChangeAnagrafica, onC
       </div>
 
       <AvvisiInizioAttivita avvisi={avvisiInizioAttivita(input)} />
+
+      <GuidaImport />
 
       {esitoImport && (
         <p className={`text-sm ${esitoImport.ok ? 'text-emerald-700' : 'text-red-700'}`}>
