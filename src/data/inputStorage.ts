@@ -27,7 +27,7 @@ function normalizzaRegime(raw: unknown): Regime {
   if (typeof raw !== 'object' || raw === null) return base
   const o = raw as Record<string, unknown>
 
-  const tipo = o.tipo === 'artigiani' || o.tipo === 'commercianti' || o.tipo === 'enpap' ? o.tipo : 'separata'
+  const tipo = o.tipo === 'artigiani' || o.tipo === 'commercianti' || o.tipo === 'enpap' || o.tipo === 'spettacolo' ? o.tipo : 'separata'
   const aliquotaEnpap =
     typeof o.aliquotaSoggettivoEnpap === 'number' && Number.isInteger(o.aliquotaSoggettivoEnpap) &&
     o.aliquotaSoggettivoEnpap >= 10 && o.aliquotaSoggettivoEnpap <= 30 && (o.aliquotaSoggettivoEnpap - 10) % 2 === 0
@@ -65,7 +65,7 @@ const TIPI_VERS: TipoVersamento[] = [
   'gs-saldo', 'gs-acconto-1', 'gs-acconto-2',
   'fissi-1', 'fissi-2', 'fissi-3', 'fissi-4-prec',
   'ecc-saldo', 'ecc-acconto-1', 'ecc-acconto-2',
-  'enpap-soggettivo', 'enpap-integrativo', 'enpap-maternita', 'altro',
+  'enpap-soggettivo', 'enpap-integrativo', 'enpap-maternita', 'fpls-trattenute', 'altro',
 ]
 
 /** Ricostruisce una riga di versamento valida da dati grezzi. */

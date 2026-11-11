@@ -51,6 +51,23 @@ export interface DatiEnpap {
   scadenzaSaldo: string
 }
 
+/**
+ * Costanti FPLS (Fondo pensioni lavoratori dello spettacolo, ex ENPALS) di un
+ * anno. Campo opzionale: gli anni senza nodo `spettacolo` restano validi.
+ * Fonti: 2026 circolare INPS 6/2026. Attenzione 2025: la soglia della
+ * aliquota aggiuntiva (55448) NON è stata verificata su una circolare INPS.
+ */
+export interface DatiSpettacolo {
+  /** Quota a carico del lavoratore (%), trattenuta dal committente in fattura. */
+  quotaLavoratore: number
+  /** Aliquota aggiuntiva (%) sulla parte di compenso oltre la soglia. */
+  aliquotaAggiuntiva: number
+  /** Soglia annua oltre la quale scatta l'aliquota aggiuntiva. */
+  sogliaAggiuntiva: number
+  /** Massimale annuo di compenso soggetto a contribuzione. */
+  massimale: number
+}
+
 /** Costanti fiscali validate per un singolo anno. */
 export interface DatiAnno {
   minimaleReddito: number
@@ -64,6 +81,7 @@ export interface DatiAnno {
   }
   scadenze: ScadenzeAnno
   enpap?: DatiEnpap
+  spettacolo?: DatiSpettacolo
 }
 
 // ---------------------------------------------------------------------------
@@ -142,6 +160,24 @@ function validaEnpap(anno: string, v: unknown): DatiEnpap {
   return d
 }
 
+function validaSpettacolo(anno: string, v: unknown): DatiSpettacolo {
+  if (typeof v !== 'object' || v === null) {
+    throw new TaxDataError(anno, 'spettacolo', 'atteso oggetto')
+  }
+  const o = v as Record<string, unknown>
+  const n = (k: string) => numeroPositivo(anno, `spettacolo.${k}`, o[k])
+  const d: DatiSpettacolo = {
+    quotaLavoratore: n('quotaLavoratore'),
+    aliquotaAggiuntiva: n('aliquotaAggiuntiva'),
+    sogliaAggiuntiva: n('sogliaAggiuntiva'),
+    massimale: n('massimale'),
+  }
+  if (d.sogliaAggiuntiva > d.massimale) {
+    throw new TaxDataError(anno, 'spettacolo.sogliaAggiuntiva', 'maggiore del massimale')
+  }
+  return d
+}
+
 export function validaAnno(anno: string, v: unknown): DatiAnno {
   if (typeof v !== 'object' || v === null) {
     throw new TaxDataError(anno, '(root)', 'atteso oggetto')
@@ -156,6 +192,7 @@ export function validaAnno(anno: string, v: unknown): DatiAnno {
 
   return {
     ...(o.enpap !== undefined ? { enpap: validaEnpap(anno, o.enpap) } : {}),
+    ...(o.spettacolo !== undefined ? { spettacolo: validaSpettacolo(anno, o.spettacolo) } : {}),
     minimaleReddito: numeroPositivo(anno, 'minimaleReddito', o.minimaleReddito),
     sogliaPrimaFascia: numeroPositivo(anno, 'sogliaPrimaFascia', o.sogliaPrimaFascia),
     aliquotaSeparata: numeroPositivo(anno, 'aliquotaSeparata', o.aliquotaSeparata),
@@ -262,6 +299,9 @@ export function aliquotaContributi(anno: number, tipo: TipoRegime): number {
     case 'enpap':
       // L'aliquota ENPAP è scelta per periodo (Regime.aliquotaSoggettivoEnpap): qui il minimo.
       return d.enpap?.aliquotaSoggettivoMin ?? 0
+    case 'spettacolo':
+      // Nessuna aliquota unica: quota lavoratore e aliquota aggiuntiva sono in datiSpettacolo.
+      return d.spettacolo?.quotaLavoratore ?? 0
   }
 }
 
@@ -276,4 +316,9 @@ export function contributoFissoAnno(anno: number, tipo: TipoRegime): ContributoF
 /** Costanti ENPAP dell'anno, o undefined se l'anno non ha il nodo `enpap`. */
 export function datiEnpap(anno: number): DatiEnpap | undefined {
   return datiAnno(anno).enpap
+}
+
+/** Costanti FPLS dell'anno, o undefined se l'anno non ha il nodo `spettacolo`. */
+export function datiSpettacolo(anno: number): DatiSpettacolo | undefined {
+  return datiAnno(anno).spettacolo
 }

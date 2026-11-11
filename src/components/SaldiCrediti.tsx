@@ -95,6 +95,14 @@ export function SaldiCrediti({ anno, calcoli }: Props) {
       saldo: calcoli.saldoEnpapAnnoCorrente,
       nota: "Soggettivo, integrativo (in rivalsa sul cliente) e maternità, al netto dell'acconto dovuto.",
     },
+    {
+      voce: 'Contributi spettacolo FPLS',
+      dovuto: calcoli.totaleContributiSpettacoloTrattenute,
+      acconti: 0,
+      accontiVersati: 0,
+      saldo: 0,
+      nota: 'Quota lavoratore trattenuta in fattura e versata dal committente: nessun acconto o saldo a tuo carico.',
+    },
   ].filter((r) => r.dovuto > 0.005 || r.acconti > 0.005)
 
   const totaleSaldi =

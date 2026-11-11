@@ -554,3 +554,45 @@ describe('calcola — ENPAP', () => {
     expect(secondo.saldoEnpapAnnoCorrente).toBeCloseTo(856 + 66 - 0.7 * (856 + 66), 6)
   })
 })
+
+describe('calcola — spettacolo FPLS', () => {
+  const spettacolo = (fatturato: number): Regime => ({
+    id: 's',
+    tipo: 'spettacolo',
+    aliquota: 5,
+    coefficiente: 78,
+    meseInizio: 7, giornoInizio: 1,
+    meseFine: 12, giornoFine: 31,
+    fatturato,
+    riduzioneContributi: 'nessuna',
+  })
+  const run = (fatturato: number) =>
+    calcola(mkInput({ anno: 2026, regimiCorrente: [spettacolo(fatturato)], regimiPrecedente: [] }))
+
+  it('sotto soglia: solo quota lavoratore, senza proporzione ai giorni, senza acconti né saldi', () => {
+    const r = run(20000)
+    expect(r.totaleContributiSpettacoloTrattenute).toBeCloseTo(20000 * 0.0919, 6)
+    expect(r.totaleContributiINPS).toBeCloseTo(20000 * 0.0919, 6)
+    expect(r.rateFisse).toEqual([0, 0, 0, 0])
+    expect(r.saldoEnpapAnnoCorrente).toBe(0)
+  })
+
+  it('sopra soglia: aliquota aggiuntiva 1% sulla parte eccedente', () => {
+    const r = run(60000)
+    expect(r.totaleContributiSpettacoloTrattenute).toBeCloseTo(60000 * 0.0919 + (60000 - 56224) * 0.01, 6)
+  })
+
+  it('sopra massimale: compensi eccedenti ignorati', () => {
+    const r = run(200000)
+    expect(r.totaleContributiSpettacoloTrattenute).toBeCloseTo(122295 * 0.0919 + (122295 - 56224) * 0.01, 6)
+  })
+
+  it('più periodi spettacolo: soglia aggiuntiva applicata al fatturato aggregato', () => {
+    const r = calcola(mkInput({
+      anno: 2026,
+      regimiCorrente: [{ ...spettacolo(40000), id: 'a' }, { ...spettacolo(20000), id: 'b' }],
+      regimiPrecedente: [],
+    }))
+    expect(r.totaleContributiSpettacoloTrattenute).toBeCloseTo(run(60000).totaleContributiSpettacoloTrattenute, 6)
+  })
+})

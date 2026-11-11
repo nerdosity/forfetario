@@ -89,6 +89,12 @@
         "scadenzaAcconto": "03-01",
         "scadenzaSaldo": "10-01"
       },
+      "spettacolo": {
+        "quotaLavoratore": 9.19,
+        "aliquotaAggiuntiva": 1,
+        "sogliaAggiuntiva": 55448,
+        "massimale": 120607
+      },
       "scadenze": {
         "rateContributiFissi": ["05-16", "08-20", "11-18", "02-17"],
         "saldoImposte": "06-30",
@@ -126,6 +132,12 @@
         "massimale": 122295,
         "scadenzaAcconto": "03-01",
         "scadenzaSaldo": "10-01"
+      },
+      "spettacolo": {
+        "quotaLavoratore": 9.19,
+        "aliquotaAggiuntiva": 1,
+        "sogliaAggiuntiva": 56224,
+        "massimale": 122295
       },
       "scadenze": {
         "rateContributiFissi": ["05-16", "08-20", "11-16", "02-16"],

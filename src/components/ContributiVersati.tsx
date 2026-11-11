@@ -42,6 +42,7 @@ const TIPI: { value: TipoVersamento; label: string }[] = [
   { value: 'enpap-soggettivo', label: 'ENPAP · soggettivo (anno prec.)' },
   { value: 'enpap-integrativo', label: 'ENPAP · integrativo (anno prec.)' },
   { value: 'enpap-maternita', label: 'ENPAP · maternità (anno prec.)' },
+  { value: 'fpls-trattenute', label: 'Spettacolo FPLS · trattenute in fattura' },
   { value: 'altro', label: 'Altro' },
 ]
 
@@ -75,6 +76,10 @@ const MENU: { label: string; voci: { tipo: TipoVersamento; label: string }[] }[]
       { tipo: 'enpap-maternita', label: 'Maternità (anno prec.)' },
     ],
   },
+  {
+    label: 'Spettacolo FPLS',
+    voci: [{ tipo: 'fpls-trattenute', label: 'Trattenute in fattura' }],
+  },
 ]
 
 const isEnpap = (tipo: TipoVersamento) => tipo.startsWith('enpap-')
@@ -104,6 +109,8 @@ function suggerimento(tipo: TipoVersamento, calcoli: RisultatoCalcolo | null): n
     case 'enpap-soggettivo': return calcoli.datiAnnoPrecedente.totaleContributiEnpapSoggettivo
     case 'enpap-integrativo': return calcoli.datiAnnoPrecedente.totaleContributiEnpapIntegrativo
     case 'enpap-maternita': return calcoli.datiAnnoPrecedente.totaleContributiEnpapMaternita
+    // FPLS: quota trattenuta alla fattura, principio di cassa: trattenute dell'anno corrente.
+    case 'fpls-trattenute': return calcoli.totaleContributiSpettacoloTrattenute
     default: return null
   }
 }
@@ -113,7 +120,7 @@ const TIPI_STIMA: TipoVersamento[] = [
   'gs-saldo', 'gs-acconto-1', 'gs-acconto-2',
   'fissi-1', 'fissi-2', 'fissi-3', 'fissi-4-prec',
   'ecc-saldo', 'ecc-acconto-1', 'ecc-acconto-2',
-  'enpap-soggettivo', 'enpap-maternita',
+  'enpap-soggettivo', 'enpap-maternita', 'fpls-trattenute',
 ]
 
 const arrotonda = (v: number) => Math.round(v * 100) / 100
@@ -165,8 +172,11 @@ export function ContributiVersati({
     calcoli.totaleContributiEnpapSoggettivo + calcoli.totaleContributiEnpapMaternita +
     calcoli.datiAnnoPrecedente.totaleContributiEnpapSoggettivo + calcoli.datiAnnoPrecedente.totaleContributiEnpapMaternita
   ) > 0.005
+  // La voce FPLS serve solo con un periodo spettacolo nell'anno corrente.
+  const haSpettacolo = calcoli != null && calcoli.dettagliRegimiCalcolati.some((r) => r.tipo === 'spettacolo')
   const tipiVisibili = (t: TipoVersamento, escludiId?: string) =>
-    !isEnpap(t) || haEnpap || dettaglio.some((r) => r.tipo === t && r.id !== escludiId)
+    (!isEnpap(t) || haEnpap || dettaglio.some((r) => r.tipo === t && r.id !== escludiId)) &&
+    (t !== 'fpls-trattenute' || haSpettacolo || dettaglio.some((r) => r.tipo === t && r.id !== escludiId))
 
   const aggiungi = (tipo: TipoVersamento) => {
     if (giaUsato(tipo)) return

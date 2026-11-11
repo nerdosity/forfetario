@@ -1,4 +1,4 @@
-import type { CalcoloInput, RisultatoCalcolo } from '@/domain/types'
+import type { CalcoloInput, RisultatoCalcolo, TipoRegime } from '@/domain/types'
 import { datiAnno as datiFiscaliAnno, contributoFissoAnno } from '@/data/taxData'
 import { versatiDaDettaglio, TIPI_ACCONTO } from '@/domain/contributi'
 import type { AnagraficaContribuente } from '@/data/anagraficaStorage'
@@ -20,6 +20,23 @@ import { generaCodeline } from '@/domain/codelineInps'
  */
 
 /** Un valore da riportare in un campo del modello. */
+/** Colonna 6 di LM22: 1 = impresa, 2 = lavoro autonomo. Switch esaustivo su TipoRegime. */
+function tipoAttivitaLM22(tipo: TipoRegime): string {
+  switch (tipo) {
+    case 'artigiani':
+    case 'commercianti':
+      return '1 (impresa)'
+    case 'separata':
+    case 'enpap':
+    case 'spettacolo':
+      return '2 (lavoro autonomo)'
+    default: {
+      const esaustivo: never = tipo
+      return esaustivo
+    }
+  }
+}
+
 export interface CampoDichiarazione {
   /** Rigo leggibile, es. "LM34" o "RS — Contributi". */
   rigo: string
@@ -123,7 +140,7 @@ export function generaRighiDichiarazione(
           rigo: 'LM22',
           colonna: 6,
           descrizione: 'Lavoro autonomo o impresa',
-          valore: regime.tipo === 'separata' ? '2 (lavoro autonomo)' : '1 (impresa)',
+          valore: tipoAttivitaLM22(regime.tipo),
           nota: '1 = reddito d\'impresa (artigiani/commercianti), 2 = lavoro autonomo (professionisti in gestione separata). Da qui i controlli ricavano il reddito d\'impresa per la colonna 3 del quadro RR.',
         },
         {

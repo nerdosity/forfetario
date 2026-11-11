@@ -10,6 +10,8 @@ export function labelTipo(tipo: TipoRegime): string {
       return 'Commercianti'
     case 'enpap':
       return 'ENPAP'
+    case 'spettacolo':
+      return 'Spettacolo FPLS (ex ENPALS)'
   }
 }
 

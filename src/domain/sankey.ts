@@ -73,6 +73,8 @@ export interface IngressoSankey {
    * quindi è un nodo a sé, senza nastri.
    */
   contributiEnpapIntegrativo?: number
+  /** RisultatoAnno.totaleContributiSpettacoloTrattenute (già compreso in contributiINPS) */
+  contributiSpettacolo?: number
 }
 
 /** Un nodo del grafo, con geometria già risolta. */
@@ -285,13 +287,14 @@ export function ripartisci(ingresso: IngressoSankey) {
   const dalNonImponibile = (valore: number) => valore * (1 - pesoImponibile)
 
   // Suddivisione per gestione: solo le voci effettivamente presenti.
-  const [separata, fissiArtComm, eccedenzaArtComm, enpapSoggettivo, enpapMaternita] = normalizzaFigli(
+  const [separata, fissiArtComm, eccedenzaArtComm, enpapSoggettivo, enpapMaternita, spettacolo] = normalizzaFigli(
     [
       ingresso.contributiSeparata ?? 0,
       ingresso.contributiFissiArtComm ?? 0,
       ingresso.contributiEccedenzaArtComm ?? 0,
       ingresso.contributiEnpapSoggettivo ?? 0,
       ingresso.contributiEnpapMaternita ?? 0,
+      ingresso.contributiSpettacolo ?? 0,
     ],
     contributiINPS,
   )
@@ -308,6 +311,7 @@ export function ripartisci(ingresso: IngressoSankey) {
     eccedenzaArtComm,
     enpapSoggettivo,
     enpapMaternita,
+    spettacolo,
     /** Integrativo ENPAP in rivalsa: fuori dal bilancio fatturato/contributi/imposta. */
     enpapIntegrativo: clamp(ingresso.contributiEnpapIntegrativo ?? 0),
     /** Quota di ogni destinazione imputata all'imponibile lordo. */
@@ -363,6 +367,7 @@ export function costruisciSankey(
   const gestioni: NodoGrezzo[] = (
     [
       { id: 'gs', etichetta: 'Gestione separata', valore: v.separata, colonna: 3, colore: 'contributi', posizioneEtichetta: 'destra' },
+      { id: 'fpls', etichetta: 'FPLS quota lavoratore', valore: v.spettacolo, colonna: 3, colore: 'contributi', posizioneEtichetta: 'destra' },
       { id: 'fissi', etichetta: 'Art/Comm fissi', valore: v.fissiArtComm, colonna: 3, colore: 'contributi', posizioneEtichetta: 'destra' },
       { id: 'ecc', etichetta: 'Art/Comm eccedenza', valore: v.eccedenzaArtComm, colonna: 3, colore: 'contributi', posizioneEtichetta: 'destra' },
       { id: 'enpapSogg', etichetta: 'ENPAP soggettivo', valore: v.enpapSoggettivo, colonna: 3, colore: 'contributi', posizioneEtichetta: 'destra' },

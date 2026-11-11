@@ -39,6 +39,7 @@ export function RiepilogoPrecedente({ anno, calcoli }: Props) {
         contributiEnpapSoggettivo={prev.totaleContributiEnpapSoggettivo}
         contributiEnpapMaternita={prev.totaleContributiEnpapMaternita}
         contributiEnpapIntegrativo={prev.totaleContributiEnpapIntegrativo}
+        contributiSpettacolo={prev.totaleContributiSpettacoloTrattenute}
       />
 
       <p className={`mt-5 border-t border-slate-100 pt-4 ${theme.helpText}`}>

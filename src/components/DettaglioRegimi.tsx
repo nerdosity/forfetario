@@ -19,6 +19,7 @@ export function DettaglioRegimi({ anno, calcoli }: Props) {
     calcoli.totaleContributiEccedenzaArtComm > 0.005 && `Eccedenza ${formatEuro(calcoli.totaleContributiEccedenzaArtComm)}`,
     calcoli.totaleContributiEnpapSoggettivo > 0.005 && `ENPAP soggettivo ${formatEuro(calcoli.totaleContributiEnpapSoggettivo)}`,
     calcoli.totaleContributiEnpapMaternita > 0.005 && `ENPAP maternità ${formatEuro(calcoli.totaleContributiEnpapMaternita)}`,
+    calcoli.totaleContributiSpettacoloTrattenute > 0.005 && `FPLS trattenute ${formatEuro(calcoli.totaleContributiSpettacoloTrattenute)}`,
   ].filter(Boolean) as string[]
 
   const haEnpap =
@@ -58,8 +59,24 @@ export function DettaglioRegimi({ anno, calcoli }: Props) {
           contributiEnpapSoggettivo={calcoli.totaleContributiEnpapSoggettivo}
           contributiEnpapMaternita={calcoli.totaleContributiEnpapMaternita}
           contributiEnpapIntegrativo={calcoli.totaleContributiEnpapIntegrativo}
+          contributiSpettacolo={calcoli.totaleContributiSpettacoloTrattenute}
         />
       </div>
+
+      {calcoli.totaleContributiSpettacoloTrattenute > 0.005 && (
+        <div className={`mb-6 ${theme.cardInner}`}>
+          <h3 className={`${theme.h3} mb-3`}>Contributi spettacolo FPLS {anno}</h3>
+          <div className="space-y-2 rounded-lg bg-white p-3">
+            <div className={theme.row}>
+              <span className={`${theme.rowLabel} flex items-center gap-1`}>
+                Quota lavoratore trattenuta in fattura
+                <Tooltip content="Il committente trattiene la quota a carico del lavoratore e la versa all'INPS: nessun acconto, saldo o scadenza a tuo carico. L'importo si dichiara tra i contributi versati." label="Trattenute FPLS" />
+              </span>
+              <span className="font-medium text-slate-600">{formatEuro(calcoli.totaleContributiSpettacoloTrattenute)}</span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {haEnpap && (
         <div className={`mb-6 ${theme.cardInner}`}>
@@ -101,7 +118,7 @@ export function DettaglioRegimi({ anno, calcoli }: Props) {
               <div className="flex flex-wrap items-center gap-1.5">
                 <Badge color="info">{labelTipo(regime.tipo)}</Badge>
                 <Badge color="gray">Imposta {regime.aliquota}%</Badge>
-                {regime.tipo !== 'enpap' && regime.riduzioneContributi !== 'nessuna' && (
+                {regime.tipo !== 'enpap' && regime.tipo !== 'spettacolo' && regime.riduzioneContributi !== 'nessuna' && (
                   <Badge color="warning">Riduzione contributi {regime.riduzioneContributi}%</Badge>
                 )}
               </div>
@@ -116,7 +133,7 @@ export function DettaglioRegimi({ anno, calcoli }: Props) {
 
               <div className={theme.row}>
                 <span className={`${theme.rowLabel} flex items-center gap-1`}>
-                  {regime.tipo === 'enpap' ? 'Contributi ENPAP dovuti (soggettivo e maternità)' : 'Contributi INPS dovuti'}
+                  {regime.tipo === 'enpap' ? 'Contributi ENPAP dovuti (soggettivo e maternità)' : regime.tipo === 'spettacolo' ? 'Trattenute FPLS (quota lavoratore)' : 'Contributi INPS dovuti'}
                   {regime.dettaglioCalcoloContributi && (
                     <Tooltip content={regime.dettaglioCalcoloContributi} label="Dettaglio calcolo contributi" />
                   )}

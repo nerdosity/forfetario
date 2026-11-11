@@ -1,5 +1,5 @@
 /** Tipi di gestione contributiva INPS supportati dal regime forfettario. */
-export type TipoRegime = 'separata' | 'artigiani' | 'commercianti' | 'enpap'
+export type TipoRegime = 'separata' | 'artigiani' | 'commercianti' | 'enpap' | 'spettacolo'
 
 /** Aliquota dell'imposta sostitutiva: 5% (start-up) o 15% (a regime). */
 export type Aliquota = 5 | 15
@@ -199,6 +199,7 @@ export type TipoVersamento =
   | 'enpap-soggettivo'
   | 'enpap-integrativo'
   | 'enpap-maternita'
+  | 'fpls-trattenute'
   | 'altro'
 
 /** Una singola voce di contributo versato durante l'anno. */
@@ -347,6 +348,12 @@ export interface RisultatoAnno {
   totaleContributiEnpapIntegrativo: number
   /** ENPAP: contributo di maternità fisso annuo. */
   totaleContributiEnpapMaternita: number
+  /**
+   * Spettacolo FPLS: quota a carico del lavoratore trattenuta in fattura dal
+   * committente (già compresa in totaleContributiINPS). Nessun acconto, saldo o
+   * scadenza: il versamento all'INPS è del committente.
+   */
+  totaleContributiSpettacoloTrattenute: number
   /**
    * Importo dei contributi fissi per trimestre [1ª, 2ª, 3ª, 4ª], sommato su
    * tutti i regimi Art/Comm dell'anno. Per la 4ª rata il versamento materiale

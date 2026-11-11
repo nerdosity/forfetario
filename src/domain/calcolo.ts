@@ -6,7 +6,7 @@ import type {
   RisultatoCalcolo,
 } from '@/domain/types'
 import { datiDellAnno } from '@/domain/types'
-import { aliquotaContributi, datiAnno, datiEnpap } from '@/data/taxData'
+import { aliquotaContributi, datiAnno, datiEnpap, datiSpettacolo } from '@/data/taxData'
 import type { DatiEnpap } from '@/data/taxData'
 import { giorniPermanenza } from '@/domain/dates'
 import { getMesiInPeriodo, applicaRiduzioneIVS, contributiVersatiEffettivi, rateFissePerTrimestre, baseEccedenzaAcconto, accontoVersatoDaLista } from '@/domain/contributi'
@@ -89,6 +89,11 @@ function calcolaDatiAnno(
   let totaleContributiEnpapSoggettivo = 0
   let totaleContributiEnpapIntegrativo = 0
   let totaleContributiEnpapMaternita = 0
+  let totaleContributiSpettacoloTrattenute = 0
+  const costantiSpettacolo = regimi.some((r) => r.tipo === 'spettacolo') ? datiSpettacolo(anno) : undefined
+  // Spettacolo: soglia aggiuntiva e massimale valgono sul fatturato aggregato
+  // dell'anno; il risultato è ripartito sui periodi in proporzione al fatturato.
+  const fatturatoSpettacolo = regimi.filter((r) => r.tipo === 'spettacolo').reduce((s, r) => s + r.fatturato, 0)
 
   for (const regime of regimi) {
     const giorniRegime = giorniPermanenza(
@@ -131,6 +136,28 @@ Integrativo (rivalsa sul cliente): ${enpap.integrativo.toFixed(2)} €
 Maternità: ${enpap.maternita.toFixed(2)} €`
             : '')
         : 'ENPAP: costanti non disponibili per questo anno'
+    } else if (regime.tipo === 'spettacolo') {
+      // Trattenute alla fattura: dipendono dai compensi, non dal tempo, quindi
+      // nessuna proporzione ai giorni. Soglia e massimale si applicano al fatturato aggregato dell'anno.
+      if (costantiSpettacolo) {
+        const base = Math.min(fatturatoSpettacolo, costantiSpettacolo.massimale)
+        const quotaAnno = (base * costantiSpettacolo.quotaLavoratore) / 100
+        const aggiuntivaAnno =
+          (Math.max(0, base - costantiSpettacolo.sogliaAggiuntiva) * costantiSpettacolo.aliquotaAggiuntiva) / 100
+        const quotaPeriodo = fatturatoSpettacolo > 0 ? regime.fatturato / fatturatoSpettacolo : 0
+        const quota = quotaAnno * quotaPeriodo
+        const aggiuntiva = aggiuntivaAnno * quotaPeriodo
+        contributiRegimeINPS = quota + aggiuntiva
+        dettaglioCalcoloContributi =
+          `FPLS quota lavoratore: ${base.toFixed(2)} € × ${costantiSpettacolo.quotaLavoratore}% = ${quota.toFixed(2)} €` +
+          `
+Aliquota aggiuntiva ${costantiSpettacolo.aliquotaAggiuntiva}% oltre ${costantiSpettacolo.sogliaAggiuntiva} €: ${aggiuntiva.toFixed(2)} €` +
+          `
+Trattenute dal committente in fattura: nessun acconto, saldo o scadenza`
+      } else {
+        dettaglioCalcoloContributi = 'Spettacolo FPLS: costanti non disponibili per questo anno'
+      }
+      totaleContributiSpettacoloTrattenute += contributiRegimeINPS
     } else {
       // Artigiani / commercianti: contributi fissi (mensili) + eccedenza
       const { minimaleReddito, sogliaPrimaFascia } = datiAnno(anno)
@@ -235,6 +262,7 @@ Maternità: ${enpap.maternita.toFixed(2)} €`
     totaleContributiEnpapSoggettivo,
     totaleContributiEnpapIntegrativo,
     totaleContributiEnpapMaternita,
+    totaleContributiSpettacoloTrattenute,
     rateFisse,
   }
 }
@@ -253,6 +281,7 @@ const annoVuoto = (): RisultatoAnno => ({
   totaleContributiEnpapSoggettivo: 0,
   totaleContributiEnpapIntegrativo: 0,
   totaleContributiEnpapMaternita: 0,
+  totaleContributiSpettacoloTrattenute: 0,
   rateFisse: [0, 0, 0, 0],
 })
 

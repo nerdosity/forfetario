@@ -8,7 +8,7 @@ import { Field, NumberInput, MoneyInput, Select } from '@/components/ui'
 import { datiEnpap } from '@/data/taxData'
 import { theme } from '@/theme'
 
-const TIPI: TipoRegime[] = ['separata', 'artigiani', 'commercianti', 'enpap']
+const TIPI: TipoRegime[] = ['separata', 'artigiani', 'commercianti', 'enpap', 'spettacolo']
 const ALIQUOTE: Aliquota[] = [5, 15]
 const COEFFICIENTI = [40, 54, 62, 67, 78, 86]
 
@@ -106,7 +106,7 @@ export function RegimeEditor({ titolo, anno, regimi, onChange }: RegimeEditorPro
           <Field
             label="Tipo regime"
             small
-            info="Gestione INPS: separata (percentuale flat sul reddito) oppure artigiani/commercianti (contributi fissi mensili più contributi sull'eccedenza del minimale). ENPAP: cassa previdenziale degli psicologi."
+            info="Gestione INPS: separata (percentuale flat sul reddito) oppure artigiani/commercianti (contributi fissi mensili più contributi sull'eccedenza del minimale). ENPAP: cassa previdenziale degli psicologi. Spettacolo FPLS: lavoratori dello spettacolo, con contributi trattenuti in fattura dal committente."
           >
             <Select<TipoRegime>
               small
@@ -116,7 +116,7 @@ export function RegimeEditor({ titolo, anno, regimi, onChange }: RegimeEditorPro
             />
           </Field>
 
-          {regime.tipo !== 'separata' && regime.tipo !== 'enpap' && (
+          {regime.tipo !== 'separata' && regime.tipo !== 'enpap' && regime.tipo !== 'spettacolo' && (
             <Field
               label="Riduzione contributi"
               small
@@ -222,7 +222,7 @@ export function RegimeEditor({ titolo, anno, regimi, onChange }: RegimeEditorPro
 
           <Field
             label="Fatturato (compensi incassati nel periodo)"
-            info={`Totale dei compensi incassati nel periodo, al lordo di imposte e contributi. È il dato di partenza: l'imponibile si ottiene applicando il coefficiente di redditività.${regime.tipo === 'enpap' ? " Per l'ENPAP inserisci l'importo al netto dell'integrativo 2% addebitato in fattura." : ''}`}
+            info={`Totale dei compensi incassati nel periodo, al lordo di imposte e contributi. È il dato di partenza: l'imponibile si ottiene applicando il coefficiente di redditività.${regime.tipo === 'enpap' ? " Per l'ENPAP inserisci l'importo al netto dell'integrativo 2% addebitato in fattura." : ''}${regime.tipo === 'spettacolo' ? ' Per lo spettacolo FPLS: compensi lordi fatturati a committenti italiani che versano il FPLS; la quota trattenuta in fattura si deduce come versata.' : ''}`}
           >
             <MoneyInput
               value={regime.fatturato}
