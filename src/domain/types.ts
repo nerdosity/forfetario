@@ -281,11 +281,8 @@ export function datiAnnoVuoto(regimi: Regime[]): DatiAnno {
   }
 }
 
-/** Mese e anno di inizio dell'attività (mese 1-12). */
-export interface InizioAttivita {
-  anno: number
-  mese: number
-}
+/** Data di inizio dell'attività in formato ISO "AAAA-MM-GG". */
+export type InizioAttivita = string
 
 /**
  * Tutti gli input che alimentano il motore di calcolo.

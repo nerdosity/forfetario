@@ -186,14 +186,14 @@ function migraDalVecchio(o: Record<string, unknown>, anno: number): Record<numbe
   return anni
 }
 
-/** Inizio attività valido (anno intero plausibile, mese 1-12) oppure null. */
+/** Inizio attività valido (stringa ISO AAAA-MM-GG, anno 1950-2200) oppure null. */
 function normalizzaInizioAttivita(raw: unknown): InizioAttivita | null {
-  if (typeof raw !== 'object' || raw === null) return null
-  const o = raw as Record<string, unknown>
-  const { anno, mese } = o
-  if (typeof anno !== 'number' || !Number.isInteger(anno) || anno < 1950 || anno > 2200) return null
-  if (typeof mese !== 'number' || !Number.isInteger(mese) || mese < 1 || mese > 12) return null
-  return { anno, mese }
+  if (typeof raw !== 'string') return null
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw)
+  if (!m) return null
+  const [anno, mese, giorno] = [Number(m[1]), Number(m[2]), Number(m[3])]
+  if (anno < 1950 || anno > 2200 || mese < 1 || mese > 12 || giorno < 1 || giorno > 31) return null
+  return raw
 }
 
 /**

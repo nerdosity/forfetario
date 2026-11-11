@@ -20,16 +20,16 @@ describe('avvisiInizioAttivita', () => {
     expect(avvisiInizioAttivita(input(2030, { aliquota: 5 }, null))).toEqual([])
   })
   it('segnala il 5% oltre i 5 anni e il 5% prima dell\'inizio', () => {
-    const a = avvisiInizioAttivita(input(2030, { aliquota: 5 }, { anno: 2025, mese: 3 }))
+    const a = avvisiInizioAttivita(input(2030, { aliquota: 5 }, '2025-03-15'))
     expect(a.map((x) => x.id)).toEqual(['startup-scaduto-2030'])
     expect(a[0].messaggio).toContain('dal 2030 si applica il 15%')
-    expect(avvisiInizioAttivita(input(2024, { aliquota: 5 }, { anno: 2025, mese: 3 })).map((x) => x.id))
+    expect(avvisiInizioAttivita(input(2024, { aliquota: 5 }, '2025-03-15')).map((x) => x.id))
       .toEqual(['precedente-inizio-2024'])
-    expect(avvisiInizioAttivita(input(2029, { aliquota: 5 }, { anno: 2025, mese: 3 }))).toEqual([])
+    expect(avvisiInizioAttivita(input(2029, { aliquota: 5 }, '2025-03-15'))).toEqual([])
   })
   it('segnala la riduzione 50% oltre 36 mesi', () => {
     const r: Partial<Regime> = { riduzioneContributi: '50', meseInizio: 4 }
-    expect(avvisiInizioAttivita(input(2028, r, { anno: 2025, mese: 3 }))).toHaveLength(1)
-    expect(avvisiInizioAttivita(input(2028, { ...r, meseInizio: 2 }, { anno: 2025, mese: 3 }))).toEqual([])
+    expect(avvisiInizioAttivita(input(2028, r, '2025-03-15'))).toHaveLength(1)
+    expect(avvisiInizioAttivita(input(2028, { ...r, meseInizio: 2 }, '2025-03-15'))).toEqual([])
   })
 })

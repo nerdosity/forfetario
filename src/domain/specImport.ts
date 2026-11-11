@@ -12,7 +12,7 @@ Il file è un oggetto JSON con questi campi di primo livello.
 - anno (intero): anno di riferimento selezionato, ad esempio 2025.
 - anni (oggetto): mappa "anno solare" -> dati di quell'anno. Le chiavi sono gli anni come stringhe ("2024", "2025"). Ogni anno contiene i regimi di competenza di quell'anno e i versamenti effettuati DURANTE quell'anno solare (principio di cassa).
 - rateazioniImposta (oggetto): scelte di rateazione, per chiave. Chiavi possibili: "saldo-AAAA", "acconto1-AAAA" (imposta), "gs-saldo-AAAA", "gs-acconto1-AAAA", "ecc-saldo-AAAA", "ecc-acconto1-AAAA" (contributi), con AAAA anno di competenza. Valore: { "inizio": "giugno" | "luglio", "numeroRate": intero >= 2 }. Se non ci sono rateazioni usare {}.
-- inizioAttivita (oggetto | null): { "anno": intero, "mese": 1-12 }, mese e anno di apertura della partita IVA. null se non noto.
+- inizioAttivita (stringa | null): data di apertura della partita IVA in formato "AAAA-MM-GG". null se non nota.
 
 ## Dati di un anno (valore di ogni chiave di "anni")
 
@@ -127,7 +127,7 @@ export const ESEMPIO_IMPORT = {
     },
   },
   rateazioniImposta: {},
-  inizioAttivita: { anno: 2022, mese: 3 },
+  inizioAttivita: '2022-03-01',
 }
 
 export const PROMPT_IMPORT = `Sei un assistente che prepara i dati di un contribuente in regime forfettario italiano per l'importazione in un'applicazione di calcolo di imposte e contributi. Ti allego documenti (vecchia dichiarazione dei redditi, PDF dei modelli F24, movimenti bancari). Devi produrre un unico file JSON nel formato descritto dalla specifica qui sotto.

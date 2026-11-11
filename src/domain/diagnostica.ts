@@ -11,8 +11,12 @@ export interface Avviso {
  * se il campo non è compilato. Non influisce sui calcoli.
  */
 export function avvisiInizioAttivita(input: CalcoloInput): Avviso[] {
-  const inizio = input.inizioAttivita
-  if (!inizio) return []
+  const iso = input.inizioAttivita
+  if (!iso) return []
+  const annoInizio = Number(iso.slice(0, 4))
+  const meseInizioAtt = Number(iso.slice(5, 7))
+  if (!Number.isFinite(annoInizio) || !Number.isFinite(meseInizioAtt)) return []
+  const inizio = { anno: annoInizio, mese: meseInizioAtt }
   const avvisi: Avviso[] = []
   const indiceInizio = inizio.anno * 12 + (inizio.mese - 1)
 
